@@ -1,0 +1,19 @@
+# Core Financier — Antigravity Rules
+# Ce fichier est lu automatiquement par Antigravity à chaque session.
+# NE PAS MODIFIER sans mettre à jour AGENTS.md en parallèle.
+
+project: Core Financier
+description: Système de gestion financière pour SODICA SARL (PME camerounaise)
+stack: Spring Boot 3.2 + Vue.js 3 + MySQL 8 (XAMPP)
+
+rules:
+  - Controllers dépendent UNIQUEMENT des interfaces (package service/interfaces), jamais des impl
+  - Toujours utiliser les DTOs entre controller et service, jamais les entités JPA
+  - @Transactional sur toutes les méthodes de service qui modifient des données
+  - Après chaque action sensible appeler journalAuditService.enregistrer(...)
+  - Seuil PDG lu depuis table parametrage (clé SEUIL_APPROBATION_PDG), jamais hardcodé
+  - Vérifier séparation des tâches : saisi_par ≠ valide_par ≠ approuve_par_pdg ≠ execute_par
+  - Frontend : Composition API <script setup> uniquement, jamais Options API
+  - Profil dev pour XAMPP local : spring.profiles.active=dev
+
+context_file: AGENTS.md

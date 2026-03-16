@@ -1,0 +1,10 @@
+package com.corefi.dto.request.auth;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class RefreshTokenRequest {
+    @NotBlank(message = "Le refresh token est requis")
+    private String refreshToken;
+}
