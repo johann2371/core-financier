@@ -49,6 +49,7 @@ public class Decaissement {
 
     private String beneficiaire;
     private String reference;
+    private String motif; // Raison de la demande de décaissement
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

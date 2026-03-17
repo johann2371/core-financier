@@ -1,33 +1,29 @@
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+# ========== BACKEND ==========
+backend/target/
+backend/*.jar
+backend/*.war
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+backend/src/main/resources/application-prod.properties
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# ========== FRONTEND ==========
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.production
 
-### IntelliJ IDEA ###
-.idea
-*.iws
+# ========== IDE ==========
+.idea/
 *.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
 .vscode/
+*.suo
+*.user
+
+# ========== OS ==========
+.DS_Store
+Thumbs.db
+
+# ========== SÉCURITÉ — ne jamais pusher ==========
+*.env
+application-prod.properties

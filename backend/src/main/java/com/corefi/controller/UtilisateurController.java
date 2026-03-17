@@ -1,7 +1,7 @@
 package com.corefi.controller;
 
 import com.corefi.dto.request.utilisateur.UtilisateurCreateRequest;
-import com.corefi.entity.Utilisateur;
+import com.corefi.dto.response.utilisateur.UtilisateurResponse;
 import com.corefi.service.interfaces.IUtilisateurService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,18 +20,29 @@ public class UtilisateurController {
     private final IUtilisateurService utilisateurService;
 
     @GetMapping
-    public ResponseEntity<List<Utilisateur>> findAll() {
+    public ResponseEntity<List<UtilisateurResponse>> findAll() {
         return ResponseEntity.ok(utilisateurService.findAll());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<UtilisateurResponse> findById(@PathVariable Long id) {
+        return ResponseEntity.ok(utilisateurService.findById(id));
+    }
+
     @PostMapping
-    public ResponseEntity<Utilisateur> creer(@Valid @RequestBody UtilisateurCreateRequest request) {
+    public ResponseEntity<UtilisateurResponse> creer(@Valid @RequestBody UtilisateurCreateRequest request) {
         return ResponseEntity.ok(utilisateurService.creer(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Utilisateur> mettreAJour(@PathVariable Long id,
+    public ResponseEntity<UtilisateurResponse> mettreAJour(@PathVariable Long id,
             @Valid @RequestBody UtilisateurCreateRequest request) {
         return ResponseEntity.ok(utilisateurService.mettreAJour(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> desactiver(@PathVariable Long id) {
+        utilisateurService.desactiver(id);
+        return ResponseEntity.noContent().build();
     }
 }

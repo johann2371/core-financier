@@ -1,6 +1,6 @@
 package com.corefi.controller;
 
-import com.corefi.entity.CompteFinancier;
+import com.corefi.dto.response.compte.CompteFinancierResponse;
 import com.corefi.service.interfaces.ICompteFinancierService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +16,12 @@ public class CompteFinancierController {
     private final ICompteFinancierService compteFinancierService;
 
     @GetMapping
-    public ResponseEntity<List<CompteFinancier>> findAll() {
+    public ResponseEntity<List<CompteFinancierResponse>> findAll() {
         return ResponseEntity.ok(compteFinancierService.findAll());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<CompteFinancierResponse> findById(@PathVariable Long id) {
+        return ResponseEntity.ok(compteFinancierService.findById(id));
     }
 }

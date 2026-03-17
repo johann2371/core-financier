@@ -1,10 +1,9 @@
 package com.corefi.service.interfaces;
 
-import com.corefi.entity.CompteFinancier;
+import com.corefi.dto.response.compte.CompteFinancierResponse;
 import java.util.List;
 
 public interface ICompteFinancierService {
-    List<CompteFinancier> findAll();
-
-    CompteFinancier findById(Long id);
+    List<CompteFinancierResponse> findAll();
+    CompteFinancierResponse findById(Long id);
 }

@@ -1,17 +1,13 @@
 package com.corefi.service.interfaces;
 
 import com.corefi.dto.request.utilisateur.UtilisateurCreateRequest;
-import com.corefi.entity.Utilisateur;
+import com.corefi.dto.response.utilisateur.UtilisateurResponse;
 import java.util.List;
 
 public interface IUtilisateurService {
-    Utilisateur creer(UtilisateurCreateRequest request);
-
-    Utilisateur mettreAJour(Long id, UtilisateurCreateRequest request);
-
-    Utilisateur findById(Long id);
-
-    List<Utilisateur> findAll();
-
+    UtilisateurResponse creer(UtilisateurCreateRequest request);
+    UtilisateurResponse mettreAJour(Long id, UtilisateurCreateRequest request);
+    UtilisateurResponse findById(Long id);
+    List<UtilisateurResponse> findAll();
     void desactiver(Long id);
 }
