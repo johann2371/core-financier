@@ -1,5 +1,6 @@
 package com.corefi.config;
 
+import com.corefi.security.JwtAuthenticationEntryPoint;
 import com.corefi.security.JwtAuthenticationFilter;
 import com.corefi.security.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class SecurityConfig {
 
     private final UserDetailsServiceImpl userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint unauthorizedHandler;
     private final PasswordEncoder passwordEncoder;
 
     // ── Fournisseur d'authentification basé sur la BD ──────────────────────
@@ -48,10 +50,13 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> {})
+            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()   // login & refresh publics
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs").permitAll() // Swagger
+                .requestMatchers("/error").permitAll()         // Évite le faux 401 sur les erreurs
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())

@@ -35,4 +35,11 @@ public class EncaissementController {
     public ResponseEntity<EncaissementResponse> creer(@Valid @RequestBody EncaissementCreateRequest request) {
         return ResponseEntity.ok(encaissementService.creer(request));
     }
+
+    @PostMapping("/{id}/affecter")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE')")
+    public ResponseEntity<Void> affecter(@PathVariable Long id, @Valid @RequestBody List<com.corefi.dto.request.encaissement.AffectationRequest> affectations) {
+        encaissementService.affecter(id, affectations);
+        return ResponseEntity.ok().build();
+    }
 }

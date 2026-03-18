@@ -1,5 +1,7 @@
 package com.corefi.exception;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -9,8 +11,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleNotFound(ResourceNotFoundException ex) {
@@ -45,4 +49,12 @@ public class GlobalExceptionHandler {
         errorResponse.put("error", message);
         return ResponseEntity.status(status).body(errorResponse);
     }
+
+    // Catch-all : affiche les erreurs 500 inattendues dans les logs
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> handleGenericException(Exception ex) {
+        log.error("ERREUR 500 NON GÉRÉE : ", ex);
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Erreur interne : " + ex.getMessage());
+    }
 }
+
