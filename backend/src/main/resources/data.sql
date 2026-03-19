@@ -22,3 +22,18 @@ VALUES
     ('DUREE_SESSION_MINUTES',       '60',     'Durée de validité du token JWT en minutes'),
     ('MAX_TENTATIVES_CONNEXION',    '5',      'Nombre de tentatives avant blocage du compte'),
     ('DUREE_BLOCAGE_MINUTES',       '30',     'Durée du blocage de compte en minutes');
+
+-- 4. Comptes financiers par défaut pour les tests
+INSERT IGNORE INTO compte_financier (id, type, numero, libelle, solde, devise_id, actif)
+VALUES
+    (1, 'BANQUE', 'BQ-001', 'Compte Courant Société Générale', 15000000.00, 1, true),
+    (2, 'CAISSE', 'CA-001', 'Caisse Principale siège', 500000.00, 1, true);
+
+INSERT IGNORE INTO compte_bancaire (banque, agence, iban, bic, type_compte, id)
+VALUES
+    ('Société Générale', 'Agence Yaoundé', 'CM21 1000 1000 1000', 'SGCMCM', 'COURANT', 1);
+
+INSERT IGNORE INTO caisse (emplacement, solde_limite, id)
+VALUES
+    ('Siège Social Yaoundé', 2000000.00, 2);
+
