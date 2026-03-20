@@ -152,6 +152,12 @@ public class FactureServiceImpl implements IFactureService {
         facture.setStatut(StatutFacture.VALIDEE);
         facture.setValidePar(validePar);
 
+        // Ajout au solde du Tiers
+        Tiers tiers = facture.getTiers();
+        if (tiers.getSolde() == null) tiers.setSolde(java.math.BigDecimal.ZERO);
+        tiers.setSolde(tiers.getSolde().add(facture.getMontantTtc()));
+        tiersRepository.save(tiers);
+
         Facture saved = factureRepository.save(facture);
 
         journalAuditService.enregistrer(

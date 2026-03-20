@@ -1,3 +1,4 @@
+com\corefi\config\WebSocketConfig.class
 com\corefi\repository\TiersRepository.class
 com\corefi\entity\Encaissement.class
 com\corefi\enums\StatutDecaissement.class
@@ -16,6 +17,7 @@ com\corefi\dto\request\tiers\TiersCreateRequest.class
 com\corefi\repository\DeviseRepository.class
 com\corefi\dto\request\auth\LoginRequest.class
 com\corefi\config\SwaggerConfig.class
+com\corefi\service\interfaces\INotificationService.class
 com\corefi\dto\response\auth\AuthResponse.class
 com\corefi\entity\LigneFacture.class
 com\corefi\CoreFinancierApplication.class
@@ -29,6 +31,7 @@ com\corefi\repository\JournalAuditRepository.class
 com\corefi\service\interfaces\ITableauBordService.class
 com\corefi\security\JwtAuthenticationFilter.class
 com\corefi\service\impl\FactureServiceImpl.class
+com\corefi\entity\Notification.class
 com\corefi\entity\TauxChange.class
 com\corefi\service\impl\AuthServiceImpl.class
 com\corefi\controller\DecaissementController.class
@@ -36,6 +39,7 @@ com\corefi\entity\Facture.class
 com\corefi\entity\CompteBancaire.class
 com\corefi\exception\SeuilPDGRequiredException.class
 com\corefi\exception\SoldeInsuffisantException.class
+com\corefi\service\interfaces\IPdfService.class
 com\corefi\exception\WorkflowException.class
 com\corefi\controller\UtilisateurController.class
 com\corefi\mapper\EncaissementMapper.class
@@ -61,6 +65,7 @@ com\corefi\entity\Caisse.class
 com\corefi\dto\request\decaissement\DecaissementCreateRequest.class
 com\corefi\controller\CompteFinancierController.class
 com\corefi\dto\response\decaissement\DecaissementResponse.class
+com\corefi\repository\NotificationRepository.class
 com\corefi\service\impl\JournalAuditServiceImpl.class
 com\corefi\repository\ParametrageRepository.class
 com\corefi\config\SecurityConfig.class
@@ -70,12 +75,14 @@ com\corefi\dto\request\decaissement\ValidationRFRequest.class
 com\corefi\entity\JournalAudit.class
 com\corefi\dto\request\facture\LigneFactureRequest.class
 com\corefi\repository\LigneFactureRepository.class
+com\corefi\service\impl\NotificationServiceImpl.class
 com\corefi\config\DataInitializer.class
 com\corefi\dto\request\encaissement\AffectationRequest.class
 com\corefi\entity\Tiers.class
 com\corefi\dto\request\encaissement\EncaissementCreateRequest.class
 com\corefi\entity\CompteFinancier.class
 com\corefi\repository\EncaissementRepository.class
+com\corefi\controller\NotificationController.class
 com\corefi\entity\Parametrage.class
 com\corefi\controller\FactureController.class
 com\corefi\entity\MouvementCompte.class
@@ -93,6 +100,7 @@ com\corefi\enums\StatutEncaissement.class
 com\corefi\repository\AffectationPaiementRepository.class
 com\corefi\dto\response\encaissement\EncaissementResponse.class
 com\corefi\entity\Decaissement.class
+com\corefi\service\impl\PdfServiceImpl.class
 com\corefi\mapper\CompteFinancierMapper.class
 com\corefi\repository\CompteFinancierRepository.class
 com\corefi\service\impl\CompteFinancierServiceImpl.class

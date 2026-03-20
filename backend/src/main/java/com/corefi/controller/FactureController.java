@@ -20,6 +20,17 @@ import java.util.List;
 public class FactureController {
 
     private final IFactureService factureService;
+    private final com.corefi.service.interfaces.IPdfService pdfService;
+
+    @GetMapping("/{id}/pdf")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG')")
+    public ResponseEntity<byte[]> genererPdf(@PathVariable Long id) {
+        byte[] pdfBytes = pdfService.genererFacturePdf(id);
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "facture_" + id + ".pdf");
+        return new ResponseEntity<>(pdfBytes, headers, org.springframework.http.HttpStatus.OK);
+    }
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG')")

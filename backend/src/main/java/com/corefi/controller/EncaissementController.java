@@ -17,6 +17,17 @@ import java.util.List;
 public class EncaissementController {
 
     private final IEncaissementService encaissementService;
+    private final com.corefi.service.interfaces.IPdfService pdfService;
+
+    @GetMapping("/{id}/recu/pdf")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE', 'CAISSIER')")
+    public ResponseEntity<byte[]> genererRecuPdf(@PathVariable Long id) {
+        byte[] pdfBytes = pdfService.genererRecuEncaissementPdf(id);
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "recu_encaissement_" + id + ".pdf");
+        return new ResponseEntity<>(pdfBytes, headers, org.springframework.http.HttpStatus.OK);
+    }
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE', 'RESPONSABLE_FINANCIER', 'PDG', 'CAISSIER')")
@@ -31,13 +42,13 @@ public class EncaissementController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE', 'CAISSIER')")
     public ResponseEntity<EncaissementResponse> creer(@Valid @RequestBody EncaissementCreateRequest request) {
         return ResponseEntity.ok(encaissementService.creer(request));
     }
 
     @PostMapping("/{id}/affecter")
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE', 'CAISSIER')")
     public ResponseEntity<Void> affecter(@PathVariable Long id, @Valid @RequestBody List<com.corefi.dto.request.encaissement.AffectationRequest> affectations) {
         encaissementService.affecter(id, affectations);
         return ResponseEntity.ok().build();

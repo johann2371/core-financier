@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "tiers")
@@ -37,6 +38,9 @@ public class Tiers {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "devise_defaut_id")
     private Devise deviseDefaut;
+
+    @Column(precision = 18, scale = 2)
+    private BigDecimal solde = BigDecimal.ZERO;
 
     private boolean actif = true;
 }

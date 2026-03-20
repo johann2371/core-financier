@@ -14,6 +14,7 @@ public class TiersResponse {
     private String ville;
     private String pays;
     private boolean actif;
+    private Double solde;
 
     // Champs spécifiques CLIENT
     private String typeClient;

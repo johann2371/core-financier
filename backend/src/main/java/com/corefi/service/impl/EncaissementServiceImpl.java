@@ -160,6 +160,12 @@ public class EncaissementServiceImpl implements IEncaissementService {
                 facture.setStatut(StatutFacture.PARTIELLEMENT_PAYEE);
             }
             factureRepository.save(facture);
+
+            // Mettre à jour le solde du tiers (diminue la dette du client)
+            Tiers client = facture.getTiers();
+            if (client.getSolde() == null) client.setSolde(java.math.BigDecimal.ZERO);
+            client.setSolde(client.getSolde().subtract(aff.getMontantAffecte()));
+            tiersRepository.save(client);
         }
 
         // Vérifier que le total affecté ne dépasse pas le montant de l'encaissement

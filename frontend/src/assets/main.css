@@ -1,0 +1,49 @@
+/* 
+  Palette stricte de 4 couleurs (Thème "Clair Corporatif Minimaliste")
+  1. Base Background: #f8fafc (Slate 50)
+  2. Surface/Card: #ffffff (White)
+  3. Primary Accent: #1d4ed8 (Blue 700)
+  4. Text: #1e293b (Slate 800)
+*/
+
+:root {
+  --c-bg: #f8fafc;
+  --c-surface: #ffffff;
+  --c-primary: #1d4ed8;
+  --c-text: #1e293b;
+  
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--c-bg);
+  color: var(--c-text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--c-primary);
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+a:hover {
+  opacity: 0.8;
+}
+
+button {
+  font-family: inherit;
+}
+
+input {
+  font-family: inherit;
+}

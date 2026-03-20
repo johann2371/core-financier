@@ -35,6 +35,7 @@ public class DecaissementServiceImpl implements IDecaissementService {
     private final UtilisateurRepository utilisateurRepository;
     private final DecaissementMapper decaissementMapper;
     private final IJournalAuditService journalAuditService;
+    private final com.corefi.service.interfaces.INotificationService notificationService;
 
     // Seuil au-delà duquel l'approbation du PDG est requise (en XAF)
     private static final BigDecimal SEUIL_PDG = new BigDecimal("500000");
@@ -105,6 +106,11 @@ public class DecaissementServiceImpl implements IDecaissementService {
         journalAuditService.enregistrer("UPDATE", "Decaissement", id,
                 "statut=BROUILLON", "statut=EN_ATTENTE", null);
 
+        notificationService.creerEtEnvoyer(
+                "Nouveau décaissement à valider",
+                "Le décaissement " + d.getNumero() + " de " + d.getMontant() + " XAF a été soumis pour validation.",
+                "RESPONSABLE_FINANCIER");
+
         return decaissementMapper.toResponse(saved);
     }
 
@@ -136,6 +142,18 @@ public class DecaissementServiceImpl implements IDecaissementService {
 
         journalAuditService.enregistrer("UPDATE", "Decaissement", id,
                 "statut=EN_ATTENTE", "statut=" + saved.getStatut().name(), null);
+
+        if (d.isSeuilPdgRequis()) {
+            notificationService.creerEtEnvoyer(
+                "Approbation requise",
+                "Le décaissement " + d.getNumero() + " (" + d.getMontant() + " XAF) nécessite votre approbation PDG.",
+                "PDG");
+        } else {
+            notificationService.creerEtEnvoyer(
+                "Paiement à exécuter",
+                "Le décaissement " + d.getNumero() + " a été validé et attend votre exécution en caisse.",
+                "CAISSIER");
+        }
 
         return decaissementMapper.toResponse(saved);
     }
@@ -189,6 +207,11 @@ public class DecaissementServiceImpl implements IDecaissementService {
 
         journalAuditService.enregistrer("UPDATE", "Decaissement", id,
                 "statut=EN_ATTENTE_PDG", "statut=VALIDEE_PDG", null);
+
+        notificationService.creerEtEnvoyer(
+                "Paiement à exécuter",
+                "Le décaissement " + d.getNumero() + " a été approuvé par le PDG et attend votre exécution en caisse.",
+                "CAISSIER");
 
         return decaissementMapper.toResponse(saved);
     }
@@ -254,6 +277,12 @@ public class DecaissementServiceImpl implements IDecaissementService {
         // Débiter le compte (simulation)
         compte.setSolde(compte.getSolde().subtract(d.getMontant()));
         compteFinancierRepository.save(compte);
+
+        // Soustraire du solde fournisseur (on a payé notre dette)
+        Tiers fournisseur = d.getFournisseur();
+        if (fournisseur.getSolde() == null) fournisseur.setSolde(java.math.BigDecimal.ZERO);
+        fournisseur.setSolde(fournisseur.getSolde().subtract(d.getMontant()));
+        tiersRepository.save(fournisseur);
 
         // Mettre à jour le décaissement
         d.setStatut(StatutDecaissement.EXECUTEE);

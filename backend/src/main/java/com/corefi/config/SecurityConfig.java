@@ -49,12 +49,13 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
-            .cors(cors -> {})
+            .cors(org.springframework.security.config.Customizer.withDefaults())
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()   // login & refresh publics
+                .requestMatchers("/ws/**").permitAll()         // WebSockets
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs").permitAll() // Swagger
                 .requestMatchers("/error").permitAll()         // Évite le faux 401 sur les erreurs
                 .anyRequest().authenticated()
