@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import MainLayout from '../components/MainLayout.vue'
+import Pagination from '../components/Pagination.vue'
 import { useDecaissementStore } from '../stores/decaissement.store'
 import { useTierStore } from '../stores/tier.store'
 
@@ -12,8 +13,18 @@ const showApproveModal = ref(false)
 const showRejectModal = ref(false)
 const activeDecaissement = ref(null)
 
+// Pagination
+const currentPage = ref(1)
+const itemsPerPage = 8
+
+const paginatedList = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  return store.decaissements.slice(start, start + itemsPerPage)
+})
+
 // Forms State
-const createForm = ref({ motif: '', montant: '', fournisseurId: '', beneficiaire: '', mode: 'VIREMENT' })
+const createForm = ref({ motif: '', montant: '', fournisseurId: '', beneficiaire: '', mode: 'VIREMENT', banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '' })
+const defaultCreateForm = { motif: '', montant: '', fournisseurId: '', beneficiaire: '', mode: 'VIREMENT', banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '' }
 const rejectForm = ref({ reason: 'missing_docs', comments: '' })
 const approveForm = ref({ checks: [false, false, false, false] })
 
@@ -38,16 +49,30 @@ const submitCreate = async () => {
     const beneficiaireStr = selectedFou ? selectedFou.raisonSociale : 'Fournisseur Inconnu'
 
     const dataToSend = {
-      motif: `${createForm.value.mode.toUpperCase()} - ${createForm.value.motif}`,
+      motif: createForm.value.motif || '',
       montant: createForm.value.montant,
       beneficiaire: beneficiaireStr,
       fournisseurId: createForm.value.fournisseurId,
+      moyenPaiement: createForm.value.mode,
+      banqueEmettrice: createForm.value.banqueEmettrice || null,
+      numeroOperation: createForm.value.numeroOperation || null,
+      dateOperation: createForm.value.dateOperation || null,
+      telephone: createForm.value.telephone || null,
       deviseId: 1
     }
-    await store.createDecaissement(dataToSend)
+    const newlyCreated = await store.createDecaissement(dataToSend)
+    
     showCreateModal.value = false
-    createForm.value = { motif: '', montant: '', fournisseurId: '', beneficiaire: '', mode: 'VIREMENT' }
-  } catch(e) { console.error(e) }
+    createForm.value = { ...defaultCreateForm }
+    
+    // Auto-téléchargement du bon pour le Décaissement
+    if (newlyCreated && newlyCreated.id) {
+      await store.downloadReceipt(newlyCreated.id)
+    }
+
+  } catch(e) {
+    console.error(e)
+  }
 }
 
 const openApprove = (item) => {
@@ -120,7 +145,7 @@ const submitReject = async () => {
             </td>
           </tr>
           
-          <tr v-for="item in store.decaissements" :key="item.id">
+          <tr v-for="item in paginatedList" :key="item.id">
             <td class="font-semibold text-dark">#TXN-{{ item.id?.toString().padStart(4, '0') }}-BK</td>
             <td class="text-muted">{{ new Date(item.dateDemande).toLocaleDateString() }}</td>
             <td>
@@ -152,6 +177,15 @@ const submitReject = async () => {
           </tr>
         </tbody>
       </table>
+      
+      <!-- Composant de Pagination -->
+      <Pagination 
+        v-if="store.decaissements.length > 0"
+        :currentPage="currentPage" 
+        :totalItems="store.decaissements.length" 
+        :itemsPerPage="itemsPerPage" 
+        @update:currentPage="currentPage = $event" 
+      />
     </div>
 
     <!-- MODAL : NOUVELLE DEMANDE (SAISIE RAPIDE AVANCÉE) -->
@@ -194,7 +228,7 @@ const submitReject = async () => {
 
             <div class="form-group mt-2">
               <label>Mode de Décaissement</label>
-              <div class="payment-modes">
+              <div class="payment-modes" style="grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
                 <label class="mode-card" :class="{ active: createForm.mode === 'VIREMENT' }">
                   <input type="radio" v-model="createForm.mode" value="VIREMENT" class="hidden-radio"/>
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
@@ -210,6 +244,36 @@ const submitReject = async () => {
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
                   <span>Espèces</span>
                 </label>
+                <label class="mode-card" :class="{ active: createForm.mode === 'ORANGE_MONEY' }">
+                  <input type="radio" v-model="createForm.mode" value="ORANGE_MONEY" class="hidden-radio"/>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                  <span>Or. Money</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="dynamic-fields fade-in-fast" v-if="createForm.mode !== 'ESPECES'">
+              <div v-if="createForm.mode === 'VIREMENT' || createForm.mode === 'CHEQUE'" class="form-row mt-2">
+                <div class="form-group half">
+                  <label>Banque Destinataire <span class="req">*</span></label>
+                  <input v-model="createForm.banqueEmettrice" type="text" class="input-large" :placeholder="createForm.mode === 'CHEQUE' ? 'Banque tirée...' : 'Banque destinataire...'" required />
+                </div>
+                <div class="form-group half">
+                  <label>N° {{ createForm.mode === 'CHEQUE' ? 'du Chèque' : 'Opération' }} <span class="req">*</span></label>
+                  <input v-model="createForm.numeroOperation" type="text" class="input-large" placeholder="Saisir la référence..." required />
+                </div>
+              </div>
+
+              <div v-if="createForm.mode === 'CHEQUE'" class="form-group mt-2">
+                <label>Date sur le Chèque <span class="req">*</span></label>
+                <input v-model="createForm.dateOperation" type="date" class="input-large" required />
+              </div>
+
+              <div v-if="createForm.mode === 'ORANGE_MONEY'" class="form-row mt-2">
+                <div class="form-group half">
+                  <label>Téléphone Bénéficiaire <span class="req">*</span></label>
+                  <input v-model="createForm.telephone" type="text" class="input-large" placeholder="Ex: 6XX XX XX XX" required />
+                </div>
               </div>
             </div>
 
@@ -477,10 +541,10 @@ const submitReject = async () => {
 
 
 /* STYLE EXTRA POUR MODALE DE CREATION EXPERTE */
-.modal-lg { max-width: 950px; }
+.modal-lg { max-width: 950px; display: flex; flex-direction: column; max-height: 90vh; }
 .bg-blue-light { background: #eff6ff; padding: 0.5rem; border-radius: 8px; }
 .text-blue { color: #2563eb; }
-.modal-split { display: grid; grid-template-columns: 1.5fr 1fr; border-bottom: 1px solid #f3f4f6;}
+.modal-split { display: grid; grid-template-columns: 1.5fr 1fr; border-bottom: 1px solid #f3f4f6; overflow-y: auto; flex: 1; min-height: 0; }
 .modal-left { padding: 2.5rem 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
 .modal-right { background: #f9fafb; padding: 2.5rem 2rem; border-left: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 1.5rem; }
 .form-row { display: flex; gap: 1rem; }

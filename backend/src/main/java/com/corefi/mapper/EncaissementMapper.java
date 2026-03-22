@@ -23,6 +23,10 @@ public class EncaissementMapper {
         e.setCompteFinancier(compte);
         e.setDevise(devise);
         e.setReference(request.getReference());
+        e.setBanqueEmettrice(request.getBanqueEmettrice());
+        e.setNumeroOperation(request.getNumeroOperation());
+        e.setDateOperation(request.getDateOperation());
+        e.setTelephone(request.getTelephone());
         e.setStatut(StatutEncaissement.VALIDEE); // Par défaut : VALIDEE
         return e;
     }

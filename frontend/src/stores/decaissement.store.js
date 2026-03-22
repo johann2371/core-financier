@@ -56,6 +56,21 @@ export const useDecaissementStore = defineStore('decaissement', {
       } finally {
         this.loading = false
       }
+    },
+
+    async downloadReceipt(id) {
+      try {
+        const response = await api.get(`/decaissements/${id}/recu/pdf`, { responseType: 'blob' })
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', `Bon_Decaissement_${id}.pdf`)
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      } catch (err) {
+        console.error('Erreur téléchargement PDF: ', err)
+      }
     }
   }
 })

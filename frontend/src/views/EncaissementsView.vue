@@ -1,14 +1,23 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import MainLayout from '../components/MainLayout.vue'
+import Pagination from '../components/Pagination.vue'
 import { useEncaissementStore } from '../stores/encaissement.store'
 import { useTierStore } from '../stores/tier.store'
 
 const store = useEncaissementStore()
 const tierStore = useTierStore()
 const showModal = ref(false)
-const selectedMode = ref('VIREMENT')
+const selectedMode = ref('VIREMENT') // Default helper
 
+// Pagination
+const currentPage = ref(1)
+const itemsPerPage = 8
+
+const paginatedList = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  return store.encaissements.slice(start, start + itemsPerPage)
+})
 // Champs du formulaire dynamique
 const form = ref({
   motif: '',
@@ -16,7 +25,11 @@ const form = ref({
   factureId: null,
   clientId: '',
   moyenPaiement: 'VIREMENT',
-  compteFinancierId: 1 // TODO: Dynamic later
+  compteFinancierId: 1, // TODO: Dynamic later
+  banqueEmettrice: '',
+  numeroOperation: '',
+  dateOperation: '',
+  telephone: ''
 })
 
 onMounted(async () => {
@@ -31,11 +44,21 @@ const submitForm = async () => {
       montant: form.value.montant,
       moyenPaiement: selectedMode.value,
       compteFinancierId: form.value.compteFinancierId,
-      reference: form.value.motif
+      reference: form.value.motif || '',
+      banqueEmettrice: form.value.banqueEmettrice || null,
+      numeroOperation: form.value.numeroOperation || null,
+      dateOperation: form.value.dateOperation || null,
+      telephone: form.value.telephone || null
     }
-    await store.createEncaissement(dataToSend)
+    const newlyCreated = await store.createEncaissement(dataToSend)
     showModal.value = false
-    form.value = { motif: '', montant: '', factureId: null, clientId: '', moyenPaiement: 'VIREMENT', compteFinancierId: 1 }
+    form.value = { motif: '', montant: '', factureId: null, clientId: '', moyenPaiement: 'VIREMENT', compteFinancierId: 1, banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '' }
+    
+    // Auto-téléchargement du reçu pour marquer l'acte
+    if (newlyCreated && newlyCreated.id) {
+      await store.downloadReceipt(newlyCreated.id)
+    }
+
   } catch(e) {
     console.error(e)
   }
@@ -85,7 +108,7 @@ const submitForm = async () => {
             </td>
           </tr>
           
-          <tr v-for="item in store.encaissements" :key="item.id">
+          <tr v-for="item in paginatedList" :key="item.id">
             <td class="font-semibold text-dark">#ENC-{{ item.id?.toString().padStart(4, '0') }}</td>
             <td class="text-muted">{{ new Date(item.dateEncaissement).toLocaleDateString() }}</td>
             <td>
@@ -103,6 +126,15 @@ const submitForm = async () => {
           </tr>
         </tbody>
       </table>
+      
+      <!-- Composant de Pagination -->
+      <Pagination 
+        v-if="store.encaissements.length > 0"
+        :currentPage="currentPage" 
+        :totalItems="store.encaissements.length" 
+        :itemsPerPage="itemsPerPage" 
+        @update:currentPage="currentPage = $event" 
+      />
     </div>
 
     <!-- Modal "SAISIE RAPIDE" experte -->
@@ -156,25 +188,57 @@ const submitForm = async () => {
 
             <div class="form-group">
               <label>Mode d'Encaissement</label>
-              <div class="payment-modes">
+              <div class="payment-modes" style="grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
                 <label class="mode-card" :class="{ active: selectedMode === 'VIREMENT' }">
                   <input type="radio" v-model="selectedMode" value="VIREMENT" class="hidden-radio"/>
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
                   <span>Virement</span>
-                  <span class="shortcut">ALT+1</span>
                 </label>
                 <label class="mode-card" :class="{ active: selectedMode === 'CHEQUE' }">
                   <input type="radio" v-model="selectedMode" value="CHEQUE" class="hidden-radio"/>
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
                   <span>Chèque</span>
-                  <span class="shortcut">ALT+2</span>
                 </label>
                 <label class="mode-card" :class="{ active: selectedMode === 'ESPECES' }">
                   <input type="radio" v-model="selectedMode" value="ESPECES" class="hidden-radio"/>
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
                   <span>Espèces</span>
-                  <span class="shortcut">ALT+3</span>
                 </label>
+                <label class="mode-card" :class="{ active: selectedMode === 'ORANGE_MONEY' }">
+                  <input type="radio" v-model="selectedMode" value="ORANGE_MONEY" class="hidden-radio"/>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                  <span>Or. Money</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Champs dynamiques selon Mode -->
+            <div class="dynamic-fields fade-in-fast" v-if="selectedMode !== 'ESPECES'">
+              <div v-if="selectedMode === 'VIREMENT' || selectedMode === 'CHEQUE'" class="form-row mt-2">
+                <div class="form-group half">
+                  <label>Banque <span class="req">*</span></label>
+                  <input v-model="form.banqueEmettrice" type="text" class="input-large" :placeholder="selectedMode === 'CHEQUE' ? 'Banque émettrice...' : 'Banque d\'origine...'" required />
+                </div>
+                <div class="form-group half">
+                  <label>N° {{ selectedMode === 'CHEQUE' ? 'du Chèque' : 'Opération' }} <span class="req">*</span></label>
+                  <input v-model="form.numeroOperation" type="text" class="input-large" placeholder="Saisir la référence..." required />
+                </div>
+              </div>
+
+              <div v-if="selectedMode === 'CHEQUE'" class="form-group mt-2">
+                <label>Date sur le Chèque <span class="req">*</span></label>
+                <input v-model="form.dateOperation" type="date" class="input-large" required />
+              </div>
+
+              <div v-if="selectedMode === 'ORANGE_MONEY'" class="form-row mt-2">
+                <div class="form-group half">
+                  <label>Téléphone <span class="req">*</span></label>
+                  <input v-model="form.telephone" type="text" class="input-large" placeholder="Ex: 6XX XX XX XX" required />
+                </div>
+                <div class="form-group half">
+                  <label>ID Transaction <span class="req">*</span></label>
+                  <input v-model="form.numeroOperation" type="text" class="input-large" placeholder="ID OM..." required />
+                </div>
               </div>
             </div>
 
@@ -317,7 +381,7 @@ kbd { font-family: inherit; background: #e5e7eb; color: #4b5563; padding: 2px 6p
 .close-btn { background: none; border: none; color: #9ca3af; cursor: pointer; transition: color 0.15s; }
 .close-btn:hover { color: #111827; }
 
-.modal-split { display: grid; grid-template-columns: 1.5fr 1fr; overflow-y: auto; }
+.modal-split { display: grid; grid-template-columns: 1.5fr 1fr; overflow-y: auto; flex: 1; min-height: 0; }
 
 /* LEFT COL (FORM) */
 .modal-left { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; }

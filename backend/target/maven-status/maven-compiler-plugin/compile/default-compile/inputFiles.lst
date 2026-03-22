@@ -95,6 +95,7 @@ C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\bac
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\service\impl\JournalAuditServiceImpl.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\dto\request\decaissement\ExecutionCaissierRequest.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\repository\AffectationPaiementRepository.java
+C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\config\CorsConfig.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\entity\Utilisateur.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\service\impl\UtilisateurServiceImpl.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\repository\TauxChangeRepository.java

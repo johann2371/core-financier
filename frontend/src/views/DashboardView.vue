@@ -1,5 +1,10 @@
 <script setup>
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth.store'
 import MainLayout from '../components/MainLayout.vue'
+
+const authStore = useAuthStore()
+const router = useRouter()
 </script>
 
 <template>
@@ -18,7 +23,7 @@ import MainLayout from '../components/MainLayout.vue'
           <span class="shortcut">Ctrl + E</span>
         </router-link>
         
-        <router-link to="#" class="action-card">
+        <router-link to="/factures?create=VENTE" class="action-card">
           <div class="action-icon light-indigo">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
           </div>
@@ -34,11 +39,11 @@ import MainLayout from '../components/MainLayout.vue'
           <span class="shortcut">Ctrl + D</span>
         </router-link>
 
-        <router-link to="#" class="action-card">
+        <router-link to="/tiers?create=CLIENT" class="action-card">
           <div class="action-icon light-indigo">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
           </div>
-          <h4>Nouveau<br/>Client</h4>
+          <h4>Nouveau<br/>Tier</h4>
           <span class="shortcut">Ctrl + C</span>
         </router-link>
       </div>

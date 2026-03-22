@@ -6,7 +6,9 @@ import com.corefi.entity.LigneFacture;
 import com.corefi.entity.Tiers;
 import com.corefi.exception.ResourceNotFoundException;
 import com.corefi.exception.WorkflowException;
+import com.corefi.entity.Decaissement;
 import com.corefi.repository.EncaissementRepository;
+import com.corefi.repository.DecaissementRepository;
 import com.corefi.repository.FactureRepository;
 import com.corefi.service.interfaces.IPdfService;
 import com.itextpdf.text.*;
@@ -26,6 +28,7 @@ public class PdfServiceImpl implements IPdfService {
 
     private final FactureRepository factureRepository;
     private final EncaissementRepository encaissementRepository;
+    private final DecaissementRepository decaissementRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -179,8 +182,23 @@ public class PdfServiceImpl implements IPdfService {
             Font fontTexte = FontFactory.getFont(FontFactory.HELVETICA, 12);
             document.add(new Paragraph("Date du paiement: " + encaissement.getDateEncaissement().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
             document.add(new Paragraph("Moyen de paiement: " + encaissement.getMoyenPaiement().name(), fontTexte));
+            
+            // Métadonnées de paiement dynamiques
+            if (encaissement.getBanqueEmettrice() != null) {
+                document.add(new Paragraph("Banque: " + encaissement.getBanqueEmettrice(), fontTexte));
+            }
+            if (encaissement.getNumeroOperation() != null) {
+                document.add(new Paragraph("N° Opération: " + encaissement.getNumeroOperation(), fontTexte));
+            }
+            if (encaissement.getDateOperation() != null) {
+                document.add(new Paragraph("Date Opération: " + encaissement.getDateOperation().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
+            }
+            if (encaissement.getTelephone() != null) {
+                document.add(new Paragraph("Téléphone (Mobile Money): " + encaissement.getTelephone(), fontTexte));
+            }
+
             if (encaissement.getReference() != null && !encaissement.getReference().isEmpty()) {
-                document.add(new Paragraph("Référence paiement: " + encaissement.getReference(), fontTexte));
+                document.add(new Paragraph("Référence / Motif: " + encaissement.getReference(), fontTexte));
             }
             
             document.add(new Paragraph(" "));
@@ -217,5 +235,95 @@ public class PdfServiceImpl implements IPdfService {
         header.setBorderWidth(1);
         header.setPhrase(new Phrase(texte, police));
         table.addCell(header);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] genererRecuDecaissementPdf(Long decaissementId) {
+        Decaissement decaissement = decaissementRepository.findById(decaissementId)
+                .orElseThrow(() -> new ResourceNotFoundException("Décaissement introuvable"));
+
+        Tiers fournisseur = decaissement.getFournisseur();
+        if (fournisseur != null) {
+            fournisseur.getRaisonSociale();
+        }
+
+        try {
+            Document document = new Document();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfWriter.getInstance(document, baos);
+
+            document.open();
+
+            // En-tête
+            Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
+            Paragraph titreApp = new Paragraph("SODICA SARL", fontTitre);
+            titreApp.setAlignment(Element.ALIGN_CENTER);
+            document.add(titreApp);
+            document.add(new Paragraph(" ")); 
+            
+            // Titre Reçu
+            Font fontRecu = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+            Paragraph titreRecu = new Paragraph("BON DE DÉCAISSEMENT N° " + decaissement.getNumero(), fontRecu);
+            titreRecu.setAlignment(Element.ALIGN_CENTER);
+            document.add(titreRecu);
+
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph(" "));
+
+            // Informations
+            Font fontTexte = FontFactory.getFont(FontFactory.HELVETICA, 12);
+            document.add(new Paragraph("Date de création: " + decaissement.getDateSaisie().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
+            if (decaissement.getDateExecution() != null) {
+                document.add(new Paragraph("Date d'exécution: " + decaissement.getDateExecution().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
+            }
+            if (decaissement.getMoyenPaiement() != null) {
+                document.add(new Paragraph("Moyen de paiement: " + decaissement.getMoyenPaiement().name(), fontTexte));
+            }
+            
+            // Métadonnées de paiement dynamiques
+            if (decaissement.getBanqueEmettrice() != null) {
+                document.add(new Paragraph("Banque: " + decaissement.getBanqueEmettrice(), fontTexte));
+            }
+            if (decaissement.getNumeroOperation() != null) {
+                document.add(new Paragraph("N° Opération: " + decaissement.getNumeroOperation(), fontTexte));
+            }
+            if (decaissement.getDateOperation() != null) {
+                document.add(new Paragraph("Date Opération: " + decaissement.getDateOperation().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
+            }
+            if (decaissement.getTelephone() != null) {
+                document.add(new Paragraph("Téléphone (Mobile Money): " + decaissement.getTelephone(), fontTexte));
+            }
+
+            document.add(new Paragraph("Motif: " + decaissement.getMotif(), fontTexte));
+            
+            document.add(new Paragraph(" "));
+            
+            String fournNom = fournisseur != null ? fournisseur.getRaisonSociale() : "Fournisseur Divers";
+            document.add(new Paragraph("Bénéficiaire / Fournisseur: " + fournNom, fontTexte));
+            if (decaissement.getBeneficiaire() != null) {
+                document.add(new Paragraph("À l'attention de: " + decaissement.getBeneficiaire(), fontTexte));
+            }
+            
+            document.add(new Paragraph(" "));
+            
+            Font fontMontant = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
+            String deviseCode = decaissement.getDevise() != null ? decaissement.getDevise().getCode() : "XAF";
+            Paragraph pMontant = new Paragraph("Montant payé : " + String.format("%.2f", decaissement.getMontant()) + " " + deviseCode, fontMontant);
+            pMontant.setAlignment(Element.ALIGN_RIGHT);
+            document.add(pMontant);
+
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph(" "));
+            Paragraph footer = new Paragraph("Bon de décaissement - " + decaissement.getStatut().name(), FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10));
+            footer.setAlignment(Element.ALIGN_CENTER);
+            document.add(footer);
+
+            document.close();
+            return baos.toByteArray();
+
+        } catch (DocumentException e) {
+            throw new WorkflowException("Erreur lors de la génération du bon PDF : " + e.getMessage());
+        }
     }
 }

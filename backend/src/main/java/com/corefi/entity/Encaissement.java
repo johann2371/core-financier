@@ -51,6 +51,12 @@ public class Encaissement {
     private String numeroRecu;
     private String reference;
 
+    // --- Métadonnées Paiement (Chèque, Virement, Mobile Money) ---
+    private String banqueEmettrice;
+    private String numeroOperation;
+    private LocalDate dateOperation;
+    private String telephone;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatutEncaissement statut = StatutEncaissement.VALIDEE;

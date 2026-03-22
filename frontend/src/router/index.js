@@ -31,8 +31,13 @@ const router = createRouter({
       name: 'tiers',
       component: () => import('../views/TiersView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/factures',
+      name: 'factures',
+      component: () => import('../views/FacturesView.vue'),
+      meta: { requiresAuth: true }
     }
-    // Ajoutez d'autres routes ici au fur et à mesure (factures, etc.)
   ]
 })
 

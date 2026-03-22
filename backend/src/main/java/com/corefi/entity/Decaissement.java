@@ -51,6 +51,12 @@ public class Decaissement {
     private String reference;
     private String motif; // Raison de la demande de décaissement
 
+    // --- Métadonnées Paiement (Chèque, Virement, Mobile Money) ---
+    private String banqueEmettrice;
+    private String numeroOperation;
+    private LocalDate dateOperation;
+    private String telephone;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatutDecaissement statut = StatutDecaissement.BROUILLON;

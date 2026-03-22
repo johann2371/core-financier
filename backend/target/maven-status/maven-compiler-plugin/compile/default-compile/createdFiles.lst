@@ -8,6 +8,7 @@ com\corefi\enums\MoyenPaiement.class
 com\corefi\service\interfaces\ICompteFinancierService.class
 com\corefi\enums\TypeMouvement.class
 com\corefi\service\interfaces\IFactureService.class
+com\corefi\config\CorsConfig.class
 com\corefi\service\impl\TableauBordServiceImpl.class
 com\corefi\repository\UtilisateurRepository.class
 com\corefi\repository\FournisseurRepository.class

@@ -17,6 +17,17 @@ import java.util.List;
 public class DecaissementController {
 
     private final IDecaissementService decaissementService;
+    private final com.corefi.service.interfaces.IPdfService pdfService;
+
+    @GetMapping("/{id}/recu/pdf")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE', 'CAISSIER', 'RESPONSABLE_FINANCIER', 'PDG')")
+    public ResponseEntity<byte[]> genererRecuPdf(@PathVariable Long id) {
+        byte[] pdfBytes = pdfService.genererRecuDecaissementPdf(id);
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "bon_decaissement_" + id + ".pdf");
+        return new ResponseEntity<>(pdfBytes, headers, org.springframework.http.HttpStatus.OK);
+    }
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE', 'RESPONSABLE_FINANCIER', 'PDG', 'CAISSIER')")

@@ -5,6 +5,7 @@ import com.corefi.dto.response.decaissement.DecaissementResponse;
 import com.corefi.entity.Decaissement;
 import com.corefi.entity.Tiers;
 import com.corefi.entity.Devise;
+import com.corefi.enums.MoyenPaiement;
 import com.corefi.enums.StatutDecaissement;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,11 @@ public class DecaissementMapper {
         d.setMontant(request.getMontant());
         d.setBeneficiaire(request.getBeneficiaire());
         d.setMotif(request.getMotif()); // Raison de la demande
+        d.setMoyenPaiement(MoyenPaiement.valueOf(request.getMoyenPaiement()));
+        d.setBanqueEmettrice(request.getBanqueEmettrice());
+        d.setNumeroOperation(request.getNumeroOperation());
+        d.setDateOperation(request.getDateOperation());
+        d.setTelephone(request.getTelephone());
         d.setDevise(devise);
         d.setStatut(StatutDecaissement.BROUILLON);
         return d;
