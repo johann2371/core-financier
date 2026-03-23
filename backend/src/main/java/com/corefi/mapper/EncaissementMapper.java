@@ -41,6 +41,7 @@ public class EncaissementMapper {
         r.setMontant(e.getMontant());
         r.setMoyenPaiement(e.getMoyenPaiement().name());
         r.setStatut(e.getStatut().name());
+        r.setReference(e.getReference());
         return r;
     }
 }

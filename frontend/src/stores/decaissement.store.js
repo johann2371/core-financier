@@ -15,7 +15,7 @@ export const useDecaissementStore = defineStore('decaissement', {
       this.error = null
       try {
         const response = await api.get('/decaissements')
-        this.decaissements = response.data
+        this.decaissements = response.data.sort((a, b) => b.id - a.id)
       } catch (err) {
         this.error = err.response?.data?.error || 'Erreur lors du chargement des décaissements'
       } finally {
@@ -28,7 +28,7 @@ export const useDecaissementStore = defineStore('decaissement', {
       this.error = null
       try {
         const response = await api.post('/decaissements', data)
-        this.decaissements.push(response.data)
+        this.decaissements.unshift(response.data)
         return response.data
       } catch (err) {
         this.error = err.response?.data?.error || 'Erreur lors de la création du décaissement'
@@ -61,7 +61,7 @@ export const useDecaissementStore = defineStore('decaissement', {
     async downloadReceipt(id) {
       try {
         const response = await api.get(`/decaissements/${id}/recu/pdf`, { responseType: 'blob' })
-        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
         const link = document.createElement('a')
         link.href = url
         link.setAttribute('download', `Bon_Decaissement_${id}.pdf`)

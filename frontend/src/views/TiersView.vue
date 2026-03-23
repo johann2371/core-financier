@@ -101,7 +101,6 @@ const submitForm = async () => {
           <line x1="23" y1="11" x2="17" y2="11"></line>
         </svg>
         Nouveau Tier
-        <span class="shortcut">Ctrl + N</span>
       </button>
     </template>
 
@@ -149,7 +148,7 @@ const submitForm = async () => {
           <tr>
             <th>Code</th>
             <th>Type</th>
-            <th>Raison Sociale</th>
+            <th>Désignation</th>
             <th>Contact</th>
             <th class="text-right">Solde Actuel (XAF)</th>
           </tr>
@@ -172,7 +171,7 @@ const submitForm = async () => {
             )"
             :key="item.id"
           >
-            <td class="font-semibold text-dark">{{ item.codeTiers }}</td>
+            <td class="font-semibold text-dark">{{ item.code }}</td>
             <td>
               <span
                 class="badge"
@@ -240,7 +239,7 @@ const submitForm = async () => {
           </div>
 
           <div class="form-group">
-            <label>Raison Sociale <span class="req">*</span></label>
+            <label>Désignation <span class="req">*</span></label>
             <input
               v-model="form.raisonSociale"
               type="text"

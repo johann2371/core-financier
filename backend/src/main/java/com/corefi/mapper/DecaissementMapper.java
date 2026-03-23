@@ -35,7 +35,10 @@ public class DecaissementMapper {
         r.setId(d.getId());
         r.setNumero(d.getNumero());
         r.setDateDecaissement(d.getDateDecaissement());
+        r.setDateCreation(d.getDateSaisie());
         r.setFournisseurNom(d.getFournisseur() != null ? d.getFournisseur().getRaisonSociale() : null);
+        r.setBeneficiaire(d.getBeneficiaire());
+        r.setMotif(d.getMotif());
         r.setMontant(d.getMontant());
         r.setStatut(d.getStatut().name());
         r.setSeuilPdgRequis(d.isSeuilPdgRequis());

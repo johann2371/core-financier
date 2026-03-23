@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useUiStore } from '../stores/ui.store'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -41,17 +42,29 @@ const router = createRouter({
   ]
 })
 
-// Gardien de navigation (Navigation Guard) pour protéger les routes
+// Gardien de navigation (Navigation Guard) pour protéger les routes et gérer le chargement
 router.beforeEach((to, from, next) => {
+  const uiStore = useUiStore()
+  uiStore.setLoading(true)
+
   const publicPages = ['/login'];
   const authRequired = !publicPages.includes(to.path);
-  const loggedIn = localStorage.getItem('token'); // A remplacer par le store Pinia plus tard
+  const loggedIn = localStorage.getItem('token');
 
   if (authRequired && !loggedIn) {
+    uiStore.setLoading(false)
     return next('/login');
   }
 
   next();
+})
+
+router.afterEach(() => {
+  const uiStore = useUiStore()
+  // Un léger délai pour assurer que l'utilisateur voit la transition même sur des pages rapides
+  setTimeout(() => {
+    uiStore.setLoading(false)
+  }, 400)
 })
 
 export default router

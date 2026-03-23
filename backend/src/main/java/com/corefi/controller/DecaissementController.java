@@ -20,7 +20,7 @@ public class DecaissementController {
     private final com.corefi.service.interfaces.IPdfService pdfService;
 
     @GetMapping("/{id}/recu/pdf")
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE', 'CAISSIER', 'RESPONSABLE_FINANCIER', 'PDG')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE', 'RESPONSABLE_FINANCIER', 'PDG', 'CAISSIER')")
     public ResponseEntity<byte[]> genererRecuPdf(@PathVariable Long id) {
         byte[] pdfBytes = pdfService.genererRecuDecaissementPdf(id);
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();

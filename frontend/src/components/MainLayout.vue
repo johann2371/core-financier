@@ -1,9 +1,11 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
+import { useUiStore } from '../stores/ui.store'
 
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -34,10 +36,14 @@ onMounted(() => {
     <!-- Sidebar Réutilisable -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <div class="logo-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+        <div class="app-logo-vector">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <path d="M50 5 C25 5 5 25 5 50 C5 75 25 95 50 95 C75 95 95 75 95 50 C95 25 75 5 50 5 Z" fill="none" stroke="currentColor" stroke-width="2" opacity="0.1" />
+            <path d="M30 40 C30 25 70 25 70 40 C70 50 30 50 30 60 C30 75 70 75 70 60" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" />
+            <path d="M40 40 C40 35 60 35 60 40 C60 45 40 45 40 50 C40 55 60 55 60 50" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity="0.3" />
+          </svg>
         </div>
-        <h2>Core Financier</h2>
+        <h2>SODICA</h2>
       </div>
 
       <nav class="nav-menu">
@@ -115,13 +121,29 @@ onMounted(() => {
         <slot></slot>
       </div>
     </main>
+
+    <!-- Overlay de chargement Global -->
+    <Transition name="fade">
+      <div v-if="uiStore.isLoading" class="page-loader-overlay">
+        <div class="loader-content">
+          <div class="sodica-spinner">
+            <svg viewBox="0 0 100 100" class="clockwise-svg">
+               <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2" opacity="0.1" />
+               <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-dasharray="283" class="spinner-circle" />
+            </svg>
+          </div>
+          <span>Chargement...</span>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <style scoped>
 .dashboard-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background-color: #f9fafb; /* Très léger gris fond principal */
   color: var(--c-text);
   font-family: var(--font-family);
@@ -143,14 +165,17 @@ onMounted(() => {
   gap: 0.75rem;
 }
 
-.logo-icon {
-  width: 32px; height: 32px;
-  background-color: var(--c-primary);
-  color: var(--c-surface);
-  border-radius: 6px;
+.app-logo-vector {
+  width: 42px;
+  height: 42px;
+  color: var(--c-primary);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.app-logo-vector svg {
+  width: 100%;
+  height: 100%;
 }
 
 .sidebar-header h2 {
@@ -257,7 +282,8 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .topbar {
@@ -265,6 +291,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
+  flex-shrink: 0;
 }
 
 .topbar-left {
@@ -348,5 +375,65 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ====== GLOBAL LOADER ====== */
+.page-loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.loader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.sodica-spinner {
+  width: 64px;
+  height: 64px;
+  color: var(--c-primary);
+}
+
+.clockwise-svg {
+  transform: rotate(-90deg); /* Oriente le départ à 12h */
+}
+
+.spinner-circle {
+  animation: progress-clockwise 1.5s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes progress-clockwise {
+  0% { stroke-dashoffset: 283; }
+  50% { stroke-dashoffset: 70; }
+  100% { stroke-dashoffset: 283; transform: rotate(360deg); }
+}
+
+.loader-content span {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--c-primary);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Transition Vue (fade) */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
 }
 </style>

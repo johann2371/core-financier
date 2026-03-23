@@ -23,7 +23,7 @@ public class FactureController {
     private final com.corefi.service.interfaces.IPdfService pdfService;
 
     @GetMapping("/{id}/pdf")
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG','CAISSIER')")
     public ResponseEntity<byte[]> genererPdf(@PathVariable Long id) {
         byte[] pdfBytes = pdfService.genererFacturePdf(id);
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();

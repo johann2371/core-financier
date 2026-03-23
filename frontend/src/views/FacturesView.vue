@@ -85,8 +85,13 @@ const submitForm = async () => {
       tiersId: form.value.tiersId,
       lignes: form.value.lignes
     }
-    await store.createFacture(dataToSend)
+    const newlyCreated = await store.createFacture(dataToSend)
     showModal.value = false
+    
+    // Auto-téléchargement de la facture après génération
+    if (newlyCreated && newlyCreated.id) {
+      await store.downloadPdf(newlyCreated.id)
+    }
     
     // Réinitialisation conditionnelle selon le besoin
     form.value = {
@@ -152,10 +157,10 @@ const submitForm = async () => {
             </td>
             <td>
               <div class="motif-cell">
-                <span class="motif-text">{{ item.tiersRaisonSociale || (item.tiers ? item.tiers.raisonSociale : 'Inconnu') }}</span>
+                <span class="motif-text">{{ item.tiersNom || 'Inconnu' }}</span>
               </div>
             </td>
-            <td>{{ new Date(item.dateCreation).toLocaleDateString() }}</td>
+            <td>{{ item.dateFacture ? new Date(item.dateFacture).toLocaleDateString() : 'Non définie' }}</td>
             <td>
               <span class="badge" :class="{
                 'badge-attente': item.statut === 'EN_ATTENTE_PAIEMENT',
@@ -174,16 +179,16 @@ const submitForm = async () => {
           </tr>
         </tbody>
       </table>
-      
-      <!-- Composant de Pagination -->
-      <Pagination 
-        v-if="filteredFactures.length > 0"
-        :currentPage="currentPage" 
-        :totalItems="filteredFactures.length" 
-        :itemsPerPage="itemsPerPage" 
-        @update:currentPage="currentPage = $event" 
-      />
     </div>
+
+    <!-- Composant de Pagination Détaché -->
+    <Pagination 
+      v-if="filteredFactures.length > 0"
+      :currentPage="currentPage" 
+      :totalItems="filteredFactures.length" 
+      :itemsPerPage="itemsPerPage" 
+      @update:currentPage="currentPage = $event" 
+    />
 
     <!-- Modale Création Facture (Complexe: Lignes) -->
     <div v-if="showModal" class="modal-backdrop fade-in">
@@ -227,10 +232,10 @@ const submitForm = async () => {
                  <input v-model="ligne.designation" type="text" required class="input-std" placeholder="Nom de l'article ou service..." />
                </div>
                <div class="line-col qty-col">
-                 <input v-model.number="ligne.quantite" type="number" required min="1" step="0.01" class="input-std text-center" />
+                 <input v-model.number="ligne.quantite" type="number" required min="1" step="1" class="input-std text-center" />
                </div>
                <div class="line-col price-col">
-                 <input v-model.number="ligne.prixUnitaire" type="number" required min="0" step="100" class="input-std text-right" />
+                 <input v-model.number="ligne.prixUnitaire" type="number" required min="0" step="25" class="input-std text-right" />
                </div>
                <div class="line-col total-col v-center">
                  <span class="font-semibold text-dark">{{ (ligne.quantite * ligne.prixUnitaire).toLocaleString() }}</span>

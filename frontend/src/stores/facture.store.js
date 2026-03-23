@@ -47,7 +47,7 @@ export const useFactureStore = defineStore('facture', {
       try {
         // Optionnel: On peut utiliser window.open si c'est géré en REST GET simple
         const response = await api.get(`/factures/${id}/pdf`, { responseType: 'blob' })
-        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
         const link = document.createElement('a')
         link.href = url
         link.setAttribute('download', `Facture_${id}.pdf`)

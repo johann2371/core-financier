@@ -73,7 +73,6 @@ const submitForm = async () => {
       <button @click="showModal = true" class="btn-primary">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         Saisie Rapide
-        <span class="shortcut">Ctrl + E</span>
       </button>
     </template>
 
@@ -113,29 +112,30 @@ const submitForm = async () => {
             <td class="text-muted">{{ new Date(item.dateEncaissement).toLocaleDateString() }}</td>
             <td>
               <div class="motif-cell">
-                <span class="motif-text">{{ item.motif }}</span>
+                <strong class="text-dark">{{ item.moyenPaiement }}</strong>
+                <span class="text-muted" style="font-size: 0.75rem;">{{ item.reference || 'Aucune référence' }}</span>
                 <span class="facture-badge" v-if="item.factureId">Lié à Fac-{{ item.factureId }}</span>
               </div>
             </td>
             <td class="text-right font-semibold text-dark">{{ item.montant?.toLocaleString() }} XAF</td>
             <td class="text-center">
-              <button class="btn-icon" title="Télécharger le Reçu PDF">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10.4 12.6a2 2 0 1 1 3-3L8 14l-5 1.5L4.5 9l5.5-5.5a2 2 0 1 1 3 3L8.5 11l-3 1"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path></svg>
+              <button class="icon-btn" @click.stop="store.downloadReceipt(item.id)" title="Télécharger le Reçu PDF">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               </button>
             </td>
           </tr>
         </tbody>
       </table>
-      
-      <!-- Composant de Pagination -->
-      <Pagination 
-        v-if="store.encaissements.length > 0"
-        :currentPage="currentPage" 
-        :totalItems="store.encaissements.length" 
-        :itemsPerPage="itemsPerPage" 
-        @update:currentPage="currentPage = $event" 
-      />
     </div>
+
+    <!-- Composant de Pagination Détaché -->
+    <Pagination 
+      v-if="store.encaissements.length > 0"
+      :currentPage="currentPage" 
+      :totalItems="store.encaissements.length" 
+      :itemsPerPage="itemsPerPage" 
+      @update:currentPage="currentPage = $event" 
+    />
 
     <!-- Modal "SAISIE RAPIDE" experte -->
     <div v-if="showModal" class="modal-backdrop">
@@ -153,7 +153,6 @@ const submitForm = async () => {
             </div>
           </div>
           <div class="modal-close-group">
-            <span class="shortcut-tip">Quitter <kbd>Echap</kbd></span>
             <button @click="showModal = false" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
           </div>
         </div>
@@ -164,7 +163,7 @@ const submitForm = async () => {
             
             <div class="form-group search-group">
               <div class="label-row">
-                <label>Client <kbd>ALT+C</kbd></label>
+                <label>Client</label>
                 <span class="status-text blue-text">Auto-complétion active...</span>
               </div>
               <div class="input-with-icon">
@@ -255,7 +254,7 @@ const submitForm = async () => {
 
             <div class="form-group">
               <div class="label-row">
-                <label>Note / Référence Interne <kbd>ALT+N</kbd></label>
+                <label>Note / Référence Interne</label>
               </div>
               <textarea v-model="form.motif" rows="3" placeholder="Ajouter un commentaire sur cet encaissement..." required></textarea>
             </div>
@@ -277,7 +276,7 @@ const submitForm = async () => {
                     <strong>{{ client.raisonSociale }}</strong>
                     <span>Solde : {{ client.solde?.toLocaleString() }} XAF</span>
                   </div>
-                  <kbd>Select</kbd>
+                  <span class="text-muted" style="font-size: 0.75rem;">Choisir</span>
                 </div>
               </div>
             </div>
@@ -320,16 +319,15 @@ const submitForm = async () => {
         <div class="modal-footer pt-0">
           <button type="button" class="btn-text-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            Aperçu du reçu <kbd>ALT+P</kbd>
+            Aperçu du reçu
           </button>
           
           <div class="actions-group">
             <button type="button" class="btn-outline">
-              Ajouter et Nouveau <kbd>Ctrl+N</kbd>
+              Ajouter et Nouveau
             </button>
             <button type="submit" form="encaissement-form" class="btn-primary-large" :disabled="store.loading || !form.montant">
               {{ store.loading ? 'En cours...' : 'Confirmer et Enregistrer' }}
-              <kbd class="dark-kbd">Ctrl+Entrée</kbd>
             </button>
           </div>
         </div>
@@ -359,6 +357,9 @@ const submitForm = async () => {
 .facture-badge { font-size: 0.65rem; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; display: inline-block; align-self: flex-start; font-weight: 600;}
 
 /* BOUTON ACTIONS LIST */
+.icon-btn { background: #f3f4f6; border: none; padding: 0.4rem; border-radius: 6px; color: #4b5563; cursor: pointer; transition: 0.15s;}
+.icon-btn:hover { background: #e5e7eb; color: #111827; }
+
 .btn-primary { display: flex; align-items: center; gap: 0.5rem; background-color: #2563eb; color: white; padding: 0.625rem 1rem; border-radius: 8px; border: none; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.15s, transform 0.1s; }
 .btn-primary:hover { background-color: #1d4ed8; }
 .btn-primary:active { transform: scale(0.98); }

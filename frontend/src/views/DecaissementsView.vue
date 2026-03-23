@@ -147,11 +147,11 @@ const submitReject = async () => {
           
           <tr v-for="item in paginatedList" :key="item.id">
             <td class="font-semibold text-dark">#TXN-{{ item.id?.toString().padStart(4, '0') }}-BK</td>
-            <td class="text-muted">{{ new Date(item.dateDemande).toLocaleDateString() }}</td>
+            <td class="text-muted">{{ new Date(item.dateCreation || item.dateDecaissement).toLocaleDateString() }}</td>
             <td>
               <div class="cell-stack">
-                <strong class="text-dark">{{ item.beneficiaire || 'N/A' }}</strong>
-                <span class="text-muted text-sm">{{ item.motif }}</span>
+                <strong class="text-dark">{{ item.beneficiaire || item.fournisseurNom || 'N/A' }}</strong>
+                <span class="text-muted text-sm">{{ item.motif || 'Aucun motif renseigné' }}</span>
               </div>
             </td>
             <td class="text-right font-semibold text-dark">{{ item.montant?.toLocaleString() }} XAF</td>
@@ -170,23 +170,28 @@ const submitReject = async () => {
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
                </template>
+               <template v-else-if="item.statut === 'REJETE'">
+                 <span class="text-muted text-sm italic">Rejeté</span>
+               </template>
                <template v-else>
-                 <span class="text-muted text-sm italic">Traité</span>
+                 <button class="icon-btn" @click.stop="store.downloadReceipt(item.id)" title="Télécharger le Reçu PDF">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                 </button>
                </template>
             </td>
           </tr>
         </tbody>
       </table>
-      
-      <!-- Composant de Pagination -->
-      <Pagination 
-        v-if="store.decaissements.length > 0"
-        :currentPage="currentPage" 
-        :totalItems="store.decaissements.length" 
-        :itemsPerPage="itemsPerPage" 
-        @update:currentPage="currentPage = $event" 
-      />
     </div>
+
+    <!-- Composant de Pagination Détaché -->
+    <Pagination 
+      v-if="store.decaissements.length > 0"
+      :currentPage="currentPage" 
+      :totalItems="store.decaissements.length" 
+      :itemsPerPage="itemsPerPage" 
+      @update:currentPage="currentPage = $event" 
+    />
 
     <!-- MODAL : NOUVELLE DEMANDE (SAISIE RAPIDE AVANCÉE) -->
     <div v-if="showCreateModal" class="modal-backdrop">
@@ -517,6 +522,8 @@ const submitReject = async () => {
 .actions-cell { display: flex; gap: 0.5rem; justify-content: center; }
 .btn-icon { background: none; border: none; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
 .btn-icon:hover { background: #f3f4f6; }
+.icon-btn { background: #f3f4f6; border: none; padding: 0.4rem; border-radius: 6px; color: #4b5563; cursor: pointer; transition: 0.15s;}
+.icon-btn:hover { background: #e5e7eb; color: #111827; }
 .text-green { color: #10b981; }
 .text-red { color: #ef4444; }
 

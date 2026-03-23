@@ -23,18 +23,17 @@ const handleLogin = async () => {
 
 <template>
   <div class="login-wrapper">
-    <!-- En-tête avec Logo -->
-    <div class="brand-header">
-      <div class="logo">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-      </div>
-      <h1>Core Financier</h1>
-      <p>Gestion financière de haute précision</p>
-    </div>
-
     <!-- Carte de connexion -->
     <div class="login-card">
       <div class="card-header">
+        <div class="login-logo-vector">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <path d="M50 5 C25 5 5 25 5 50 C5 75 25 95 50 95 C75 95 95 75 95 50 C95 25 75 5 50 5 Z" fill="none" stroke="currentColor" stroke-width="2" opacity="0.1" />
+            <path d="M30 40 C30 25 70 25 70 40 C70 50 30 50 30 60 C30 75 70 75 70 60" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" />
+            <path d="M40 40 C40 35 60 35 60 40 C60 45 40 45 40 50 C40 55 60 55 60 50" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity="0.3" />
+          </svg>
+        </div>
+        <h1>SODICA</h1>
         <h2>Connexion</h2>
         <p>Accédez à votre espace sécurisé</p>
       </div>
@@ -124,16 +123,16 @@ const handleLogin = async () => {
   margin-bottom: 2rem;
 }
 
-.logo {
-  width: 56px; height: 56px;
-  margin: 0 auto 1rem auto;
-  background-color: var(--c-primary); /* Couleur 3 */
-  color: var(--c-surface); /* Couleur 2 */
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--c-primary) 30%, transparent);
+.login-logo-vector {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 1.5rem auto;
+  color: var(--c-primary);
+  filter: drop-shadow(0 4px 12px rgba(37, 99, 235, 0.2));
+}
+.login-logo-vector svg {
+  width: 100%;
+  height: 100%;
 }
 
 .brand-header h1 {
@@ -161,6 +160,15 @@ const handleLogin = async () => {
 
 .card-header {
   padding: 2.5rem 2.5rem 1.5rem 2.5rem;
+  text-align: center;
+}
+
+.card-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--c-primary);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
 }
 
 .card-header h2 {

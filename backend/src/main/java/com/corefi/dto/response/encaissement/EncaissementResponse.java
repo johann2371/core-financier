@@ -11,6 +11,7 @@ public class EncaissementResponse {
     private LocalDate dateEncaissement;
     private String nomClient;
     private BigDecimal montant;
+    private String reference;
     private String moyenPaiement;
     private String statut;
 }
