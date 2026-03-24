@@ -77,6 +77,9 @@ public class DecaissementServiceImpl implements IDecaissementService {
         Utilisateur saisiPar = getUtilisateurConnecte();
         decaissement.setSaisiPar(saisiPar);
 
+        // Statut direct à EN_ATTENTE (plus de brouillon, visibilité immédiate sur Dashboard)
+        decaissement.setStatut(StatutDecaissement.EN_ATTENTE);
+
         Decaissement saved = decaissementRepository.save(decaissement);
 
         journalAuditService.enregistrer(
@@ -84,6 +87,12 @@ public class DecaissementServiceImpl implements IDecaissementService {
                 "Décaissement " + saved.getNumero() + " — " + saved.getMontant() + " XAF"
                         + (saved.isSeuilPdgRequis() ? " (seuil PDG requis)" : ""),
                 null);
+
+        // Notification immédiate pour le RF
+        notificationService.creerEtEnvoyer(
+                "Nouveau décaissement à valider",
+                "Un nouveau décaissement " + saved.getNumero() + " de " + saved.getMontant() + " XAF a été créé et attend votre validation.",
+                "RESPONSABLE_FINANCIER");
 
         return decaissementMapper.toResponse(saved);
     }

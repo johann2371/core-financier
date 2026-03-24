@@ -8,4 +8,6 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     Optional<Utilisateur> findByEmail(String email);
 
     boolean existsByEmail(String email);
+
+    java.util.List<Utilisateur> findByRole(com.corefi.enums.Role role);
 }

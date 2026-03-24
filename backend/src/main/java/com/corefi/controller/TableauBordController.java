@@ -17,7 +17,7 @@ public class TableauBordController {
     private final ITableauBordService tableauBordService;
 
     @GetMapping("/kpis")
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'RESPONSABLE_FINANCIER', 'PDG')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'RESPONSABLE_FINANCIER', 'PDG', 'COMPTABLE', 'CAISSIER')")
     public ResponseEntity<TableauBordResponse> getKpis() {
         return ResponseEntity.ok(tableauBordService.getKpis());
     }

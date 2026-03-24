@@ -58,7 +58,7 @@ public class Decaissement {
     private String telephone;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private StatutDecaissement statut = StatutDecaissement.BROUILLON;
 
     // --- Saisie ---

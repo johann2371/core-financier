@@ -1,9 +1,14 @@
 package com.corefi.service.impl;
 
 import com.corefi.entity.Notification;
+import com.corefi.entity.Utilisateur;
+import com.corefi.enums.Role;
 import com.corefi.repository.NotificationRepository;
+import com.corefi.repository.UtilisateurRepository;
+import com.corefi.service.interfaces.IEmailService;
 import com.corefi.service.interfaces.INotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,9 +17,12 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class NotificationServiceImpl implements INotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final UtilisateurRepository utilisateurRepository;
+    private final IEmailService emailService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Override
@@ -27,8 +35,25 @@ public class NotificationServiceImpl implements INotificationService {
         
         Notification saved = notificationRepository.save(notification);
 
-        // Diffuser en temps réel via WebSocket (STOMP)
-        messagingTemplate.convertAndSend("/topic/notifications/" + roleCible, saved);
+        // 1. Diffuser en temps réel via WebSocket (STOMP)
+        try {
+            messagingTemplate.convertAndSend("/topic/notifications/" + roleCible, saved);
+        } catch (Exception e) {
+            log.warn("Erreur WebSocket : {}", e.getMessage());
+        }
+
+        // 2. Envoyer par Mail à tous les utilisateurs du rôle cible
+        try {
+            Role roleEnum = Role.valueOf(roleCible);
+            List<Utilisateur> destinataires = utilisateurRepository.findByRole(roleEnum);
+            for (Utilisateur u : destinataires) {
+                if (u.getEmail() != null && !u.getEmail().isEmpty()) {
+                    emailService.sendSimpleMessage(u.getEmail(), "SODICA - " + titre, message);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Erreur lors de l'envoi des mails de notification: {}", e.getMessage());
+        }
 
         return saved;
     }

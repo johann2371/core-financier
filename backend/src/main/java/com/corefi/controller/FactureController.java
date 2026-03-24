@@ -28,7 +28,7 @@ public class FactureController {
         byte[] pdfBytes = pdfService.genererFacturePdf(id);
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
-        headers.setContentDispositionFormData("attachment", "facture_" + id + ".pdf");
+        headers.setContentDisposition(org.springframework.http.ContentDisposition.inline().build());
         return new ResponseEntity<>(pdfBytes, headers, org.springframework.http.HttpStatus.OK);
     }
 

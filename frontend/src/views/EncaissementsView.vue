@@ -1,28 +1,96 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import api from '../services/api'
 import MainLayout from '../components/MainLayout.vue'
 import Pagination from '../components/Pagination.vue'
 import { useEncaissementStore } from '../stores/encaissement.store'
 import { useTierStore } from '../stores/tier.store'
+import { useCompteStore } from '../stores/compte.store'
 
 const store = useEncaissementStore()
 const tierStore = useTierStore()
+const compteStore = useCompteStore()
 const showModal = ref(false)
-const selectedMode = ref('VIREMENT') // Default helper
+const showPreview = ref(false)
+const previewUrl = ref(null)
+const selectedMode = ref('ESPECES') // Passer ESPECES par défaut pour plus de sûreté
+
+const openPreview = async (id) => {
+  try {
+    const response = await api.get(`/encaissements/${id}/recu/pdf`, { responseType: 'blob' })
+
+    if (response.status === 204 || !response.data || response.data.size === 0) {
+      alert("Erreur: Le serveur n'a renvoyé aucune donnée pour ce reçu.")
+      return
+    }
+
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    previewUrl.value = URL.createObjectURL(blob)
+    showPreview.value = true
+  } catch (err) {
+    console.error('Erreur lors de la prévisualisation:', err)
+  }
+}
+
+const closePreview = () => {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+  }
+  showPreview.value = false
+  previewUrl.value = null
+}
 
 // Pagination
 const currentPage = ref(1)
 const itemsPerPage = 8
 
+// Filtres
+const filters = ref({
+  search: '', // Référence ou Client
+  clientId: '',
+  dateDebut: '',
+  dateFin: ''
+})
+
+const resetFilters = () => {
+  filters.value = { search: '', clientId: '', dateDebut: '', dateFin: '' }
+}
+
+const filteredEncaissements = computed(() => {
+  let list = store.encaissements
+  
+  if (filters.value.search) {
+    const s = filters.value.search.toLowerCase()
+    list = list.filter(e => 
+      (e.reference && e.reference.toLowerCase().includes(s)) ||
+      (e.nomClient && e.nomClient.toLowerCase().includes(s)) ||
+      (e.id && e.id.toString().includes(s))
+    )
+  }
+
+  if (filters.value.clientId) {
+    list = list.filter(e => e.clientId == filters.value.clientId)
+  }
+
+  if (filters.value.dateDebut) {
+    list = list.filter(e => e.dateEncaissement && e.dateEncaissement >= filters.value.dateDebut)
+  }
+  if (filters.value.dateFin) {
+    list = list.filter(e => e.dateEncaissement && e.dateEncaissement <= filters.value.dateFin)
+  }
+
+  return list
+})
+
 const paginatedList = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage
-  return store.encaissements.slice(start, start + itemsPerPage)
+  return filteredEncaissements.value.slice(start, start + itemsPerPage)
 })
 // Champs du formulaire dynamique
 const form = ref({
   motif: '',
   montant: '',
-  factureId: null,
+  numeroFacture: '',
   clientId: '',
   moyenPaiement: 'VIREMENT',
   compteFinancierId: 1, // TODO: Dynamic later
@@ -35,6 +103,27 @@ const form = ref({
 onMounted(async () => {
   await store.fetchEncaissements()
   await tierStore.fetchTiers()
+  await compteStore.fetchComptes()
+})
+
+const availableComptes = computed(() => {
+  if (selectedMode.value === 'ESPECES') {
+    return compteStore.caisses
+  } else {
+    return compteStore.banques
+  }
+})
+
+// Auto-select first available account when mode changes
+const watchMode = computed(() => selectedMode.value)
+import { watch } from 'vue'
+watch(watchMode, (newMode) => {
+  const list = newMode === 'ESPECES' ? compteStore.caisses : compteStore.banques
+  if (list.length > 0) {
+    form.value.compteFinancierId = list[0].id
+  } else {
+    form.value.compteFinancierId = null
+  }
 })
 
 const submitForm = async () => {
@@ -50,9 +139,18 @@ const submitForm = async () => {
       dateOperation: form.value.dateOperation || null,
       telephone: form.value.telephone || null
     }
+
+    // Gestion de l'affectation automatique par numéro de facture
+    if (form.value.numeroFacture) {
+      dataToSend.affectations = [{
+        numeroFacture: form.value.numeroFacture,
+        montantAffecte: form.value.montant
+      }]
+    }
+
     const newlyCreated = await store.createEncaissement(dataToSend)
     showModal.value = false
-    form.value = { motif: '', montant: '', factureId: null, clientId: '', moyenPaiement: 'VIREMENT', compteFinancierId: 1, banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '' }
+    form.value = { motif: '', montant: '', numeroFacture: '', clientId: '', moyenPaiement: 'VIREMENT', compteFinancierId: 1, banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '' }
     
     // Auto-téléchargement du reçu pour marquer l'acte
     if (newlyCreated && newlyCreated.id) {
@@ -63,6 +161,15 @@ const submitForm = async () => {
     console.error(e)
   }
 }
+
+const getStatusClass = (statut) => {
+  if (!statut) return ''
+  const s = statut.toUpperCase()
+  if (s.includes('VALIDEE') || s.includes('PAYE')) return 'badge-success'
+  if (s.includes('REJETE') || s.includes('ANNULE')) return 'badge-danger'
+  if (s.includes('ATTENTE') || s.includes('SOUMIS')) return 'badge-warning'
+  return 'badge-info'
+}
 </script>
 
 <template>
@@ -71,10 +178,37 @@ const submitForm = async () => {
 
     <template #actions>
       <button @click="showModal = true" class="btn-primary">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        Saisie Rapide
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        Nouveau Encaissement
       </button>
     </template>
+    
+    <!-- Barre de Filtres -->
+    <div class="filter-bar">
+      <div class="filter-group group-search">
+        <div class="input-with-icon-left">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input v-model="filters.search" type="text" placeholder="Référence ou Client..." class="filter-input-std" />
+        </div>
+      </div>
+      
+      <div class="filter-group">
+        <select v-model="filters.clientId" class="filter-input-std">
+          <option value="">Tous les clients</option>
+          <option v-for="c in tierStore.clients" :key="c.id" :value="c.id">{{ c.raisonSociale }}</option>
+        </select>
+      </div>
+
+      <div class="filter-group-range">
+        <input v-model="filters.dateDebut" type="date" class="filter-input-std" title="Date début" />
+        <span class="to-text">à</span>
+        <input v-model="filters.dateFin" type="date" class="filter-input-std" title="Date fin" />
+      </div>
+
+      <button @click="resetFilters" class="btn-clear-filters" title="Réinitialiser">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+      </button>
+    </div>
 
     <div class="table-card">
       <div v-if="store.loading && store.encaissements.length === 0" class="loading-state">
@@ -86,53 +220,69 @@ const submitForm = async () => {
         <button @click="store.fetchEncaissements" class="btn-outline">Réessayer</button>
       </div>
 
-      <table v-else class="data-table">
-        <thead>
-          <tr>
-            <th>Référence</th>
-            <th>Date</th>
-            <th>Détails & Mode</th>
-            <th class="text-right">Montant</th>
-            <th class="text-center">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="store.encaissements.length === 0" class="empty-row text-center">
-            <td colspan="5">
-              <div class="empty-state">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M12 12h.01"></path><path d="M17 12h.01"></path><path d="M7 12h.01"></path></svg>
-                <p>Aucun encaissement récent.</p>
-                <span>Utilisez "Saisie Rapide" pour déclarer une entrée.</span>
-              </div>
-            </td>
-          </tr>
-          
-          <tr v-for="item in paginatedList" :key="item.id">
-            <td class="font-semibold text-dark">#ENC-{{ item.id?.toString().padStart(4, '0') }}</td>
-            <td class="text-muted">{{ new Date(item.dateEncaissement).toLocaleDateString() }}</td>
-            <td>
-              <div class="motif-cell">
-                <strong class="text-dark">{{ item.moyenPaiement }}</strong>
-                <span class="text-muted" style="font-size: 0.75rem;">{{ item.reference || 'Aucune référence' }}</span>
-                <span class="facture-badge" v-if="item.factureId">Lié à Fac-{{ item.factureId }}</span>
-              </div>
-            </td>
-            <td class="text-right font-semibold text-dark">{{ item.montant?.toLocaleString() }} XAF</td>
-            <td class="text-center">
-              <button class="icon-btn" @click.stop="store.downloadReceipt(item.id)" title="Télécharger le Reçu PDF">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else class="table-scroll-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Référence</th>
+              <th>Date</th>
+              <th>Client</th>
+              <th>Moyen</th>
+              <th class="text-right">Montant (XAF)</th>
+              <th class="text-center">Statut</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="filteredEncaissements.length === 0" class="empty-row text-center">
+              <td colspan="7">
+                <div class="empty-state">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M12 12h.01"></path><path d="M17 12h.01"></path><path d="M7 12h.01"></path></svg>
+                  <p>Aucun encaissement trouvé.</p>
+                </div>
+              </td>
+            </tr>
+            <tr v-for="e in paginatedList" :key="e.id">
+              <td>
+                <div class="motif-cell">
+                  <span class="motif-text">{{ e.reference || 'N/A' }}</span>
+                  <span class="motif-sub">{{ e.numero }}</span>
+                </div>
+              </td>
+              <td>{{ new Date(e.dateEncaissement).toLocaleDateString() }}</td>
+              <td class="font-semibold text-dark">{{ e.nomClient }}</td>
+              <td>{{ e.moyenPaiement }}</td>
+              <td class="text-right font-semibold">{{ e.montant?.toLocaleString() }}</td>
+              <td class="text-center">
+                <span class="badge" :class="getStatusClass(e.statut)">
+                  {{ e.statut }}
+                </span>
+              </td>
+              <td class="text-center actions-cell">
+                <button @click="openPreview(e.id)" class="icon-btn preview-btn" title="Aperçu">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+                <button @click="store.downloadReceipt(e.id)" class="icon-btn download-btn" title="Télécharger">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Info Pagination -->
+      <div class="table-footer-info" v-if="filteredEncaissements.length > 0">
+        Affichage de {{ paginatedList.length }} sur {{ filteredEncaissements.length }} encaissement(s)
+        <span v-if="filteredEncaissements.length < store.encaissements.length" class="text-blue italic">(Filtré)</span>
+      </div>
     </div>
 
     <!-- Composant de Pagination Détaché -->
     <Pagination 
-      v-if="store.encaissements.length > 0"
+      v-if="filteredEncaissements.length > 0"
       :currentPage="currentPage" 
-      :totalItems="store.encaissements.length" 
+      :totalItems="filteredEncaissements.length" 
       :itemsPerPage="itemsPerPage" 
       @update:currentPage="currentPage = $event" 
     />
@@ -143,18 +293,8 @@ const submitForm = async () => {
         
         <!-- Header Mode App -->
         <div class="modal-header">
-          <div class="modal-title-group">
-            <div class="modal-icon bg-blue-light">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            </div>
-            <div>
-              <h3>Saisie Rapide : Nouvel Encaissement</h3>
-              <span class="subtitle">MODE PERFORMANCE • <strong class="text-blue">ENC-2026-MOD</strong></span>
-            </div>
-          </div>
-          <div class="modal-close-group">
-            <button @click="showModal = false" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-          </div>
+          <h3>Nouveau Encaissement</h3>
+          <button @click="showModal = false" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
 
         <div class="modal-split">
@@ -164,7 +304,7 @@ const submitForm = async () => {
             <div class="form-group search-group">
               <div class="label-row">
                 <label>Client</label>
-                <span class="status-text blue-text">Auto-complétion active...</span>
+                
               </div>
               <div class="input-with-icon">
                 <select v-model="form.clientId" class="input-huge" required autofocus>
@@ -247,8 +387,22 @@ const submitForm = async () => {
                 <input v-model="form.montant" type="number" required class="input-large text-right font-semibold" placeholder="0.00" />
               </div>
               <div class="form-group half">
-                <label>Lier Facture N°</label>
-                <input v-model="form.factureId" type="number" class="input-large" placeholder="Optionnel" />
+                <label>Lier à la Facture N° (Ex: FAC-...)</label>
+                <input v-model="form.numeroFacture" type="text" class="input-large" placeholder="Saisir le code facture (Optionnel)" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group half" v-if="selectedMode">
+                <label>Compte Financier <span class="req">*</span></label>
+                <select v-model="form.compteFinancierId" class="input-std" required>
+                  <option v-for="c in availableComptes" :key="c.id" :value="c.id">
+                    {{ c.type === 'CAISSE' ? 'Compte de Caisse' : 'Compte de Banque' }}
+                  </option>
+                </select>
+                <div v-if="availableComptes.length === 0" class="text-xs text-red mt-1">
+                  Aucun compte de ce type disponible.
+                </div>
               </div>
             </div>
 
@@ -316,20 +470,27 @@ const submitForm = async () => {
         </div>
 
         <!-- Footer Actions -->
-        <div class="modal-footer pt-0">
-          <button type="button" class="btn-text-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            Aperçu du reçu
-          </button>
-          
+        <div class="modal-footer pt-0 justify-end">
           <div class="actions-group">
-            <button type="button" class="btn-outline">
-              Ajouter et Nouveau
-            </button>
             <button type="submit" form="encaissement-form" class="btn-primary-large" :disabled="store.loading || !form.montant">
               {{ store.loading ? 'En cours...' : 'Confirmer et Enregistrer' }}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale de Prévisualisation (iFrame) Globalisé -->
+    <div v-if="showPreview" class="modal-backdrop-preview" @click.self="closePreview">
+      <div class="preview-container">
+        <div class="preview-header">
+          <h3>Aperçu du Reçu d'Encaissement</h3>
+          <button @click="closePreview" class="close-btn-preview">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="preview-body">
+          <iframe :src="previewUrl" width="100%" height="100%" frameborder="0"></iframe>
         </div>
       </div>
     </div>
@@ -338,20 +499,6 @@ const submitForm = async () => {
 
 <style scoped>
 /* GENERAL TABLE LIST */
-.table-card {
-  background: white; border-radius: 12px;
-  border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden;
-}
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 1.25rem 1.5rem; text-align: left; border-bottom: 1px solid #f3f4f6; }
-.data-table th { background-color: #f9fafb; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #6b7280; letter-spacing: 0.05em; }
-.data-table td { font-size: 0.9rem; color: #4b5563; vertical-align: middle; }
-.text-right { text-align: right !important; }
-.text-center { text-align: center !important; }
-.font-semibold { font-weight: 600; }
-.text-dark { color: #111827; }
-.text-muted { color: #6b7280; }
-
 .motif-cell { display: flex; flex-direction: column; gap: 0.25rem; }
 .motif-text { color: #111827; font-weight: 500;}
 .facture-badge { font-size: 0.65rem; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; display: inline-block; align-self: flex-start; font-weight: 600;}
@@ -363,22 +510,13 @@ const submitForm = async () => {
 .btn-primary { display: flex; align-items: center; gap: 0.5rem; background-color: #2563eb; color: white; padding: 0.625rem 1rem; border-radius: 8px; border: none; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.15s, transform 0.1s; }
 .btn-primary:hover { background-color: #1d4ed8; }
 .btn-primary:active { transform: scale(0.98); }
-.btn-primary .shortcut { background: rgba(255,255,255,0.2); border-radius: 4px; padding: 2px 6px; font-size: 0.65rem; font-weight: 500;}
+
 
 /* MODAL SAISIE RAPIDE EXPERTE */
 .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(17, 24, 39, 0.6); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 2rem;}
-.modal-lg { width: 100%; max-width: 950px; background: white; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; max-height: 90vh;}
+.modal-lg { width: 100%; max-width: 950px; background: white; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; max-height: 90vh;}
+.modal-header { padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6;}
 
-.modal-header { padding: 1.5rem 2rem; border-bottom: 1px solid #e5e7eb; background: #f9fafb; display: flex; justify-content: space-between; align-items: center; border-radius: 16px 16px 0 0; }
-.modal-title-group { display: flex; align-items: center; gap: 1rem; }
-.bg-blue-light { background: #eff6ff; padding: 0.5rem; border-radius: 8px; }
-.modal-title-group h3 { font-size: 1.125rem; font-weight: 700; color: #111827; margin-bottom: 0.1rem; }
-.modal-title-group .subtitle { font-size: 0.7rem; color: #6b7280; font-weight: 600; letter-spacing: 0.05em; }
-.text-blue { color: #2563eb; }
-
-.modal-close-group { display: flex; align-items: center; gap: 1rem; }
-.shortcut-tip { font-size: 0.75rem; color: #6b7280; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; }
-kbd { font-family: inherit; background: #e5e7eb; color: #4b5563; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; border-bottom: 1px solid #d1d5db; }
 .close-btn { background: none; border: none; color: #9ca3af; cursor: pointer; transition: color 0.15s; }
 .close-btn:hover { color: #111827; }
 
@@ -393,7 +531,7 @@ kbd { font-family: inherit; background: #e5e7eb; color: #4b5563; padding: 2px 6p
 
 .label-row { display: flex; justify-content: space-between; align-items: baseline; }
 .label-row label { font-size: 0.85rem; font-weight: 600; color: #111827; display: flex; align-items: center; gap: 0.5rem; }
-.blue-text { color: #2563eb; font-size: 0.75rem; font-weight: 500; font-style: italic; }
+
 .req { color: #ef4444; }
 
 .input-with-icon { position: relative; }
@@ -409,7 +547,7 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246,
 .autocomplete-dropdown { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; overflow: hidden; margin-top: 0.25rem; animation: slideDown 0.2s ease-out; }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 .ac-header { display: flex; justify-content: space-between; padding: 0.5rem 1rem; background: #dbeafe; font-size: 0.75rem; font-weight: 600; color: #1e40af; }
-.ac-header kbd { background: #3b82f6; color: white; border-bottom: none; }
+
 .ac-item { padding: 1rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
 .ac-info { display: flex; flex-direction: column; gap: 0.25rem; }
 .ac-info strong { font-size: 1rem; color: #111827; }
@@ -421,7 +559,7 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246,
 .mode-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; cursor: pointer; color: #4b5563; transition: all 0.15s; position: relative; }
 .mode-card.active { border-color: #2563eb; background: #eff6ff; color: #2563eb; box-shadow: 0 0 0 2px #bfdbfe; }
 .mode-card span:nth-child(3) { font-size: 0.9rem; font-weight: 600; }
-.mode-card .shortcut { font-size: 0.65rem; color: #9ca3af; font-weight: 500; }
+
 .hidden-radio { position: absolute; opacity: 0; }
 
 /* RIGHT COL (CONTEXT) */
@@ -451,7 +589,7 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246,
 
 
 /* FOOTER */
-.modal-footer { padding: 1.5rem 2rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: white; border-radius: 0 0 16px 16px; }
+.modal-footer { padding: 1.5rem 2rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; align-items: center; background: white; border-radius: 0 0 16px 16px; }
 .pt-0 { padding-top: 1.5rem; }
 
 .btn-text-icon { background: none; border: none; display: flex; align-items: center; gap: 0.5rem; color: #4b5563; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: color 0.15s; }

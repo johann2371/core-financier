@@ -45,7 +45,6 @@ export const useFactureStore = defineStore('facture', {
 
     async downloadPdf(id) {
       try {
-        // Optionnel: On peut utiliser window.open si c'est géré en REST GET simple
         const response = await api.get(`/factures/${id}/pdf`, { responseType: 'blob' })
         const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
         const link = document.createElement('a')
@@ -56,6 +55,16 @@ export const useFactureStore = defineStore('facture', {
         link.remove()
       } catch (err) {
         console.error('Erreur téléchargement PDF: ', err)
+      }
+    },
+
+    async previewPdf(id) {
+      try {
+        const response = await api.get(`/factures/${id}/pdf`, { responseType: 'blob' })
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+        window.open(url, '_blank')
+      } catch (err) {
+        console.error('Erreur prévisualisation PDF: ', err)
       }
     }
   }

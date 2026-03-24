@@ -11,6 +11,7 @@ public class DecaissementResponse {
     private String numero;
     private LocalDate dateDecaissement;
     private LocalDateTime dateCreation;
+    private Long fournisseurId;
     private String fournisseurNom;
     private String beneficiaire;
     private String motif;

@@ -9,6 +9,7 @@ public class EncaissementResponse {
     private Long id;
     private String numero;
     private LocalDate dateEncaissement;
+    private Long clientId;
     private String nomClient;
     private BigDecimal montant;
     private String reference;

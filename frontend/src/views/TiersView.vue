@@ -150,7 +150,7 @@ const submitForm = async () => {
             <th>Type</th>
             <th>Désignation</th>
             <th>Contact</th>
-            <th class="text-right">Solde Actuel (XAF)</th>
+            <th class="text-right">Dette / Créance (XAF)</th>
           </tr>
         </thead>
         <tbody>
@@ -491,13 +491,7 @@ const submitForm = async () => {
 .btn-primary:hover {
   background-color: #1d4ed8;
 }
-.btn-primary .shortcut {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 0.65rem;
-  font-weight: 500;
-}
+
 
 /* MODAL */
 .modal-backdrop {

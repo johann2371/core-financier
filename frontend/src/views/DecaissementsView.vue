@@ -1,47 +1,127 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import api from '../services/api'
 import MainLayout from '../components/MainLayout.vue'
 import Pagination from '../components/Pagination.vue'
 import { useDecaissementStore } from '../stores/decaissement.store'
 import { useTierStore } from '../stores/tier.store'
+import { useAuthStore } from '../stores/auth.store'
+import { useCompteStore } from '../stores/compte.store'
 
 const store = useDecaissementStore()
 const tierStore = useTierStore()
+const authStore = useAuthStore()
+const compteStore = useCompteStore()
+
 // Modals State
 const showCreateModal = ref(false)
 const showApproveModal = ref(false)
+const showExecuteModal = ref(false)
 const showRejectModal = ref(false)
 const activeDecaissement = ref(null)
+const showPreview = ref(false)
+const previewUrl = ref(null)
+
+const openPreview = async (id) => {
+  try {
+    const response = await api.get(`/decaissements/${id}/recu/pdf`, { responseType: 'blob' })
+
+    if (response.status === 204 || !response.data || response.data.size === 0) {
+      alert("Erreur: Le serveur n'a renvoyé aucune donnée pour ce bon.")
+      return
+    }
+
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    previewUrl.value = URL.createObjectURL(blob)
+    showPreview.value = true
+  } catch (err) {
+    console.error('Erreur lors de la prévisualisation:', err)
+  }
+}
+
+const closePreview = () => {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+  }
+  showPreview.value = false
+  previewUrl.value = null
+}
 
 // Pagination
 const currentPage = ref(1)
 const itemsPerPage = 8
 
+// Filtres
+const filters = ref({
+  search: '', // Motif, Beneficiaire, TXN
+  fournisseurId: '',
+  statut: '',
+  dateDebut: '',
+  dateFin: ''
+})
+
+const resetFilters = () => {
+  filters.value = { search: '', fournisseurId: '', statut: '', dateDebut: '', dateFin: '' }
+}
+
+const filteredDecaissements = computed(() => {
+  let list = store.decaissements
+  
+  if (filters.value.search) {
+    const s = filters.value.search.toLowerCase()
+    list = list.filter(d => 
+      (d.motif && d.motif.toLowerCase().includes(s)) ||
+      (d.beneficiaire && d.beneficiaire.toLowerCase().includes(s)) ||
+      (d.fournisseurNom && d.fournisseurNom.toLowerCase().includes(s)) ||
+      (d.id && d.id.toString().includes(s))
+    )
+  }
+
+  if (filters.value.fournisseurId) {
+    list = list.filter(d => d.fournisseurId == filters.value.fournisseurId)
+  }
+
+  if (filters.value.statut) {
+    list = list.filter(d => d.statut === filters.value.statut)
+  }
+
+  if (filters.value.dateDebut) {
+    list = list.filter(d => (d.dateCreation || d.dateDecaissement) >= filters.value.dateDebut)
+  }
+  if (filters.value.dateFin) {
+    list = list.filter(d => (d.dateCreation || d.dateDecaissement) <= filters.value.dateFin)
+  }
+
+  return list
+})
+
 const paginatedList = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage
-  return store.decaissements.slice(start, start + itemsPerPage)
+  return filteredDecaissements.value.slice(start, start + itemsPerPage)
 })
 
 // Forms State
-const createForm = ref({ motif: '', montant: '', fournisseurId: '', beneficiaire: '', mode: 'VIREMENT', banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '' })
 const defaultCreateForm = { motif: '', montant: '', fournisseurId: '', beneficiaire: '', mode: 'VIREMENT', banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '' }
+const createForm = ref({ ...defaultCreateForm })
 const rejectForm = ref({ reason: 'missing_docs', comments: '' })
 const approveForm = ref({ checks: [false, false, false, false] })
-
-// Bank balances synthétique pour l'UI
-const bankBalance = ref(14250000)
+const executeForm = ref({ compteFinancierId: null })
 
 onMounted(async () => {
   await store.fetchDecaissements()
   await tierStore.fetchTiers()
+  await compteStore.fetchComptes()
 })
 
-const getStatusClass = (statut) => {
-  const s = statut ? statut.toLowerCase() : ''
-  if (s.includes('valide') || s.includes('paye')) return 'badge-success'
-  if (s.includes('rejete')) return 'badge-danger'
-  return 'badge-warning'
-}
+const availableComptes = computed(() => {
+  if (!activeDecaissement.value) return []
+  if (activeDecaissement.value.moyenPaiement === 'ESPECES') {
+    return compteStore.caisses
+  } else {
+    return compteStore.banques
+  }
+})
+
 
 const submitCreate = async () => {
   try {
@@ -89,8 +169,29 @@ const openReject = (item) => {
 
 const submitApprove = async () => {
   try {
-    await store.updateStatut(activeDecaissement.value.id, 'VALIDE_FINANCES', 'Approuvé via Checklist')
+    if (activeDecaissement.value.statut === 'EN_ATTENTE' || activeDecaissement.value.statut === 'SOUMIS') {
+      await store.validerRF(activeDecaissement.value.id, { checks: approveForm.value.checks })
+    } else if (activeDecaissement.value.statut === 'EN_ATTENTE_PDG' || activeDecaissement.value.statut === 'VALIDEE_RF') {
+       // Note: VALIDEE_RF peut être approuvé par PDG si montant élevé, ou passé au caissier
+       await store.approuverPDG(activeDecaissement.value.id, { approved: true })
+    }
     showApproveModal.value = false
+  } catch(e) { console.error(e) }
+}
+
+const openExecute = (item) => {
+  activeDecaissement.value = item
+  const list = item.moyenPaiement === 'ESPECES' ? compteStore.caisses : compteStore.banques
+  executeForm.value.compteFinancierId = list.length > 0 ? list[0].id : null
+  showExecuteModal.value = true
+}
+
+const submitExecute = async () => {
+  try {
+    await store.executer(activeDecaissement.value.id, { 
+      compteFinancierId: executeForm.value.compteFinancierId 
+    })
+    showExecuteModal.value = false
   } catch(e) { console.error(e) }
 }
 
@@ -100,6 +201,16 @@ const submitReject = async () => {
     await store.updateStatut(activeDecaissement.value.id, 'REJETE', comment)
     showRejectModal.value = false
   } catch(e) { console.error(e) }
+}
+
+const getStatusClass = (statut) => {
+  if (!statut) return ''
+  const s = statut.toUpperCase()
+  if (s === 'EXECUTEE') return 'badge-success'
+  if (s.startsWith('VALIDEE')) return 'badge-success-light'
+  if (s.includes('REJETEE') || s.includes('ANNULEE')) return 'badge-danger'
+  if (s.includes('ATTENTE') || s.includes('SOUMIS')) return 'badge-warning'
+  return 'badge-info'
 }
 </script>
 
@@ -114,6 +225,46 @@ const submitReject = async () => {
       </button>
     </template>
 
+    <!-- Barre de Filtres -->
+    <div class="filter-bar">
+      <div class="filter-group group-search">
+        <div class="input-with-icon-left">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input v-model="filters.search" type="text" placeholder="Motif ou Bénéficiaire..." class="filter-input-std" />
+        </div>
+      </div>
+      
+      <div class="filter-group">
+        <select v-model="filters.fournisseurId" class="filter-input-std">
+          <option value="">Tous les fournisseurs</option>
+          <option v-for="f in tierStore.fournisseurs" :key="f.id" :value="f.id">{{ f.raisonSociale }}</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <select v-model="filters.statut" class="filter-input-std">
+          <option value="">Tous les statuts</option>
+          <option value="EN_ATTENTE">Attente RF</option>
+          <option value="EN_ATTENTE_PDG">Attente PDG</option>
+          <option value="VALIDEE_RF">Validé RF</option>
+          <option value="VALIDEE_PDG">Approuvé PDG</option>
+          <option value="EXECUTEE">Exécutée (Payée)</option>
+          <option value="REJETEE_RF">Rejeté RF</option>
+          <option value="REJETEE_PDG">Rejeté PDG</option>
+        </select>
+      </div>
+
+      <div class="filter-group-range">
+        <input v-model="filters.dateDebut" type="date" class="filter-input-std" title="Date début" />
+        <span class="to-text">à</span>
+        <input v-model="filters.dateFin" type="date" class="filter-input-std" title="Date fin" />
+      </div>
+
+      <button @click="resetFilters" class="btn-clear-filters" title="Réinitialiser">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+      </button>
+    </div>
+
     <div class="table-card">
       <div v-if="store.loading && store.decaissements.length === 0" class="loading-state">
         Chargement...
@@ -124,71 +275,88 @@ const submitReject = async () => {
         <button @click="store.fetchDecaissements" class="btn-outline mt-2">Réessayer</button>
       </div>
 
-      <table v-else class="data-table">
-        <thead>
-          <tr>
-            <th>Réf. TXN</th>
-            <th>Date</th>
-            <th>Bénéficiaire & Motif</th>
-            <th class="text-right">Montant (XAF)</th>
-            <th>Statut</th>
-            <th class="text-center">Contrôle</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="store.decaissements.length === 0" class="empty-row text-center">
-            <td colspan="6">
-              <div class="empty-state">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                <p>Aucune demande de décaissement.</p>
-              </div>
-            </td>
-          </tr>
-          
-          <tr v-for="item in paginatedList" :key="item.id">
-            <td class="font-semibold text-dark">#TXN-{{ item.id?.toString().padStart(4, '0') }}-BK</td>
-            <td class="text-muted">{{ new Date(item.dateCreation || item.dateDecaissement).toLocaleDateString() }}</td>
-            <td>
-              <div class="cell-stack">
-                <strong class="text-dark">{{ item.beneficiaire || item.fournisseurNom || 'N/A' }}</strong>
-                <span class="text-muted text-sm">{{ item.motif || 'Aucun motif renseigné' }}</span>
-              </div>
-            </td>
-            <td class="text-right font-semibold text-dark">{{ item.montant?.toLocaleString() }} XAF</td>
-            <td>
-              <span class="badge" :class="getStatusClass(item.statut)">
-                {{ item.statut }}
-              </span>
-            </td>
-            <td class="actions-cell">
-              <!-- Si statut est SOUMIS ou en attente on gère l'approbation -->
-               <template v-if="item.statut === 'SOUMIS' || item.statut === 'EN_ATTENTE'">
-                <button class="btn-icon text-green" @click="openApprove(item)" title="Approuver">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                </button>
-                <button class="btn-icon text-red" @click="openReject(item)" title="Rejeter">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-               </template>
-               <template v-else-if="item.statut === 'REJETE'">
-                 <span class="text-muted text-sm italic">Rejeté</span>
-               </template>
-               <template v-else>
-                 <button class="icon-btn" @click.stop="store.downloadReceipt(item.id)" title="Télécharger le Reçu PDF">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                 </button>
-               </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else class="table-scroll-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Réf. TXN</th>
+              <th>Date</th>
+              <th>Bénéficiaire & Motif</th>
+              <th class="text-right">Montant (XAF)</th>
+              <th>Statut</th>
+              <th class="text-center">Contrôle</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="filteredDecaissements.length === 0" class="empty-row text-center">
+              <td colspan="6">
+                <div class="empty-state">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <p>Aucune demande de décaissement trouvée.</p>
+                </div>
+              </td>
+            </tr>
+            <tr v-for="item in paginatedList" :key="item.id">
+              <td class="font-semibold text-dark">{{ item.numero }}</td>
+              <td class="text-muted">{{ new Date(item.dateCreation || item.dateDecaissement).toLocaleDateString() }}</td>
+              <td>
+                <div class="cell-stack">
+                  <strong class="text-dark">{{ item.beneficiaire || item.fournisseurNom || 'N/A' }}</strong>
+                  <span class="text-muted text-sm">{{ item.motif || 'Aucun motif renseigné' }}</span>
+                </div>
+              </td>
+              <td class="text-right font-semibold text-dark">{{ item.montant?.toLocaleString() }} XAF</td>
+              <td>
+                <span class="badge" :class="getStatusClass(item.statut)">
+                  {{ item.statut }}
+                </span>
+              </td>
+              <td class="text-center">
+                <div class="actions-cell">
+                  <template v-if="item.statut === 'SOUMIS' || item.statut === 'EN_ATTENTE'">
+                    <button class="btn-icon text-green" @click="openApprove(item)" title="Valider (RF)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </button>
+                    <button class="btn-icon text-red" @click="openReject(item)" title="Rejeter">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </template>
+
+                  <button v-if="item.statut === 'VALIDEE_RF' && (authStore.userRole === 'PDG' || authStore.userRole === 'ADMINISTRATEUR')" @click="openApprove(item)" class="icon-btn text-green" title="Approuver (PDG)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </button>
+
+                  <button v-if="(item.statut === 'VALIDEE_PDG' || (item.statut === 'VALIDEE_RF' && item.montant < 500000)) && (authStore.userRole === 'CAISSIER' || authStore.userRole === 'ADMINISTRATEUR')" @click="openExecute(item)" class="icon-btn text-blue" title="Exécuter Paiement">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-3-3.87"></path><path d="M1 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 7l-7 7-3-3"></path></svg>
+                  </button>
+                  
+                  <!-- Preview Button -->
+                  <button @click="openPreview(item.id)" class="icon-btn preview-btn" title="Aperçu">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  </button>
+
+                  <button @click="store.downloadReceipt(item.id)" class="icon-btn download-btn" title="Télécharger">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Info Pagination -->
+      <div class="table-footer-info" v-if="filteredDecaissements.length > 0">
+        Affichage de {{ paginatedList.length }} sur {{ filteredDecaissements.length }} décaissement(s)
+        <span v-if="filteredDecaissements.length < store.decaissements.length" class="text-blue italic">(Filtré)</span>
+      </div>
     </div>
 
     <!-- Composant de Pagination Détaché -->
     <Pagination 
-      v-if="store.decaissements.length > 0"
+      v-if="filteredDecaissements.length > 0"
       :currentPage="currentPage" 
-      :totalItems="store.decaissements.length" 
+      :totalItems="filteredDecaissements.length" 
       :itemsPerPage="itemsPerPage" 
       @update:currentPage="currentPage = $event" 
     />
@@ -197,15 +365,7 @@ const submitReject = async () => {
     <div v-if="showCreateModal" class="modal-backdrop">
       <div class="modal modal-lg">
         <div class="modal-header">
-          <div class="modal-title-group">
-            <div class="modal-icon bg-blue-light">
-               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </div>
-            <div>
-              <h3>Nouvelle Demande de Décaissement</h3>
-              <span class="subtitle">CRÉATION SÉCURISÉE • <strong class="text-blue">NOUVEAU FLUX</strong></span>
-            </div>
-          </div>
+          <h3>Nouveau Décaissement</h3>
           <button @click="showCreateModal = false" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         
@@ -410,9 +570,53 @@ const submitReject = async () => {
 
         <div class="approve-footer">
           <button @click="showApproveModal = false" class="btn-outline-wide">Cancel Request</button>
-          <button @click="submitApprove" class="btn-confirm-execute" :disabled="!approveForm.checks.every(c => c)">
+          <button @click="submitApprove" class="btn-confirm-execute" :disabled="!approveForm.checks.every(c => c) && (activeDecaissement?.statut === 'EN_ATTENTE' || activeDecaissement?.statut === 'SOUMIS')">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            Confirm and Execute
+            Confirm Approval
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL : EXÉCUTION PAIEMENT (CAISSIER) -->
+    <div v-if="showExecuteModal" class="modal-backdrop fade-in">
+      <div class="modal modal-approve">
+        <div class="approve-header-group">
+          <div class="icon-warning-rounded" style="background: #dbeafe;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-3-3.87"></path><path d="M1 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 7l-7 7-3-3"></path></svg>
+          </div>
+          <div class="title-block">
+            <h3>Exécuter Paiement</h3>
+            <span>Transaction #{{ activeDecaissement?.numero }}</span>
+          </div>
+        </div>
+
+        <div class="modal-body" style="padding: 0;">
+          <div class="form-group">
+            <label>Compte Financier <span class="req">*</span></label>
+            <select v-model="executeForm.compteFinancierId" class="input-std" required>
+              <option value="" disabled>Choisir un compte...</option>
+              <option v-for="c in availableComptes" :key="c.id" :value="c.id">
+                {{ c.type === 'CAISSE' ? 'Compte de Caisse' : 'Compte de Banque' }}
+              </option>
+            </select>
+            <div v-if="availableComptes.length === 0" class="alert-box alert-error">
+               Aucun compte compatible trouvé.
+            </div>
+          </div>
+
+          <div class="balance-calc-box">
+             <div class="balance-row">
+               <span>Montant à décaisser :</span>
+               <strong class="text-red">-{{ activeDecaissement?.montant?.toLocaleString() }} XAF</strong>
+             </div>
+          </div>
+        </div>
+
+        <div class="approve-footer">
+          <button @click="showExecuteModal = false" class="btn-outline-wide">Annuler</button>
+          <button @click="submitExecute" class="btn-confirm-execute" style="background: #2563eb;" :disabled="!executeForm.compteFinancierId">
+            Confirmer le Paiement
           </button>
         </div>
       </div>
@@ -488,32 +692,26 @@ const submitReject = async () => {
       </div>
     </div>
 
+    <!-- Modale de Prévisualisation (iFrame) -->
+    <div v-if="showPreview" class="modal-backdrop-preview" @click.self="closePreview">
+      <div class="preview-container">
+        <div class="preview-header">
+          <h3>Aperçu du Bon de Décaissement</h3>
+          <button @click="closePreview" class="close-btn-preview">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="preview-body">
+          <iframe :src="previewUrl" width="100%" height="100%" frameborder="0"></iframe>
+        </div>
+      </div>
+    </div>
   </MainLayout>
 </template>
 
 <style scoped>
 /* MAIN LAYOUT ELEMENTS */
-.table-card { background: white; border-radius: 12px; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 1.15rem 1.5rem; text-align: left; border-bottom: 1px solid #f3f4f6; }
-.data-table th { background-color: #f9fafb; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #6b7280; letter-spacing: 0.05em; }
-.data-table td { font-size: 0.9rem; color: #4b5563; vertical-align: middle; }
-
-.font-semibold { font-weight: 600; }
-.text-dark { color: #111827; }
-.text-muted { color: #6b7280; }
-.text-sm { font-size: 0.75rem; }
-.text-xs { font-size: 0.7rem; }
-.text-right { text-align: right !important; }
-.text-center { text-align: center !important; }
-.italic { font-style: italic; }
-
 .cell-stack { display: flex; flex-direction: column; gap: 0.15rem; }
-
-.badge { display: inline-flex; padding: 0.25rem 0.625rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;}
-.badge-success { background: #d1fae5; color: #065f46; }
-.badge-danger { background: #fee2e2; color: #991b1b; }
-.badge-warning { background: #fef3c7; color: #92400e; }
 
 /* ACTIONS */
 .btn-primary { display: flex; align-items: center; gap: 0.5rem; background-color: #2563eb; color: white; padding: 0.625rem 1rem; border-radius: 8px; border: none; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
@@ -549,8 +747,7 @@ const submitReject = async () => {
 
 /* STYLE EXTRA POUR MODALE DE CREATION EXPERTE */
 .modal-lg { max-width: 950px; display: flex; flex-direction: column; max-height: 90vh; }
-.bg-blue-light { background: #eff6ff; padding: 0.5rem; border-radius: 8px; }
-.text-blue { color: #2563eb; }
+.modal-header h3 { font-size: 1.25rem; font-weight: 700; color: #111827; margin: 0; }
 .modal-split { display: grid; grid-template-columns: 1.5fr 1fr; border-bottom: 1px solid #f3f4f6; overflow-y: auto; flex: 1; min-height: 0; }
 .modal-left { padding: 2.5rem 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
 .modal-right { background: #f9fafb; padding: 2.5rem 2rem; border-left: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 1.5rem; }

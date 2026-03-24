@@ -3,9 +3,11 @@ import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
 import { useUiStore } from '../stores/ui.store'
+import { useNotificationStore } from '../stores/notification.store'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
+const notificationStore = useNotificationStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -28,6 +30,15 @@ onMounted(() => {
   }
   updateTime()
   setInterval(updateTime, 60000)
+
+  // Fetch notifications initiales et polling
+  const loadNotifications = () => {
+    if (authStore.userRole) {
+      notificationStore.fetchUnread(authStore.userRole)
+    }
+  }
+  loadNotifications()
+  setInterval(loadNotifications, 60000)
 })
 </script>
 
@@ -85,7 +96,7 @@ onMounted(() => {
           <div class="user-avatar" :style="{ backgroundImage: 'url(https://ui-avatars.com/api/?name=' + (authStore.user?.prenom || 'A') + '&background=e0e7ff&color=1d4ed8)' }"></div>
           <div class="user-details">
             <span class="user-name">{{ authStore.user?.prenom || 'Alex' }} {{ authStore.user?.nom || 'Henderson' }}</span>
-            <span class="user-role">{{ authStore.userRole?.toLowerCase() || 'Comptable Senior' }}</span>
+            <span class="user-role">{{ authStore.userRole?.toLowerCase() || 'Utilisateur' }}</span>
           </div>
         </div>
         <button @click="handleLogout" class="sidebar-logout" title="Déconnexion">
@@ -107,12 +118,12 @@ onMounted(() => {
           
           <div class="search-box">
             <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" placeholder="Rechercher (Ctrl + K)..." />
+            <input type="text" placeholder="Rechercher..." />
           </div>
           
-          <button class="action-btn notifications-btn">
+          <button class="action-btn notifications-btn" :title="notificationStore.unreadNotifications.length + ' notification(s) non lue(s)'">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-            <span class="badge"></span>
+            <span v-if="notificationStore.unreadNotifications.length > 0" class="badge"></span>
           </button>
         </div>
       </header>
@@ -144,7 +155,7 @@ onMounted(() => {
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background-color: #f9fafb; /* Très léger gris fond principal */
+  background-color: #f9fafb;
   color: var(--c-text);
   font-family: var(--font-family);
 }
@@ -152,8 +163,8 @@ onMounted(() => {
 /* ====== SIDEBAR ====== */
 .sidebar {
   width: 250px;
-  background-color: var(--c-surface); /* Blanc */
-  border-right: 1px solid #e5e7eb; /* Bordure discrète */
+  background-color: var(--c-surface);
+  border-right: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
 }
@@ -199,7 +210,7 @@ onMounted(() => {
   gap: 0.875rem;
   padding: 0.625rem 1rem;
   border-radius: 6px;
-  color: #4b5563; /* Gris moyen */
+  color: #4b5563;
   font-size: 0.9rem;
   font-weight: 500;
   transition: all 0.15s ease;
@@ -212,7 +223,7 @@ onMounted(() => {
 }
 
 .nav-item.active {
-  background-color: #eff6ff; /* Bleu très léger */
+  background-color: #eff6ff;
   color: var(--c-primary);
   font-weight: 600;
 }
@@ -228,7 +239,7 @@ onMounted(() => {
   letter-spacing: 0.05em;
 }
 
-/* Sidebar Footer (User info) */
+/* Sidebar Footer */
 .sidebar-footer {
   padding: 1.25rem 1rem;
   border-top: 1px solid #e5e7eb;
@@ -364,10 +375,11 @@ onMounted(() => {
 
 .badge {
   position: absolute;
-  top: -2px; right: -2px;
+  top: 1px; right: 1px;
   background-color: #ef4444; 
-  width: 8px; height: 8px;
+  width: 7px; height: 7px;
   border-radius: 50%;
+  border: 1.5px solid white;
 }
 
 .page-content {
@@ -407,7 +419,7 @@ onMounted(() => {
 }
 
 .clockwise-svg {
-  transform: rotate(-90deg); /* Oriente le départ à 12h */
+  transform: rotate(-90deg);
 }
 
 .spinner-circle {

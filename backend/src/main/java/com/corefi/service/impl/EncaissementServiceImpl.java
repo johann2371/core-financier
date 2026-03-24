@@ -5,7 +5,6 @@ import com.corefi.dto.request.encaissement.EncaissementCreateRequest;
 import com.corefi.dto.response.encaissement.EncaissementResponse;
 import com.corefi.entity.*;
 import com.corefi.enums.MoyenPaiement;
-import com.corefi.enums.StatutEncaissement;
 import com.corefi.enums.StatutFacture;
 import com.corefi.enums.TypeTiers;
 import com.corefi.exception.ResourceNotFoundException;
@@ -18,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.corefi.repository.AffectationPaiementRepository;
+import com.corefi.entity.AffectationPaiement;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -35,8 +36,10 @@ public class EncaissementServiceImpl implements IEncaissementService {
     private final DeviseRepository deviseRepository;
     private final FactureRepository factureRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final AffectationPaiementRepository affectationPaiementRepository;
     private final EncaissementMapper encaissementMapper;
     private final IJournalAuditService journalAuditService;
+    private final com.corefi.service.interfaces.INotificationService notificationService;
 
     // ────────────────────────────────────────────────────────────────────────
     // CRÉER UN ENCAISSEMENT (simulation de paiement reçu)
@@ -89,10 +92,16 @@ public class EncaissementServiceImpl implements IEncaissementService {
         compte.setSolde(compte.getSolde().add(request.getMontant()));
         compteFinancierRepository.save(compte);
 
-        // 7. Sauvegarder
+        // 7. Mettre à jour le solde du tiers (diminue la dette globale dès l'encaissement)
+        if (client.getSolde() == null) client.setSolde(BigDecimal.ZERO);
+        BigDecimal ancienSolde = client.getSolde();
+        client.setSolde(ancienSolde.subtract(request.getMontant()));
+        tiersRepository.save(client);
+
+        // 8. Sauvegarder l'encaissement
         Encaissement saved = encaissementRepository.save(encaissement);
 
-        // 8. Si des affectations de factures sont fournies, les traiter
+        // 9. Si des affectations de factures sont fournies, les traiter
         if (request.getAffectations() != null && !request.getAffectations().isEmpty()) {
             affecter(saved.getId(), request.getAffectations());
         }
@@ -103,6 +112,12 @@ public class EncaissementServiceImpl implements IEncaissementService {
                 null,
                 "Encaissement " + saved.getNumero() + " de " + saved.getMontant() + " XAF via " + saved.getMoyenPaiement(),
                 null);
+
+        // 10. Notification
+        notificationService.creerEtEnvoyer(
+                "Nouvel encaissement reçu",
+                "Un encaissement de " + saved.getMontant() + " XAF (" + saved.getNumero() + ") a été enregistré pour le client " + client.getRaisonSociale() + ".",
+                "RESPONSABLE_FINANCIER");
 
         return encaissementMapper.toResponse(saved);
     }
@@ -143,29 +158,54 @@ public class EncaissementServiceImpl implements IEncaissementService {
         BigDecimal totalAffecte = BigDecimal.ZERO;
 
         for (AffectationRequest aff : affectations) {
-            Facture facture = factureRepository.findById(aff.getFactureId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Facture introuvable ID : " + aff.getFactureId()));
+            Facture facture;
+            if (aff.getFactureId() != null) {
+                facture = factureRepository.findById(aff.getFactureId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Facture introuvable ID : " + aff.getFactureId()));
+            } else if (aff.getNumeroFacture() != null && !aff.getNumeroFacture().isBlank()) {
+                facture = factureRepository.findByNumero(aff.getNumeroFacture())
+                        .orElseThrow(() -> new ResourceNotFoundException("Facture introuvable avec le numéro : " + aff.getNumeroFacture()));
+            } else {
+                throw new WorkflowException("ID ou Numéro de facture obligatoire pour l'affectation.");
+            }
 
-            if (facture.getStatut() != StatutFacture.VALIDEE && facture.getStatut() != StatutFacture.PARTIELLEMENT_PAYEE) {
-                throw new WorkflowException("La facture " + facture.getNumero() + " n'est pas en statut VALIDEE ou PARTIELLEMENT_PAYEE.");
+            // Vérifier que la facture appartient bien au client de l'encaissement
+            if (!facture.getTiers().getId().equals(encaissement.getClient().getId())) {
+                throw new WorkflowException("La facture " + facture.getNumero() + " n'appartient pas au client " + encaissement.getClient().getRaisonSociale());
+            }
+
+            if (facture.getStatut() != StatutFacture.EN_ATTENTE_PAIEMENT && 
+                facture.getStatut() != StatutFacture.VALIDEE && 
+                facture.getStatut() != StatutFacture.PARTIELLEMENT_PAYEE) {
+                throw new WorkflowException("La facture " + facture.getNumero() + " n'est pas en statut EN ATTENTE PAIEMENT ou PARTIELLEMENT PAYEE.");
             }
 
             totalAffecte = totalAffecte.add(aff.getMontantAffecte());
 
-            // Mettre à jour le statut de la facture
-            BigDecimal restant = facture.getMontantTtc().subtract(aff.getMontantAffecte());
+            // 1. Créer l'affectation de paiement
+            AffectationPaiement affectation = new AffectationPaiement();
+            affectation.setTransactionId(encaissement.getId());
+            affectation.setTransactionType("ENCAISSEMENT");
+            affectation.setFacture(facture);
+            affectation.setMontantAffecte(aff.getMontantAffecte());
+            affectation.setAffectePar(getUtilisateurConnecte());
+            affectationPaiementRepository.save(affectation);
+
+            // 2. Calculer le total déjà payé pour cette facture (incluant la nouvelle affectation)
+            BigDecimal totalPaye = affectationPaiementRepository.findByFactureId(facture.getId()).stream()
+                    .map(AffectationPaiement::getMontantAffecte)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // 3. Mettre à jour le statut de la facture
+            BigDecimal restant = facture.getMontantTtc().subtract(totalPaye);
             if (restant.compareTo(BigDecimal.ZERO) <= 0) {
                 facture.setStatut(StatutFacture.SOLDEE);
             } else {
                 facture.setStatut(StatutFacture.PARTIELLEMENT_PAYEE);
             }
             factureRepository.save(facture);
-
-            // Mettre à jour le solde du tiers (diminue la dette du client)
-            Tiers client = facture.getTiers();
-            if (client.getSolde() == null) client.setSolde(java.math.BigDecimal.ZERO);
-            client.setSolde(client.getSolde().subtract(aff.getMontantAffecte()));
-            tiersRepository.save(client);
+            
+            // Note: La mise à jour du solde tiers est désormais faite globalement à la création de l'encaissement
         }
 
         // Vérifier que le total affecté ne dépasse pas le montant de l'encaissement
@@ -185,5 +225,11 @@ public class EncaissementServiceImpl implements IEncaissementService {
     private String genererNumero(String prefix) {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
         return prefix + "-" + LocalDate.now().toString().replace("-", "") + "-" + suffix;
+    }
+
+    private Utilisateur getUtilisateurConnecte() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return utilisateurRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur connecté introuvable."));
     }
 }

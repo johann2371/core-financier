@@ -42,7 +42,7 @@ public class Facture {
     private BigDecimal montantTtc = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private StatutFacture statut = StatutFacture.BROUILLON;
 
     @ManyToOne(fetch = FetchType.LAZY)

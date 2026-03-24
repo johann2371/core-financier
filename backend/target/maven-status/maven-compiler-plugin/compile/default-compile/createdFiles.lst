@@ -48,6 +48,7 @@ com\corefi\entity\Client.class
 com\corefi\enums\TypeTiers.class
 com\corefi\controller\EncaissementController.class
 com\corefi\mapper\TiersMapper.class
+com\corefi\service\impl\EmailServiceImpl.class
 com\corefi\service\interfaces\IJournalAuditService.class
 com\corefi\enums\StatutFacture.class
 com\corefi\security\UserDetailsServiceImpl.class
@@ -80,10 +81,12 @@ com\corefi\service\impl\NotificationServiceImpl.class
 com\corefi\config\DataInitializer.class
 com\corefi\dto\request\encaissement\AffectationRequest.class
 com\corefi\entity\Tiers.class
+com\corefi\service\interfaces\IEmailService.class
 com\corefi\dto\request\encaissement\EncaissementCreateRequest.class
 com\corefi\entity\CompteFinancier.class
 com\corefi\repository\EncaissementRepository.class
 com\corefi\controller\NotificationController.class
+com\corefi\dto\response\tableaubord\ActiviteResponse.class
 com\corefi\entity\Parametrage.class
 com\corefi\controller\FactureController.class
 com\corefi\entity\MouvementCompte.class
@@ -113,6 +116,7 @@ com\corefi\repository\DecaissementRepository.class
 com\corefi\config\ApplicationConfig$1.class
 com\corefi\entity\Fournisseur.class
 com\corefi\enums\Role.class
+com\corefi\dto\response\tableaubord\ActiviteResponse$ActiviteResponseBuilder.class
 com\corefi\enums\TypeCompte.class
 com\corefi\service\impl\TiersServiceImpl.class
 com\corefi\dto\response\facture\FactureResponse.class

@@ -7,8 +7,9 @@ import java.math.BigDecimal;
 
 @Data
 public class AffectationRequest {
-    @NotNull
     private Long factureId;
+    
+    private String numeroFacture;
 
     @NotNull
     @Positive

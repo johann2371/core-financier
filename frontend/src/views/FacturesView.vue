@@ -5,6 +5,7 @@ import Pagination from '../components/Pagination.vue'
 import { useFactureStore } from '../stores/facture.store'
 import { useTierStore } from '../stores/tier.store'
 import { useRoute, useRouter } from 'vue-router'
+import api from '../services/api'
 
 const store = useFactureStore()
 const tierStore = useTierStore()
@@ -12,11 +13,57 @@ const route = useRoute()
 const router = useRouter()
 
 const showModal = ref(false)
+const showPreview = ref(false)
+const previewUrl = ref(null)
+
+const openPreview = async (id) => {
+  try {
+    const response = await api.get(`/factures/${id}/pdf`, { responseType: 'blob' })
+    
+    if (response.status === 204 || !response.data || response.data.size === 0) {
+      alert("Erreur: Le serveur n'a renvoyé aucune donnée pour ce PDF. Vérifiez que la facture contient des lignes.")
+      return
+    }
+
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    previewUrl.value = URL.createObjectURL(blob)
+    showPreview.value = true
+  } catch (err) {
+    console.error('Erreur lors de la prévisualisation:', err)
+  }
+}
+
+const closePreview = () => {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+  }
+  showPreview.value = false
+  previewUrl.value = null
+}
 const activeTab = ref('TOUS') // TOUS, VENTE, ACHAT
 
 // Pagination
 const currentPage = ref(1)
-const itemsPerPage = 8
+const itemsPerPage = 10
+
+// Filtres
+const filters = ref({
+  search: '',
+  tiersId: '',
+  statut: '',
+  dateDebut: '',
+  dateFin: ''
+})
+
+const resetFilters = () => {
+  filters.value = {
+    search: '',
+    tiersId: '',
+    statut: '',
+    dateDebut: '',
+    dateFin: ''
+  }
+}
 
 const setTab = (tab) => {
   activeTab.value = tab
@@ -69,8 +116,36 @@ const totalTTC = computed(() => {
 })
 
 const filteredFactures = computed(() => {
-  if (activeTab.value === 'TOUS') return store.factures
-  return store.factures.filter(f => f.type === activeTab.value)
+  let list = store.factures
+  if (activeTab.value !== 'TOUS') {
+    list = list.filter(f => f.type === activeTab.value)
+  }
+  
+  // Recherche Numero
+  if (filters.value.search) {
+    const s = filters.value.search.toLowerCase()
+    list = list.filter(f => f.numero && f.numero.toLowerCase().includes(s))
+  }
+
+  // Tiers
+  if (filters.value.tiersId) {
+    list = list.filter(f => f.tiersId == filters.value.tiersId)
+  }
+
+  // Statut
+  if (filters.value.statut) {
+    list = list.filter(f => f.statut === filters.value.statut)
+  }
+
+  // Dates
+  if (filters.value.dateDebut) {
+    list = list.filter(f => f.dateFacture && f.dateFacture >= filters.value.dateDebut)
+  }
+  if (filters.value.dateFin) {
+    list = list.filter(f => f.dateFacture && f.dateFacture <= filters.value.dateFin)
+  }
+
+  return list
 })
 
 const paginatedList = computed(() => {
@@ -111,7 +186,7 @@ const submitForm = async () => {
       <button @click="showModal = true" class="btn-primary">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
         Nouvelle Facture
-        <span class="shortcut">Ctrl + N</span>
+
       </button>
     </template>
 
@@ -120,6 +195,43 @@ const submitForm = async () => {
       <button class="tab-btn" :class="{ active: activeTab === 'TOUS' }" @click="setTab('TOUS')">Toutes ({{ store.factures.length }})</button>
       <button class="tab-btn" :class="{ active: activeTab === 'VENTE' }" @click="setTab('VENTE')">Ventes ({{ store.ventes.length }})</button>
       <button class="tab-btn" :class="{ active: activeTab === 'ACHAT' }" @click="setTab('ACHAT')">Achats ({{ store.achats.length }})</button>
+    </div>
+
+    <!-- Barre de Filtres -->
+    <div class="filter-bar">
+      <div class="filter-group group-search">
+        <div class="input-with-icon-left">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input v-model="filters.search" type="text" placeholder="N° Facture..." class="filter-input-std" />
+        </div>
+      </div>
+      
+      <div class="filter-group">
+        <select v-model="filters.tiersId" class="filter-input-std">
+          <option value="">Tous les tiers</option>
+          <option v-for="t in tierStore.tiers" :key="t.id" :value="t.id">{{ t.raisonSociale }}</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <select v-model="filters.statut" class="filter-input-std">
+          <option value="">Tous les statuts</option>
+          <option value="EN_ATTENTE_PAIEMENT">En Attente</option>
+          <option value="PARTIELLEMENT_PAYEE">Partiel</option>
+          <option value="SOLDEE">Soldée</option>
+          <option value="VALIDEE">Validée (Legacy)</option>
+        </select>
+      </div>
+
+      <div class="filter-group-range">
+        <input v-model="filters.dateDebut" type="date" class="filter-input-std" title="Date début" />
+        <span class="to-text">à</span>
+        <input v-model="filters.dateFin" type="date" class="filter-input-std" title="Date fin" />
+      </div>
+
+      <button @click="resetFilters" class="btn-clear-filters" title="Réinitialiser">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+      </button>
     </div>
 
     <!-- Tableau -->
@@ -131,54 +243,65 @@ const submitForm = async () => {
         <button @click="store.fetchFactures" class="btn-outline">Réessayer</button>
       </div>
 
-      <table v-else class="data-table">
-        <thead>
-          <tr>
-            <th>N° Facture</th>
-            <th>Type</th>
-            <th>Tiers Associé</th>
-            <th>Date</th>
-            <th>Statut</th>
-            <th class="text-right">Total TTC (XAF)</th>
-            <th class="text-center">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="filteredFactures.length === 0" class="empty-row text-center">
-            <td colspan="7">Aucune facture trouvée.</td>
-          </tr>
-          
-          <tr v-for="item in paginatedList" :key="item.id">
-            <td class="font-semibold text-dark">{{ item.numero }}</td>
-            <td>
-              <span class="badge" :class="item.type === 'VENTE' ? 'badge-vente' : 'badge-achat'">
-                {{ item.type }}
-              </span>
-            </td>
-            <td>
-              <div class="motif-cell">
-                <span class="motif-text">{{ item.tiersNom || 'Inconnu' }}</span>
-              </div>
-            </td>
-            <td>{{ item.dateFacture ? new Date(item.dateFacture).toLocaleDateString() : 'Non définie' }}</td>
-            <td>
-              <span class="badge" :class="{
-                'badge-attente': item.statut === 'EN_ATTENTE_PAIEMENT',
-                'badge-paye': item.statut === 'SOLDEE',
-                'badge-partiel': item.statut === 'PARTIELLEMENT_PAYEE'
-              }">
-                {{ item.statut.replace(/_/g, ' ') }}
-              </span>
-            </td>
-            <td class="text-right font-semibold text-dark">{{ item.montantTotalTtc?.toLocaleString() || '0' }}</td>
-            <td class="text-center">
-               <button class="icon-btn" @click="store.downloadPdf(item.id)" title="Télécharger PDF">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-               </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else class="table-scroll-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>N° Facture</th>
+              <th>Type</th>
+              <th>Tiers Associé</th>
+              <th>Date</th>
+              <th>Statut</th>
+              <th class="text-right">Total TTC (XAF)</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="filteredFactures.length === 0" class="empty-row text-center">
+              <td colspan="7">Aucune facture trouvée.</td>
+            </tr>
+            
+            <tr v-for="item in paginatedList" :key="item.id">
+              <td class="font-semibold text-dark">{{ item.numero }}</td>
+              <td>
+                <span class="badge" :class="item.type === 'VENTE' ? 'badge-vente' : 'badge-achat'">
+                  {{ item.type }}
+                </span>
+              </td>
+              <td>
+                <div class="motif-cell">
+                  <span class="motif-text">{{ item.tiersNom || 'Inconnu' }}</span>
+                </div>
+              </td>
+              <td>{{ item.dateFacture ? new Date(item.dateFacture).toLocaleDateString() : 'Non définie' }}</td>
+              <td>
+                <span class="badge" :class="{
+                  'badge-attente': item.statut === 'EN_ATTENTE_PAIEMENT' || item.statut === 'VALIDEE',
+                  'badge-paye': item.statut === 'SOLDEE',
+                  'badge-partiel': item.statut === 'PARTIELLEMENT_PAYEE'
+                }">
+                  {{ (item.statut === 'VALIDEE' ? 'EN ATTENTE PAIEMENT' : item.statut).replace(/_/g, ' ') }}
+                </span>
+              </td>
+              <td class="text-right font-semibold text-dark">{{ item.montantTtc?.toLocaleString() || '0' }}</td>
+              <td class="text-center">
+                 <div class="actions-cell">
+                   <button class="icon-btn preview-btn" @click="openPreview(item.id)" title="Aperçu">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                   </button>
+                   <button class="icon-btn download-btn" @click="store.downloadPdf(item.id)" title="Télécharger PDF">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                   </button>
+                 </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="filteredFactures.length > 0" class="table-footer-info">
+        Affichage de {{ paginatedList.length }} sur {{ filteredFactures.length }} facture(s) 
+        <span v-if="activeTab !== 'TOUS'"> (Filtre: {{ activeTab }})</span>
+      </div>
     </div>
 
     <!-- Composant de Pagination Détaché -->
@@ -189,6 +312,21 @@ const submitForm = async () => {
       :itemsPerPage="itemsPerPage" 
       @update:currentPage="currentPage = $event" 
     />
+
+    <!-- Modale de Prévisualisation (iFrame) Globalisée -->
+    <div v-if="showPreview" class="modal-backdrop-preview" @click.self="closePreview">
+      <div class="preview-container">
+        <div class="preview-header">
+          <h3>Prévisualisation de la Facture</h3>
+          <button @click="closePreview" class="close-btn-preview">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="preview-body">
+          <iframe v-if="previewUrl" :src="previewUrl" width="100%" height="100%" frameborder="0"></iframe>
+        </div>
+      </div>
+    </div>
 
     <!-- Modale Création Facture (Complexe: Lignes) -->
     <div v-if="showModal" class="modal-backdrop fade-in">
@@ -277,31 +415,17 @@ const submitForm = async () => {
 
 <style scoped>
 /* MAIN LAYOUT ELEMENTS */
-.table-card { background: white; border-radius: 12px; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 1.15rem 1.5rem; text-align: left; border-bottom: 1px solid #f3f4f6; }
-.data-table th { background-color: #f9fafb; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #6b7280; letter-spacing: 0.05em; }
-.data-table td { font-size: 0.9rem; color: #4b5563; vertical-align: middle; }
-
-.font-semibold { font-weight: 600; }
-.text-dark { color: #111827; }
-.text-muted { color: #6b7280; }
-.text-right { text-align: right !important; }
-.text-center { text-align: center !important; }
 .v-center { display: flex; align-items: center; justify-content: center; }
-
-.badge { display: inline-flex; padding: 0.25rem 0.625rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;}
-.badge-vente { background: #dcfce7; color: #166534; }
-.badge-achat { background: #fee2e2; color: #991b1b; }
-.badge-attente { background: #fef3c7; color: #d97706; }
-.badge-paye { background: #dcfce7; color: #15803d; }
-.badge-partiel { background: #dbeafe; color: #1d4ed8; }
 
 .icon-btn { background: #f3f4f6; border: none; padding: 0.4rem; border-radius: 6px; color: #4b5563; cursor: pointer; transition: 0.15s;}
 .icon-btn:hover { background: #e5e7eb; color: #111827; }
 .icon-btn-danger { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 0.25rem; border-radius: 4px; transition: 0.1s;}
 .icon-btn-danger:hover:not(:disabled) { background: #fee2e2; color: #ef4444; }
 .icon-btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.actions-cell { display: flex; gap: 0.5rem; justify-content: center; }
+.preview-btn:hover { color: #2563eb; background: #eff6ff; }
+.download-btn:hover { color: #059669; background: #ecfdf5; }
 
 /* TABS NAV */
 .tabs-nav { display: flex; gap: 1rem; border-bottom: 1px solid #e5e7eb; margin-bottom: 1.5rem; }
@@ -312,7 +436,7 @@ const submitForm = async () => {
 /* ACTIONS */
 .btn-primary { display: flex; align-items: center; gap: 0.5rem; background-color: #2563eb; color: white; padding: 0.625rem 1rem; border-radius: 8px; border: none; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
 .btn-primary:hover { background-color: #1d4ed8; }
-.btn-primary .shortcut { background: rgba(255,255,255,0.2); border-radius: 4px; padding: 2px 6px; font-size: 0.65rem; font-weight: 500;}
+
 
 /* MODAL & LIGNES FACTURE */
 .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(17, 24, 39, 0.6); backdrop-filter: blur(2px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 2rem;}

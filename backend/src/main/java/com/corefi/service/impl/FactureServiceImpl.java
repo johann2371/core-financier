@@ -9,17 +9,20 @@ import com.corefi.enums.StatutFacture;
 import com.corefi.exception.ResourceNotFoundException;
 import com.corefi.exception.WorkflowException;
 import com.corefi.mapper.FactureMapper;
-import com.corefi.repository.DeviseRepository;
 import com.corefi.repository.FactureRepository;
 import com.corefi.repository.TiersRepository;
 import com.corefi.repository.UtilisateurRepository;
+import com.corefi.repository.DeviseRepository;
+import com.corefi.repository.AffectationPaiementRepository;
 import com.corefi.service.interfaces.IFactureService;
 import com.corefi.service.interfaces.IJournalAuditService;
+import com.corefi.entity.AffectationPaiement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -33,8 +36,10 @@ public class FactureServiceImpl implements IFactureService {
     private final TiersRepository tiersRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final DeviseRepository deviseRepository;
+    private final AffectationPaiementRepository affectationPaiementRepository;
     private final FactureMapper factureMapper;
     private final IJournalAuditService journalAuditService;
+    private final com.corefi.service.interfaces.INotificationService notificationService;
 
     // ────────────────────────────────────────────────────────────────────────
     // CRÉER UNE FACTURE
@@ -80,7 +85,15 @@ public class FactureServiceImpl implements IFactureService {
         facture.setDevise(deviseRepository.findByCode("XAF")
                 .orElseThrow(() -> new ResourceNotFoundException("Devise XAF non trouvée en base.")));
 
-        // 6. Sauvegarder
+        // 6. Statut direct à VALIDEE (pour refléter la dette immédiatement)
+        facture.setStatut(StatutFacture.EN_ATTENTE_PAIEMENT);
+        
+        // 7. Mise à jour du solde du tiers
+        if (tiers.getSolde() == null) tiers.setSolde(java.math.BigDecimal.ZERO);
+        tiers.setSolde(tiers.getSolde().add(facture.getMontantTtc()));
+        tiersRepository.save(tiers);
+
+        // 8. Sauvegarder
         Facture saved = factureRepository.save(facture);
 
         // 6. Audit
@@ -91,7 +104,13 @@ public class FactureServiceImpl implements IFactureService {
                         + saved.getMontantTtc() + ")",
                 null);
 
-        return factureMapper.toResponse(saved);
+        // 7. Notification
+        notificationService.creerEtEnvoyer(
+                "Nouvelle facture créée",
+                "La facture " + saved.getNumero() + " pour " + tiers.getRaisonSociale() + " (Montant: " + saved.getMontantTtc() + " XAF) a été enregistrée.",
+                "RESPONSABLE_FINANCIER");
+
+        return factureMapper.toResponse(saved, saved.getMontantTtc());
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -110,7 +129,7 @@ public class FactureServiceImpl implements IFactureService {
             facture.getLignes().size();
         }
 
-        return factureMapper.toResponse(facture);
+        return factureMapper.toResponse(facture, calculerResteAPayer(facture));
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -129,7 +148,7 @@ public class FactureServiceImpl implements IFactureService {
         }
 
         return factures.stream()
-                .map(factureMapper::toResponse)
+                .map(f -> factureMapper.toResponse(f, calculerResteAPayer(f)))
                 .collect(Collectors.toList());
     }
 
@@ -149,7 +168,7 @@ public class FactureServiceImpl implements IFactureService {
         Utilisateur validePar = utilisateurRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur connecté introuvable."));
 
-        facture.setStatut(StatutFacture.VALIDEE);
+        facture.setStatut(StatutFacture.EN_ATTENTE_PAIEMENT);
         facture.setValidePar(validePar);
 
         // Ajout au solde du Tiers
@@ -166,7 +185,7 @@ public class FactureServiceImpl implements IFactureService {
                 "statut=VALIDEE (par " + validePar.getNom() + ")",
                 null);
 
-        return factureMapper.toResponse(saved);
+        return factureMapper.toResponse(saved, saved.getMontantTtc());
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -185,6 +204,16 @@ public class FactureServiceImpl implements IFactureService {
         }
 
         String ancienStatut = facture.getStatut().name();
+        
+        // Si la facture était déjà validée, on annule son impact sur le solde du tiers
+        if (facture.getStatut() == StatutFacture.EN_ATTENTE_PAIEMENT || facture.getStatut() == StatutFacture.PARTIELLEMENT_PAYEE) {
+            Tiers tiers = facture.getTiers();
+            if (tiers.getSolde() != null) {
+                tiers.setSolde(tiers.getSolde().subtract(facture.getMontantTtc()));
+                tiersRepository.save(tiers);
+            }
+        }
+        
         facture.setStatut(StatutFacture.ANNULEE);
 
         Facture saved = factureRepository.save(facture);
@@ -195,7 +224,7 @@ public class FactureServiceImpl implements IFactureService {
                 "statut=ANNULEE",
                 null);
 
-        return factureMapper.toResponse(saved);
+        return factureMapper.toResponse(saved, calculerResteAPayer(saved));
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -212,5 +241,12 @@ public class FactureServiceImpl implements IFactureService {
         long count = factureRepository.count() + 1; // S'assure de l'unicité simple (en env de prod, utiliser une
                                                     // séquence BD)
         return String.format("FAC-%s-%04d", datePart, count);
+    }
+
+    private BigDecimal calculerResteAPayer(Facture f) {
+        BigDecimal totalPaye = affectationPaiementRepository.findByFactureId(f.getId()).stream()
+                .map(AffectationPaiement::getMontantAffecte)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return f.getMontantTtc().subtract(totalPaye);
     }
 }

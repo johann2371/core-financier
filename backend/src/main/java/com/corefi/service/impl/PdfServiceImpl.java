@@ -33,20 +33,28 @@ public class PdfServiceImpl implements IPdfService {
     @Override
     @Transactional(readOnly = true)
     public byte[] genererFacturePdf(Long factureId) {
+        System.out.println("Début génération PDF pour Facture ID: " + factureId);
         Facture facture = factureRepository.findById(factureId)
                 .orElseThrow(() -> new ResourceNotFoundException("Facture introuvable"));
 
-        // Force l'initialisation des collections lazy
-        facture.getLignes().size();
-        Tiers client = facture.getTiers();
-        client.getRaisonSociale();
+        System.out.println("Facture trouvée: " + facture.getNumero());
 
         try {
+            // Force l'initialisation des collections lazy
+            if (facture.getLignes() != null) {
+                System.out.println("Nombre de lignes: " + facture.getLignes().size());
+            }
+            Tiers client = facture.getTiers();
+            if (client != null) {
+                System.out.println("Client: " + client.getRaisonSociale());
+            }
+
             Document document = new Document();
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             PdfWriter.getInstance(document, baos);
 
             document.open();
+            System.out.println("Document ouvert");
 
             // En-tête de l'entreprise (SODICA SARL)
             Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
@@ -58,7 +66,7 @@ public class PdfServiceImpl implements IPdfService {
             
             // Titre Facture
             Font fontFacture = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
-            Paragraph titreFact = new Paragraph("FACTURE N° " + facture.getNumero(), fontFacture);
+            Paragraph titreFact = new Paragraph("FACTURE N° " + (facture.getNumero() != null ? facture.getNumero() : "N/A"), fontFacture);
             titreFact.setAlignment(Element.ALIGN_CENTER);
             document.add(titreFact);
 
@@ -70,14 +78,15 @@ public class PdfServiceImpl implements IPdfService {
             
             PdfPCell cellG = new PdfPCell();
             cellG.setBorder(Rectangle.NO_BORDER);
-            cellG.addElement(new Paragraph("Date d'émission: " + facture.getDateFacture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+            String dateF = facture.getDateFacture() != null ? facture.getDateFacture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
+            cellG.addElement(new Paragraph("Date d'émission: " + dateF));
             cellG.addElement(new Paragraph("Date d'échéance: " + (facture.getDateEcheance() != null ? facture.getDateEcheance().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "-")));
             
             PdfPCell cellD = new PdfPCell();
             cellD.setBorder(Rectangle.NO_BORDER);
-            cellD.addElement(new Paragraph("Client: " + client.getRaisonSociale()));
-            cellD.addElement(new Paragraph("Adresse: " + (client.getAdresse() != null ? client.getAdresse() : "-")));
-            cellD.addElement(new Paragraph("Téléphone: " + (client.getTelephone() != null ? client.getTelephone() : "-")));
+            cellD.addElement(new Paragraph("Client: " + (client != null ? client.getRaisonSociale() : "Divers")));
+            cellD.addElement(new Paragraph("Adresse: " + (client != null && client.getAdresse() != null ? client.getAdresse() : "-")));
+            cellD.addElement(new Paragraph("Téléphone: " + (client != null && client.getTelephone() != null ? client.getTelephone() : "-")));
 
             tableInfo.addCell(cellG);
             tableInfo.addCell(cellD);
@@ -98,11 +107,13 @@ public class PdfServiceImpl implements IPdfService {
             ajouterCelluleEnTete(tableLignes, "Total Ligne", fontHead);
 
             // Contenu
-            for (LigneFacture ligne : facture.getLignes()) {
-                tableLignes.addCell(new Phrase(ligne.getDesignation()));
-                tableLignes.addCell(new Phrase(ligne.getQuantite().toString()));
-                tableLignes.addCell(new Phrase(String.format("%.2f", ligne.getPrixUnitaire())));
-                tableLignes.addCell(new Phrase(String.format("%.2f", ligne.getMontantHt())));
+            if (facture.getLignes() != null) {
+                for (LigneFacture ligne : facture.getLignes()) {
+                    tableLignes.addCell(new Phrase(ligne.getDesignation() != null ? ligne.getDesignation() : ""));
+                    tableLignes.addCell(new Phrase(ligne.getQuantite() != null ? ligne.getQuantite().toString() : "0"));
+                    tableLignes.addCell(new Phrase(String.format("%.2f", ligne.getPrixUnitaire() != null ? ligne.getPrixUnitaire() : 0.0)));
+                    tableLignes.addCell(new Phrase(String.format("%.2f", ligne.getMontantHt() != null ? ligne.getMontantHt() : 0.0)));
+                }
             }
             document.add(tableLignes);
 
@@ -116,14 +127,16 @@ public class PdfServiceImpl implements IPdfService {
             PdfPCell cellVide = new PdfPCell(new Phrase(""));
             cellVide.setBorder(Rectangle.NO_BORDER);
             
+            String cur = (facture.getDevise() != null ? facture.getDevise().getCode() : "XAF");
+
             tableTotal.addCell(cellVide);
-            tableTotal.addCell(new Phrase("Montant HT: " + String.format("%.2f", facture.getMontantHt()) + " " + facture.getDevise().getCode()));
+            tableTotal.addCell(new Phrase("Montant HT: " + String.format("%.2f", facture.getMontantHt() != null ? facture.getMontantHt() : 0.0) + " " + cur));
             
             tableTotal.addCell(cellVide);
-            tableTotal.addCell(new Phrase("Montant TVA: " + String.format("%.2f", facture.getMontantTva()) + " " + facture.getDevise().getCode()));
+            tableTotal.addCell(new Phrase("Montant TVA: " + String.format("%.2f", facture.getMontantTva() != null ? facture.getMontantTva() : 0.0) + " " + cur));
             
             tableTotal.addCell(cellVide);
-            PdfPCell cellTTC = new PdfPCell(new Phrase("Montant TTC: " + String.format("%.2f", facture.getMontantTtc()) + " " + facture.getDevise().getCode(), fontHead));
+            PdfPCell cellTTC = new PdfPCell(new Phrase("Montant TTC: " + String.format("%.2f", facture.getMontantTtc() != null ? facture.getMontantTtc() : 0.0) + " " + cur, fontHead));
             cellTTC.setBorder(Rectangle.TOP);
             tableTotal.addCell(cellTTC);
             
@@ -131,17 +144,21 @@ public class PdfServiceImpl implements IPdfService {
 
             // Pied de page
             document.add(new Paragraph(" "));
-            Paragraph footer = new Paragraph("Statut de la facture : " + facture.getStatut().name(), FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10));
+            Paragraph footer = new Paragraph("Statut de la facture : " + (facture.getStatut() != null ? facture.getStatut().name() : "N/A"), FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10));
             footer.setAlignment(Element.ALIGN_CENTER);
             document.add(footer);
 
             document.close();
+            System.out.println("Génération terminée avec succès (" + baos.size() + " octets)");
             return baos.toByteArray();
 
-        } catch (DocumentException e) {
-            throw new WorkflowException("Erreur lors de la génération du PDF de la facture : " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("ERREUR GENERATION PDF: " + e.getMessage());
+            e.printStackTrace();
+            throw new WorkflowException("Erreur lors de la génération du PDF : " + e.getMessage());
         }
     }
+
 
     @Override
     @Transactional(readOnly = true)

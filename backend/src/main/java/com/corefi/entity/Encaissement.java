@@ -58,7 +58,7 @@ public class Encaissement {
     private String telephone;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private StatutEncaissement statut = StatutEncaissement.VALIDEE;
 
     @ManyToOne(fetch = FetchType.LAZY)

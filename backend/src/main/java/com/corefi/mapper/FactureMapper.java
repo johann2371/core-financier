@@ -70,14 +70,16 @@ public class FactureMapper {
     }
 
     /** Entité → Response */
-    public FactureResponse toResponse(Facture f) {
+    public FactureResponse toResponse(Facture f, BigDecimal resteAPayer) {
         FactureResponse r = new FactureResponse();
         r.setId(f.getId());
         r.setNumero(f.getNumero());
         r.setType(f.getType());
         r.setDateFacture(f.getDateFacture());
+        r.setTiersId(f.getTiers() != null ? f.getTiers().getId() : null);
         r.setTiersNom(f.getTiers() != null ? f.getTiers().getRaisonSociale() : null);
         r.setMontantTtc(f.getMontantTtc());
+        r.setResteAPayer(resteAPayer != null ? resteAPayer : f.getMontantTtc());
         r.setStatut(f.getStatut().name());
         return r;
     }

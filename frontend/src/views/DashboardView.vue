@@ -1,16 +1,81 @@
 <script setup>
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
 import MainLayout from '../components/MainLayout.vue'
+import api from '../services/api'
 
 const authStore = useAuthStore()
 const router = useRouter()
+
+const kpis = ref({
+  soldeTotalCaisses: 0,
+  soldeTotalBanques: 0,
+  decaissementsEnAttente: 0,
+  totalFacturesImpayees: 0,
+  activitesRecentes: []
+})
+const loading = ref(true)
+
+const fetchKpis = async () => {
+  loading.value = true
+  const start = Date.now()
+  try {
+    const response = await api.get('/tableau-bord/kpis')
+    kpis.value = response.data
+  } catch (error) {
+    console.error('Erreur lors de la récupération des KPIs:', error)
+  } finally {
+    // Garantie de 1s de rotation pour le feedback visuel
+    const elapsed = Date.now() - start
+    const delay = Math.max(0, 1000 - elapsed)
+    setTimeout(() => {
+      loading.value = false
+    }, delay)
+  }
+}
+
+let refreshInterval = null
+
+onMounted(() => {
+  fetchKpis()
+  // Refresh every 30 seconds
+  refreshInterval = setInterval(fetchKpis, 30000)
+})
+
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  if (refreshInterval) clearInterval(refreshInterval)
+})
+
+const formatTime = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+const formatDateLabel = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const today = new Date()
+  if (date.toDateString() === today.toDateString()) return "Aujourd'hui"
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+const getActivityIconClass = (type) => {
+  switch (type) {
+    case 'FACTURE': return 'bg-green'
+    case 'ENCAISSEMENT': return 'bg-blue'
+    case 'DECAISSEMENT': return 'bg-indigo'
+    case 'TIERS': return 'bg-yellow'
+    case 'AUTH': return 'bg-indigo'
+    default: return 'bg-gray'
+  }
+}
 </script>
 
 <template>
   <MainLayout>
-    <!-- Le header (titre et date) est géré automatiquement par MainLayout s'il n'est pas surchargé -->
-
     <!-- ACTIONS RAPIDES -->
     <div class="dashboard-section">
       <h3 class="section-title">ACTIONS RAPIDES</h3>
@@ -20,7 +85,6 @@ const router = useRouter()
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           </div>
           <h4>Nouvel<br/>Encaissement</h4>
-          <span class="shortcut">Ctrl + E</span>
         </router-link>
         
         <router-link to="/factures?create=VENTE" class="action-card">
@@ -28,7 +92,6 @@ const router = useRouter()
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
           </div>
           <h4>Nouvelle<br/>Facture</h4>
-          <span class="shortcut">Ctrl + F</span>
         </router-link>
 
         <router-link to="/decaissements" class="action-card">
@@ -36,7 +99,6 @@ const router = useRouter()
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
           </div>
           <h4>Nouveau<br/>Décaissement</h4>
-          <span class="shortcut">Ctrl + D</span>
         </router-link>
 
         <router-link to="/tiers?create=CLIENT" class="action-card">
@@ -44,7 +106,6 @@ const router = useRouter()
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
           </div>
           <h4>Nouveau<br/>Tier</h4>
-          <span class="shortcut">Ctrl + C</span>
         </router-link>
       </div>
     </div>
@@ -53,41 +114,36 @@ const router = useRouter()
     <div class="main-dashboard-grid">
       <!-- LEFTSIDE COL -->
       <div class="left-col">
-        <!-- STATISTIQUES QUOTIDIENNES -->
+        <!-- STATISTIQUES GLOBALES -->
         <div class="dashboard-section">
-          <h3 class="section-title">MES STATISTIQUES QUOTIDIENNES</h3>
+          <h3 class="section-title">ÉTAT FINANCIER GLOBAL</h3>
           <div class="kpi-grid">
             <div class="kpi-card">
-              <span class="kpi-label">Factures Émises</span>
+              <span class="kpi-label">Solde Caisses</span>
               <div class="kpi-body">
-                <span class="kpi-value">24</span>
-                <span class="kpi-trend positive">+12%</span>
+                <span class="kpi-value">{{ kpis.soldeTotalCaisses?.toLocaleString() }}<span class="currency">XAF</span></span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">Encaissements Traités</span>
+              <span class="kpi-label">Solde Banques</span>
               <div class="kpi-body">
-                <span class="kpi-value">18</span>
-                <span class="kpi-trend positive">+5%</span>
+                <span class="kpi-value">{{ kpis.soldeTotalBanques?.toLocaleString() }}<span class="currency">XAF</span></span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">Total Traité</span>
+              <span class="kpi-label">Dettes Clients (Impayées)</span>
               <div class="kpi-body">
-                <span class="kpi-value">12.4k<span class="currency">€</span></span>
-                <div class="kpi-subtrend">
-                  <span class="light">Objectif</span><br/>15k €
-                </div>
+                <span class="kpi-value warning">{{ kpis.totalFacturesImpayees?.toLocaleString() }}<span class="currency">XAF</span></span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">En Attente de Validation</span>
+              <span class="kpi-label">Décaissements en attente</span>
               <div class="kpi-body">
-                <span class="kpi-value warning">7</span>
-                <span class="kpi-trend attention">Action requise</span>
+                <span class="kpi-value" :class="{ 'warning': kpis.decaissementsEnAttente > 0 }">{{ kpis.decaissementsEnAttente }}</span>
+                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttente > 0">Action requise</span>
               </div>
             </div>
           </div>
@@ -111,34 +167,23 @@ const router = useRouter()
                 </tr>
               </thead>
               <tbody>
-                <tr>
+                <tr v-if="kpis.decaissementsEnAttente > 0">
                   <td><span class="badge badge-urgent">Urgent</span></td>
                   <td>
                     <div class="task-info">
-                      <strong>Décaissement en attente : Fournisseur Pay-092</strong>
-                      <span>Échéance fin de journée</span>
+                      <strong>{{ kpis.decaissementsEnAttente }} décaissement(s) à valider</strong>
+                      <span>Plusieurs demandes en attente de traitement</span>
                     </div>
                   </td>
-                  <td class="task-amount">4 250,00 €</td>
-                  <td><a href="#" class="task-action">Approuver</a></td>
-                </tr>
-                <tr>
-                  <td><span class="badge badge-high">Haute</span></td>
-                  <td>
-                    <div class="task-info">
-                      <strong>Facture impayée : Global Logistix</strong>
-                      <span>En retard de 2 jours</span>
-                    </div>
-                  </td>
-                  <td class="task-amount">12 800,00 €</td>
-                  <td><a href="#" class="task-action">Rappeler</a></td>
+                  <td class="task-amount">--</td>
+                  <td><router-link to="/decaissements" class="task-action">Traiter</router-link></td>
                 </tr>
                 <tr>
                   <td><span class="badge badge-normal">Normale</span></td>
                   <td>
                     <div class="task-info">
-                      <strong>Rapprochement bancaire : 24 oct.</strong>
-                      <span>12 écritures non lettrées</span>
+                      <strong>Rapprochement bancaire</strong>
+                      <span>Vérifier les flux de la veille</span>
                     </div>
                   </td>
                   <td class="task-amount">--</td>
@@ -154,59 +199,38 @@ const router = useRouter()
       <div class="right-col">
         <!-- ACTIVITÉ RÉCENTE -->
         <div class="dashboard-section right-panel">
-          <h3 class="section-title">ACTIVITÉ RÉCENTE</h3>
+          <div class="section-header-row">
+            <h3 class="section-title">ACTIVITÉ RÉCENTE</h3>
+            <button @click="fetchKpis" class="refresh-btn" :class="{ 'spinning': loading }" title="Rafraîchir">
+               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.63 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+          </div>
           
-          <div class="timeline">
-            <div class="timeline-item">
-              <div class="timeline-icon bg-green">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <div class="timeline" v-if="kpis.activitesRecentes?.length > 0">
+            <div class="timeline-item" v-for="(act, idx) in kpis.activitesRecentes" :key="idx">
+              <div class="timeline-icon" :class="getActivityIconClass(act.type)">
+                <svg v-if="act.type === 'FACTURE'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <svg v-else-if="act.type === 'ENCAISSEMENT'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
               </div>
               <div class="timeline-content">
-                <h4>Facture #402 créée</h4>
-                <p>À : Acme Corp Systems</p>
-                <span class="time">09:12 AM</span>
+                <h4>{{ act.action === 'CREATE' ? 'Création' : act.action }} {{ act.type.toLowerCase() }}</h4>
+                <p>{{ act.message }}</p>
+                <div class="timeline-meta">
+                  <span class="user">{{ act.utilisateur }}</span>
+                  <span class="time">{{ formatDateLabel(act.date) }} • {{ formatTime(act.date) }}</span>
+                </div>
               </div>
             </div>
-
-            <div class="timeline-item">
-              <div class="timeline-icon bg-blue">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
-              </div>
-              <div class="timeline-content">
-                <h4>Encaissement #99 confirmé</h4>
-                <p>Paiement pour Commande #281</p>
-                <span class="time">08:45 AM</span>
-              </div>
-            </div>
-
-            <div class="timeline-item">
-              <div class="timeline-icon bg-indigo">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-              </div>
-              <div class="timeline-content">
-                <h4>Client Ajouté</h4>
-                <p>Global Logistix Ltd.</p>
-                <span class="time">Hier, 04:30 PM</span>
-              </div>
-            </div>
-
-            <div class="timeline-item">
-              <div class="timeline-icon bg-yellow">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-              </div>
-              <div class="timeline-content">
-                <h4>Alerte Système</h4>
-                <p>Doublon détecté pour l'encaissement #88</p>
-                <span class="time">Hier, 02:15 PM</span>
-              </div>
-            </div>
+          </div>
+          <div class="empty-activity" v-else>
+            <p>Aucune activité récente enregistrée.</p>
           </div>
         </div>
 
         <!-- SCORE D'EFFICACITE -->
         <div class="dashboard-section right-panel score-panel">
           <h3 class="section-title">SCORE D'EFFICACITÉ</h3>
-          
           <div class="score-header">
             <span class="score-label">Vitesse de Traitement</span>
             <span class="score-percent">94%</span>
@@ -214,7 +238,6 @@ const router = useRouter()
           <div class="progress-bar-bg">
             <div class="progress-bar-fill" style="width: 94%"></div>
           </div>
-          
           <div class="score-stats">
             <div class="stat-col">
               <strong>1.2m</strong>
@@ -290,18 +313,7 @@ const router = useRouter()
   line-height: 1.2;
 }
 
-.shortcut {
-  margin-top: auto;
-  font-size: 0.65rem;
-  font-weight: 500;
-  color: #9ca3af;
-  background: #f3f4f6;
-  padding: 2px 6px;
-  border-radius: 4px;
-  display: inline-block;
-  align-self: flex-start;
-  margin-top: 0.5rem;
-}
+
 
 /* MAIN SPLIT */
 .main-dashboard-grid {
@@ -450,6 +462,25 @@ const router = useRouter()
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  max-height: 480px; /* Environ 5-6 activités */
+  overflow-y: auto;
+  padding-right: 0.5rem; /* Espace pour le scrollbar */
+}
+
+/* Scrollbar styling */
+.timeline::-webkit-scrollbar {
+  width: 4px;
+}
+.timeline::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+.timeline::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 10px;
+}
+.timeline::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 .timeline-item {
@@ -481,6 +512,12 @@ const router = useRouter()
 .timeline-content p { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem; }
 .timeline-content .time { font-size: 0.7rem; color: #9ca3af; font-weight: 500; }
 
+.timeline-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 0.25rem; }
+.timeline-meta .user { font-size: 0.7rem; font-weight: 600; color: #4b5563; }
+.timeline-meta .time { font-size: 0.65rem; color: #9ca3af; }
+
+.empty-activity { text-align: center; padding: 2rem 0; color: #9ca3af; font-size: 0.875rem; }
+
 /* SCORE BOARD */
 .score-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem;}
 .score-label { font-size: 0.875rem; font-weight: 600; color: #111827; }
@@ -493,4 +530,31 @@ const router = useRouter()
 .stat-col { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.25rem; }
 .stat-col strong { font-size: 1.25rem; font-weight: 700; color: #111827; }
 .stat-col span { font-size: 0.6rem; font-weight: 600; color: #9ca3af; letter-spacing: 0.05em; line-height: 1.2;}
+
+.refresh-btn { 
+  background: none; 
+  border: none; 
+  color: #9ca3af; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 4px;
+  border-radius: 50%;
+}
+.refresh-btn:hover { 
+  color: #2563eb; 
+  background: #eff6ff;
+  transform: scale(1.15) rotate(15deg);
+}
+.refresh-btn:active {
+  transform: scale(0.95);
+}
+.spinning { 
+  animation: spin 0.8s linear infinite; 
+}
+@keyframes spin { 
+  from { transform: rotate(0deg); } 
+  to { transform: rotate(360deg); } 
+}
 </style>

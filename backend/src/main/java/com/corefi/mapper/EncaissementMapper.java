@@ -37,6 +37,7 @@ public class EncaissementMapper {
         r.setId(e.getId());
         r.setNumero(e.getNumero());
         r.setDateEncaissement(e.getDateEncaissement());
+        r.setClientId(e.getClient() != null ? e.getClient().getId() : null);
         r.setNomClient(e.getClient() != null ? e.getClient().getRaisonSociale() : null);
         r.setMontant(e.getMontant());
         r.setMoyenPaiement(e.getMoyenPaiement().name());
