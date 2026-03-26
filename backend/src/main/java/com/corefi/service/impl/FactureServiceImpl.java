@@ -88,9 +88,12 @@ public class FactureServiceImpl implements IFactureService {
         // 6. Statut direct à VALIDEE (pour refléter la dette immédiatement)
         facture.setStatut(StatutFacture.EN_ATTENTE_PAIEMENT);
         
-        // 7. Mise à jour du solde du tiers
+        // 6. Mettre à jour le solde du tiers
         if (tiers.getSolde() == null) tiers.setSolde(java.math.BigDecimal.ZERO);
+        if (tiers.getTotalDette() == null) tiers.setTotalDette(java.math.BigDecimal.ZERO);
+
         tiers.setSolde(tiers.getSolde().add(facture.getMontantTtc()));
+        tiers.setTotalDette(tiers.getTotalDette().add(facture.getMontantTtc()));
         tiersRepository.save(tiers);
 
         // 8. Sauvegarder

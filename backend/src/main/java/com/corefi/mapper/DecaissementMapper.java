@@ -3,11 +3,16 @@ package com.corefi.mapper;
 import com.corefi.dto.request.decaissement.DecaissementCreateRequest;
 import com.corefi.dto.response.decaissement.DecaissementResponse;
 import com.corefi.entity.Decaissement;
+import com.corefi.entity.JustificatifDecaissement;
 import com.corefi.entity.Tiers;
 import com.corefi.entity.Devise;
 import com.corefi.enums.MoyenPaiement;
 import com.corefi.enums.StatutDecaissement;
 import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class DecaissementMapper {
@@ -18,7 +23,7 @@ public class DecaissementMapper {
         d.setFournisseur(fournisseur);
         d.setMontant(request.getMontant());
         d.setBeneficiaire(request.getBeneficiaire());
-        d.setMotif(request.getMotif()); // Raison de la demande
+        d.setMotif(request.getMotif());
         d.setMoyenPaiement(MoyenPaiement.valueOf(request.getMoyenPaiement()));
         d.setBanqueEmettrice(request.getBanqueEmettrice());
         d.setNumeroOperation(request.getNumeroOperation());
@@ -43,6 +48,26 @@ public class DecaissementMapper {
         r.setMontant(d.getMontant());
         r.setStatut(d.getStatut().name());
         r.setSeuilPdgRequis(d.isSeuilPdgRequis());
+        r.setCategorie(d.getCategorie() != null ? d.getCategorie().name() : null);
+        r.setMoyenPaiement(d.getMoyenPaiement() != null ? d.getMoyenPaiement().name() : null);
+
+        // Justificatifs
+        if (d.getJustificatifs() != null) {
+            r.setNbJustificatifs(d.getJustificatifs().size());
+            List<DecaissementResponse.JustificatifInfo> infos = d.getJustificatifs().stream().map((JustificatifDecaissement j) -> {
+                DecaissementResponse.JustificatifInfo info = new DecaissementResponse.JustificatifInfo();
+                info.setId(j.getId());
+                info.setNomOriginal(j.getNomOriginal());
+                info.setTypeFichier(j.getTypeFichier());
+                info.setTailleFichier(j.getTailleFichier());
+                return info;
+            }).collect(Collectors.toList());
+            r.setJustificatifs(infos);
+        } else {
+            r.setNbJustificatifs(0);
+            r.setJustificatifs(new ArrayList<>());
+        }
+
         return r;
     }
 }

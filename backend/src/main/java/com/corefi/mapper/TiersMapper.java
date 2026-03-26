@@ -38,7 +38,8 @@ public class TiersMapper {
         r.setVille(tiers.getVille());
         r.setPays(tiers.getPays());
         r.setActif(tiers.isActif());
-        r.setSolde(tiers.getSolde() != null ? tiers.getSolde().doubleValue() : 0.0);
+        r.setSolde(tiers.getSolde());
+        r.setTotalDette(tiers.getTotalDette());
 
         // Champs spécifiques Client
         if (tiers instanceof Client client) {

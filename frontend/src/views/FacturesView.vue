@@ -15,13 +15,24 @@ const router = useRouter()
 const showModal = ref(false)
 const showPreview = ref(false)
 const previewUrl = ref(null)
+const formError = ref('')
 
 const openPreview = async (id) => {
   try {
     const response = await api.get(`/factures/${id}/pdf`, { responseType: 'blob' })
     
-    if (response.status === 204 || !response.data || response.data.size === 0) {
-      alert("Erreur: Le serveur n'a renvoyé aucune donnée pour ce PDF. Vérifiez que la facture contient des lignes.")
+    // Vérifier si le blob est bien un PDF (parfois le serveur renvoie du JSON/HTML en cas d'erreur)
+    const contentType = response.headers['content-type'] || ''
+    if (!contentType.includes('application/pdf')) {
+      // La réponse n'est pas un PDF, c'est probablement un message d'erreur
+      const text = await response.data.text()
+      console.error('Réponse non-PDF reçue:', text)
+      alert("Le serveur n'a pas renvoyé de PDF. Réponse : " + text.substring(0, 200))
+      return
+    }
+
+    if (!response.data || response.data.size === 0) {
+      alert("Erreur: Le serveur n'a renvoyé aucune donnée pour ce PDF.")
       return
     }
 
@@ -30,6 +41,22 @@ const openPreview = async (id) => {
     showPreview.value = true
   } catch (err) {
     console.error('Erreur lors de la prévisualisation:', err)
+    let errorMsg = 'Erreur lors de la prévisualisation du PDF.'
+    if (err.response) {
+      if (err.response.status === 403) {
+        errorMsg = "Accès refusé. Vous n'avez pas les droits pour voir ce PDF."
+      } else if (err.response.status === 401) {
+        errorMsg = "Session expirée. Reconnectez-vous et réessayez."
+      } else if (err.response.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text()
+          errorMsg = 'Erreur serveur: ' + text.substring(0, 200)
+        } catch(e) { /* ignored */ }
+      }
+    } else if (!err.response) {
+      errorMsg = 'Le serveur backend ne répond pas. Vérifiez qu\'il est démarré.'
+    }
+    alert(errorMsg)
   }
 }
 
@@ -174,7 +201,10 @@ const submitForm = async () => {
       tiersId: '',
       lignes: [{ designation: '', quantite: 1, prixUnitaire: 0 }]
     }
-  } catch(e) { console.error('Erreur création facture', e) }
+  } catch(e) {
+    console.error('Erreur création facture', e)
+    formError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Erreur lors de la création de la facture.'
+  }
 }
 </script>
 
@@ -337,6 +367,14 @@ const submitForm = async () => {
         </div>
         
         <form @submit.prevent="submitForm" class="modal-body complex-body">
+
+          <!-- Bandeau d'erreur métier -->
+          <div v-if="formError" class="form-error-banner">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>{{ formError }}</span>
+            <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
+          </div>
+
           <div class="form-row">
             <div class="form-group half">
                <label>Type de Facture <span class="req">*</span></label>
@@ -481,4 +519,17 @@ const submitForm = async () => {
 .modal-footer { display: flex; justify-content: flex-end; gap: 1rem; }
 .btn-text { background: none; border: none; font-size: 0.875rem; color: #6b7280; font-weight:600; cursor: pointer; }
 .form-error { color: #dc2626; font-size: 0.875rem; padding: 0.5rem; background: #fee2e2; border-radius: 6px; }
+
+/* Bandeau d'erreur métier dans la modale */
+.form-error-banner {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.875rem 1rem; background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 1px solid #fecaca; border-radius: 10px; color: #b91c1c;
+  font-size: 0.875rem; font-weight: 500; animation: shakeIn 0.3s ease-out;
+}
+.form-error-banner svg { flex-shrink: 0; color: #ef4444; }
+.form-error-banner span { flex: 1; }
+.close-error-btn { background: none; border: none; color: #b91c1c; font-size: 1.25rem; cursor: pointer; padding: 0 0.25rem; opacity: 0.6; transition: opacity 0.15s; }
+.close-error-btn:hover { opacity: 1; }
+@keyframes shakeIn { 0% { transform: translateX(-8px); opacity: 0; } 50% { transform: translateX(4px); } 100% { transform: translateX(0); opacity: 1; } }
 </style>

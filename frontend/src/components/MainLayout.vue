@@ -11,9 +11,20 @@ const notificationStore = useNotificationStore()
 const router = useRouter()
 const route = useRoute()
 
+const showLogoutModal = ref(false)
+
 const handleLogout = () => {
+  showLogoutModal.value = true
+}
+
+const confirmLogout = () => {
+  showLogoutModal.value = false
   authStore.logout()
   router.push('/login')
+}
+
+const cancelLogout = () => {
+  showLogoutModal.value = false
 }
 
 // Vérifie si la route est active pour colorer le menu
@@ -92,13 +103,15 @@ onMounted(() => {
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-info">
-          <div class="user-avatar" :style="{ backgroundImage: 'url(https://ui-avatars.com/api/?name=' + (authStore.user?.prenom || 'A') + '&background=e0e7ff&color=1d4ed8)' }"></div>
-          <div class="user-details">
-            <span class="user-name">{{ authStore.user?.prenom || 'Alex' }} {{ authStore.user?.nom || 'Henderson' }}</span>
-            <span class="user-role">{{ authStore.userRole?.toLowerCase() || 'Utilisateur' }}</span>
+        <router-link to="/profile" class="user-info-link">
+          <div class="user-info">
+            <div class="user-avatar" :style="{ backgroundImage: authStore.user?.photoUrl ? 'url(' + authStore.user.photoUrl + ')' : 'url(https://ui-avatars.com/api/?name=' + (authStore.user?.prenom || 'A') + '&background=e0e7ff&color=1d4ed8)' }"></div>
+            <div class="user-details">
+              <span class="user-name">{{ authStore.user?.prenom || 'Alex' }} {{ authStore.user?.nom || 'Henderson' }}</span>
+              <span class="user-role">{{ authStore.userRole?.toLowerCase() || 'Utilisateur' }}</span>
+            </div>
           </div>
-        </div>
+        </router-link>
         <button @click="handleLogout" class="sidebar-logout" title="Déconnexion">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
         </button>
@@ -109,8 +122,10 @@ onMounted(() => {
     <main class="main-content">
       <header class="topbar">
         <div class="topbar-left">
-          <h1 class="page-title"><slot name="title">Bonjour, {{ authStore.user?.prenom || 'Alex' }}</slot></h1>
-          <p class="page-subtitle"><slot name="subtitle"><span class="capitalize">{{ currentDate }}</span> | {{ currentTime }}</slot></p>
+          <div>
+            <h1 class="page-title"><slot name="title">Bonjour, {{ authStore.user?.prenom || 'Alex' }}</slot></h1>
+            <p class="page-subtitle"><slot name="subtitle"><span class="capitalize">{{ currentDate }}</span> | {{ currentTime }}</slot></p>
+          </div>
         </div>
         
         <div class="topbar-right">
@@ -125,6 +140,10 @@ onMounted(() => {
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
             <span v-if="notificationStore.unreadNotifications.length > 0" class="badge"></span>
           </button>
+
+          <router-link to="/profile" class="topbar-profile-link">
+            <div class="topbar-avatar" :style="{ backgroundImage: authStore.user?.photoUrl ? 'url(' + authStore.user.photoUrl + ')' : 'url(https://ui-avatars.com/api/?name=' + (authStore.user?.prenom || 'A') + '&background=e0e7ff&color=1d4ed8)' }"></div>
+          </router-link>
         </div>
       </header>
 
@@ -144,6 +163,23 @@ onMounted(() => {
             </svg>
           </div>
           <span>Chargement...</span>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Modale de confirmation de déconnexion -->
+    <Transition name="fade">
+      <div v-if="showLogoutModal" class="logout-modal-backdrop" @click.self="cancelLogout">
+        <div class="logout-modal">
+          <div class="logout-modal-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </div>
+          <h3 class="logout-modal-title">Déconnexion</h3>
+          <p class="logout-modal-text">Êtes-vous sûr de vouloir vous déconnecter ?</p>
+          <div class="logout-modal-actions">
+            <button @click="cancelLogout" class="btn-cancel">Annuler</button>
+            <button @click="confirmLogout" class="btn-confirm-logout">Se déconnecter</button>
+          </div>
         </div>
       </div>
     </Transition>
@@ -324,6 +360,32 @@ onMounted(() => {
 }
 .capitalize { text-transform: capitalize; }
 
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.topbar-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.topbar-avatar:hover {
+  transform: scale(1.05);
+}
+
+.user-info-link {
+  text-decoration: none;
+  flex: 1;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
@@ -447,5 +509,105 @@ onMounted(() => {
 }
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+/* === Modale de confirmation de déconnexion === */
+.logout-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.logout-modal {
+  background: white;
+  border-radius: 20px;
+  padding: 2.5rem 2rem 2rem;
+  width: 380px;
+  max-width: 90vw;
+  text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: modalSlideUp 0.25s ease-out;
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.logout-modal-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+}
+
+.logout-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.5rem;
+}
+
+.logout-modal-text {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0 0 1.75rem;
+  line-height: 1.5;
+}
+
+.logout-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-cancel {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: 1.5px solid #e5e7eb;
+  background: white;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.btn-confirm-logout {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.25);
+}
+
+.btn-confirm-logout:hover {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.3);
+}
+
+.btn-confirm-logout:active {
+  transform: translateY(0);
 }
 </style>

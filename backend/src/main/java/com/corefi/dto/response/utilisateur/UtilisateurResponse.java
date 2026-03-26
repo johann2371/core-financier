@@ -10,6 +10,7 @@ public class UtilisateurResponse {
     private String prenom;
     private String email;
     private String role;
+    private String photoUrl;
     private boolean actif;
     private LocalDateTime dateCreation;
     private LocalDateTime dernierAcces;

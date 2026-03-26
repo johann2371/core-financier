@@ -56,13 +56,22 @@ public class TableauBordServiceImpl implements ITableauBordService {
         long enAttentePdg = decaissementRepository.findByStatut(StatutDecaissement.EN_ATTENTE_PDG).size();
         kpis.setDecaissementsEnAttente(enAttente + enAttentePdg);
 
-        // 4. Total des factures impayées
+        // 4. Créances Clients (Factures de VENTE impayées)
         List<Facture> factures = factureRepository.findAll();
-        BigDecimal totalImpayees = factures.stream()
+        BigDecimal totalCreances = factures.stream()
+                .filter(f -> "VENTE".equals(f.getType()))
                 .filter(f -> f.getStatut() == StatutFacture.EN_ATTENTE_PAIEMENT || f.getStatut() == StatutFacture.PARTIELLEMENT_PAYEE || f.getStatut() == StatutFacture.VALIDEE)
                 .map(Facture::getMontantTtc)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        kpis.setTotalFacturesImpayees(totalImpayees);
+        kpis.setTotalCreancesClients(totalCreances);
+
+        // 5. Dettes Fournisseurs (Factures d'ACHAT impayées)
+        BigDecimal totalDettes = factures.stream()
+                .filter(f -> "ACHAT".equals(f.getType()))
+                .filter(f -> f.getStatut() == StatutFacture.EN_ATTENTE_PAIEMENT || f.getStatut() == StatutFacture.PARTIELLEMENT_PAYEE || f.getStatut() == StatutFacture.VALIDEE)
+                .map(Facture::getMontantTtc)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        kpis.setTotalDettesFournisseurs(totalDettes);
 
         // 5. Activités récentes (Audit)
         kpis.setActivitesRecentes(

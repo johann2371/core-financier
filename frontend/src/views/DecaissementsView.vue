@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api'
 import MainLayout from '../components/MainLayout.vue'
 import Pagination from '../components/Pagination.vue'
@@ -18,6 +18,7 @@ const showCreateModal = ref(false)
 const showApproveModal = ref(false)
 const showExecuteModal = ref(false)
 const showRejectModal = ref(false)
+const formError = ref('')
 const activeDecaissement = ref(null)
 const showPreview = ref(false)
 const previewUrl = ref(null)
@@ -62,7 +63,12 @@ const filters = ref({
 
 const resetFilters = () => {
   filters.value = { search: '', fournisseurId: '', statut: '', dateDebut: '', dateFin: '' }
+  currentPage.value = 1
 }
+
+watch(filters, () => {
+  currentPage.value = 1
+}, { deep: true })
 
 const filteredDecaissements = computed(() => {
   let list = store.decaissements
@@ -101,11 +107,94 @@ const paginatedList = computed(() => {
 })
 
 // Forms State
-const defaultCreateForm = { motif: '', montant: '', fournisseurId: '', beneficiaire: '', mode: 'VIREMENT', banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '' }
+const defaultCreateForm = { motif: '', montant: '', fournisseurId: '', beneficiaire: '', mode: 'VIREMENT', banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '', categorie: 'PAIEMENT_FOURNISSEUR' }
 const createForm = ref({ ...defaultCreateForm })
 const rejectForm = ref({ reason: 'missing_docs', comments: '' })
 const approveForm = ref({ checks: [false, false, false, false] })
-const executeForm = ref({ compteFinancierId: null })
+const executeForm = ref({ compteFinancierId: 1 })
+const uploadFiles = ref([])
+
+// Catégories de décaissement
+const categories = [
+  { value: 'PAIEMENT_FOURNISSEUR', label: 'Paiement Fournisseur', icon: '🏢' },
+  { value: 'SALAIRES', label: 'Salaires', icon: '💰' },
+  { value: 'FRAIS_FONCTIONNEMENT', label: 'Frais de Fonctionnement', icon: '⚡' },
+  { value: 'MISSION_DEPLACEMENT', label: 'Mission / Déplacement', icon: '✈️' },
+  { value: 'ACHAT_MATERIEL', label: 'Achat Matériel', icon: '📦' },
+  { value: 'AUTRE', label: 'Autre', icon: '📋' }
+]
+
+// Checklist dynamique selon la catégorie
+const getChecklistItems = (categorie) => {
+  switch (categorie) {
+    case 'PAIEMENT_FOURNISSEUR': return [
+      'La facture fournisseur est jointe et conforme',
+      'Le bon de commande est présent',
+      'Les biens/services ont été réceptionnés',
+      'Le montant correspond au bon de commande'
+    ]
+    case 'SALAIRES': return [
+      'La fiche de paie est jointe',
+      'Le montant correspond au bulletin de salaire',
+      'Le bénéficiaire est bien un employé de l\'entreprise'
+    ]
+    case 'FRAIS_FONCTIONNEMENT': return [
+      'Le justificatif de la dépense est joint (facture, reçu)',
+      'Le montant est conforme au justificatif',
+      'La dépense est autorisée / budgétisée'
+    ]
+    case 'MISSION_DEPLACEMENT': return [
+      'L\'ordre de mission est validé',
+      'Les justificatifs de frais sont joints',
+      'Le montant correspond aux frais engagés'
+    ]
+    case 'ACHAT_MATERIEL': return [
+      'Le bon de commande est présent',
+      'Le devis/proforma est joint',
+      'Le matériel a été réceptionné'
+    ]
+    default: return [
+      'Un justificatif est fourni',
+      'Le montant est justifié'
+    ]
+  }
+}
+
+const approveChecklist = computed(() => {
+  if (!activeDecaissement.value) return []
+  return getChecklistItems(activeDecaissement.value.categorie || 'PAIEMENT_FOURNISSEUR')
+})
+
+const onFilesSelected = (event) => {
+  uploadFiles.value = Array.from(event.target.files)
+}
+
+const removeFile = (index) => {
+  uploadFiles.value.splice(index, 1)
+}
+
+const downloadJustificatif = async (id, originalName) => {
+  try {
+    const response = await api.get(`/decaissements/justificatifs/${id}/download`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', originalName)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (err) {
+    console.error('Erreur lors du téléchargement du justificatif:', err)
+    alert('Impossible de télécharger le fichier.')
+  }
+}
+
+const selectedFournisseurObj = computed(() => {
+  if (!createForm.value.fournisseurId) return null
+  return tierStore.fournisseurs.find(f => f.id === createForm.value.fournisseurId)
+})
+
+const isSubmitting = ref(false)
 
 onMounted(async () => {
   await store.fetchDecaissements()
@@ -124,16 +213,22 @@ const availableComptes = computed(() => {
 
 
 const submitCreate = async () => {
+  formError.value = ''
   try {
-    const selectedFou = tierStore.fournisseurs.find(f => f.id === createForm.value.fournisseurId)
-    const beneficiaireStr = selectedFou ? selectedFou.raisonSociale : 'Fournisseur Inconnu'
+    // Bénéficiaire selon la catégorie
+    let beneficiaireStr = createForm.value.beneficiaire || ''
+    if (createForm.value.categorie === 'PAIEMENT_FOURNISSEUR') {
+      const selectedFou = tierStore.fournisseurs.find(f => f.id === createForm.value.fournisseurId)
+      beneficiaireStr = selectedFou ? selectedFou.raisonSociale : beneficiaireStr || 'Fournisseur Inconnu'
+    }
 
     const dataToSend = {
       motif: createForm.value.motif || '',
       montant: createForm.value.montant,
       beneficiaire: beneficiaireStr,
-      fournisseurId: createForm.value.fournisseurId,
+      fournisseurId: createForm.value.categorie === 'PAIEMENT_FOURNISSEUR' ? createForm.value.fournisseurId : null,
       moyenPaiement: createForm.value.mode,
+      categorie: createForm.value.categorie,
       banqueEmettrice: createForm.value.banqueEmettrice || null,
       numeroOperation: createForm.value.numeroOperation || null,
       dateOperation: createForm.value.dateOperation || null,
@@ -142,16 +237,31 @@ const submitCreate = async () => {
     }
     const newlyCreated = await store.createDecaissement(dataToSend)
     
+    // Upload des justificatifs si des fichiers sont sélectionnés
+    if (newlyCreated && newlyCreated.id && uploadFiles.value.length > 0) {
+      const formData = new FormData()
+      uploadFiles.value.forEach(f => formData.append('files', f))
+      try {
+        await api.post(`/decaissements/${newlyCreated.id}/justificatifs`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+      } catch (uploadErr) {
+        console.warn('Upload justificatifs échoué:', uploadErr)
+      }
+    }
+
     showCreateModal.value = false
     createForm.value = { ...defaultCreateForm }
+    uploadFiles.value = []
     
-    // Auto-téléchargement du bon pour le Décaissement
+    // Auto-téléchargement du bon
     if (newlyCreated && newlyCreated.id) {
       await store.downloadReceipt(newlyCreated.id)
     }
 
   } catch(e) {
     console.error(e)
+    formError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Une erreur est survenue lors de l\'enregistrement.'
   }
 }
 
@@ -176,7 +286,10 @@ const submitApprove = async () => {
        await store.approuverPDG(activeDecaissement.value.id, { approved: true })
     }
     showApproveModal.value = false
-  } catch(e) { console.error(e) }
+  } catch(e) {
+    console.error(e)
+    alert(e.response?.data?.error || e.response?.data?.message || e.message || 'Erreur lors de la validation.')
+  }
 }
 
 const openExecute = (item) => {
@@ -192,7 +305,10 @@ const submitExecute = async () => {
       compteFinancierId: executeForm.value.compteFinancierId 
     })
     showExecuteModal.value = false
-  } catch(e) { console.error(e) }
+  } catch(e) {
+    console.error(e)
+    alert(e.response?.data?.error || e.response?.data?.message || e.message || 'Erreur lors de l\'exécution.')
+  }
 }
 
 const submitReject = async () => {
@@ -200,7 +316,10 @@ const submitReject = async () => {
     const comment = `Raison: ${rejectForm.value.reason}. ${rejectForm.value.comments}`
     await store.updateStatut(activeDecaissement.value.id, 'REJETE', comment)
     showRejectModal.value = false
-  } catch(e) { console.error(e) }
+  } catch(e) {
+    console.error(e)
+    alert(e.response?.data?.error || e.response?.data?.message || e.message || 'Erreur lors du rejet.')
+  }
 }
 
 const getStatusClass = (statut) => {
@@ -212,6 +331,12 @@ const getStatusClass = (statut) => {
   if (s.includes('ATTENTE') || s.includes('SOUMIS')) return 'badge-warning'
   return 'badge-info'
 }
+
+const bankBalance = computed(() => {
+  if (!activeDecaissement.value || !activeDecaissement.value.compteFinancierId) return 0
+  const c = compteStore.comptes.find(acc => acc.id === activeDecaissement.value.compteFinancierId)
+  return c ? c.solde : 0
+})
 </script>
 
 <template>
@@ -372,8 +497,29 @@ const getStatusClass = (statut) => {
         <div class="modal-split">
           <!-- Formulaire Principal -->
           <form id="create-decaissement-form" @submit.prevent="submitCreate" class="modal-left">
-            <div class="form-group input-with-icon">
-              <label>Fournisseur</label>
+
+            <!-- Bandeau d'erreur métier -->
+            <div v-if="formError" class="form-error-banner">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span>{{ formError }}</span>
+              <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
+            </div>
+
+            <!-- Sélecteur de catégorie -->
+            <div class="form-group">
+              <label>Catégorie <span class="req">*</span></label>
+              <div class="category-grid">
+                <label v-for="cat in categories" :key="cat.value" class="category-card" :class="{ active: createForm.categorie === cat.value }">
+                  <input type="radio" v-model="createForm.categorie" :value="cat.value" class="hidden-radio" />
+                  <span class="cat-icon">{{ cat.icon }}</span>
+                  <span class="cat-label">{{ cat.label }}</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Fournisseur (visible uniquement si PAIEMENT_FOURNISSEUR) -->
+            <div v-if="createForm.categorie === 'PAIEMENT_FOURNISSEUR'" class="form-group input-with-icon">
+              <label>Fournisseur <span class="req">*</span></label>
               <select v-model="createForm.fournisseurId" required class="input-huge" autofocus>
                  <option value="" disabled>Sélectionner un Fournisseur...</option>
                  <option v-for="fou in tierStore.fournisseurs" :key="fou.id" :value="fou.id">
@@ -453,6 +599,27 @@ const getStatusClass = (statut) => {
               <label>Motif de la dépense <span class="req">*</span></label>
               <textarea v-model="createForm.motif" rows="3" required placeholder="Description détaillée du décaissement..."></textarea>
             </div>
+
+            <!-- Zone d'upload de justificatifs -->
+            <div class="form-group">
+              <label>Pièces justificatives</label>
+              <div class="upload-zone">
+                <input type="file" id="justificatif-upload" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" @change="onFilesSelected" class="upload-input" />
+                <label for="justificatif-upload" class="upload-label">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  <span>Cliquer pour ajouter des fichiers</span>
+                  <span class="upload-hint">PDF, Images, Documents (max 10 Mo)</span>
+                </label>
+              </div>
+              <div v-if="uploadFiles.length > 0" class="uploaded-files">
+                <div v-for="(file, index) in uploadFiles" :key="index" class="file-item">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                  <span class="file-name">{{ file.name }}</span>
+                  <span class="file-size">{{ (file.size / 1024).toFixed(0) }} Ko</span>
+                  <button type="button" @click="removeFile(index)" class="file-remove">&times;</button>
+                </div>
+              </div>
+            </div>
           </form>
 
           <!-- Panneau Latéral (Validation Temp Réel) -->
@@ -479,7 +646,7 @@ const getStatusClass = (statut) => {
                   </div>
                 </div>
 
-                <div class="alert-box alert-success" v-if="createForm.montant && createForm.fournisseurId">
+                <div class="alert-box alert-success" v-if="createForm.montant && (createForm.fournisseurId || createForm.beneficiaire)">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                   <div>
                     <strong>Formulaire complet</strong>
@@ -492,7 +659,7 @@ const getStatusClass = (statut) => {
         
         <div class="modal-footer bottom-bar">
           <button type="button" class="btn-text" @click="showCreateModal = false">Annuler</button>
-          <button type="submit" form="create-decaissement-form" class="btn-primary-large" :disabled="!createForm.montant || !createForm.fournisseurId">
+          <button type="submit" form="create-decaissement-form" class="btn-primary-large" :disabled="!createForm.montant || (createForm.categorie === 'PAIEMENT_FOURNISSEUR' && !createForm.fournisseurId) || (createForm.categorie !== 'PAIEMENT_FOURNISSEUR' && !createForm.beneficiaire)">
             Soumettre Demande
           </button>
         </div>
@@ -508,33 +675,37 @@ const getStatusClass = (statut) => {
           </div>
           <div class="title-block">
             <h3>Confirm Disbursement</h3>
-            <span>Security validation required for transaction #TXN-{{ activeDecaissement.id?.toString().padStart(4, '0') }}-BK</span>
+            <span>Security validation required for transaction #TXN-{{ activeDecaissement?.id?.toString().padStart(4, '0') }}-BK</span>
           </div>
         </div>
 
         <div class="checklist-section">
-          <span class="section-label">MANDATORY SECURITY CHECKLIST</span>
+          <span class="section-label">CHECKLIST DE SÉCURITÉ ({{ activeDecaissement?.categorie }})</span>
           <div class="checklist">
-            <label class="check-item">
-              <input type="checkbox" v-model="approveForm.checks[0]" />
+            <label v-for="(item, idx) in approveChecklist" :key="idx" class="check-item">
+              <input type="checkbox" v-model="approveForm.checks[idx]" />
               <div class="custom-check"></div>
-              <span>I have verified the supporting documents</span>
+              <span>{{ item }}</span>
             </label>
-            <label class="check-item">
-              <input type="checkbox" v-model="approveForm.checks[1]" />
-              <div class="custom-check"></div>
-              <span>I have verified the supplier identity</span>
-            </label>
-            <label class="check-item">
-              <input type="checkbox" v-model="approveForm.checks[2]" />
-              <div class="custom-check"></div>
-              <span>Amounts match the invoice exactly</span>
-            </label>
-            <label class="check-item">
-              <input type="checkbox" v-model="approveForm.checks[3]" />
-              <div class="custom-check"></div>
-              <span>Bank balance will remain sufficient after debit</span>
-            </label>
+          </div>
+        </div>
+
+        <div v-if="activeDecaissement?.justificatifs?.length > 0" class="justificatifs-display-section">
+          <span class="section-label">PIÈCES JUSTIFICATIVES JOINTES</span>
+          <div class="justificatif-list">
+            <div v-for="j in activeDecaissement.justificatifs" :key="j.id" class="justif-item">
+              <div class="justif-info">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                <div class="justif-text">
+                  <span class="justif-name">{{ j.nomOriginal }}</span>
+                  <span class="justif-size">{{ (j.tailleFichier / 1024).toFixed(1) }} Ko</span>
+                </div>
+              </div>
+              <button @click="downloadJustificatif(j.id, j.nomOriginal)" class="btn-justif-view" title="Ouvrir le document">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                Ouvrir
+              </button>
+            </div>
           </div>
         </div>
 
@@ -549,13 +720,13 @@ const getStatusClass = (statut) => {
             </div>
             <div class="b-col text-right">
               <span class="label">POST-TRANSACTION</span>
-              <strong class="val text-blue">{{ (bankBalance - activeDecaissement.montant).toLocaleString() }} XAF</strong>
+              <strong class="val text-blue">{{ (bankBalance - (activeDecaissement?.montant || 0)).toLocaleString() }} XAF</strong>
             </div>
           </div>
           <div class="divider"></div>
           <div class="balance-row amounts-row">
             <span class="label">Transaction Amount:</span>
-            <strong class="val-dark">-{{ activeDecaissement.montant.toLocaleString() }} XAF</strong>
+            <strong class="val-dark">-{{ activeDecaissement?.montant?.toLocaleString() }} XAF</strong>
           </div>
         </div>
 
@@ -632,7 +803,7 @@ const getStatusClass = (statut) => {
           </div>
           <div class="title-block">
             <h3>Reject Disbursement</h3>
-            <span>Transaction ID: TXN-{{ activeDecaissement.id?.toString().padStart(4, '0') }}-BK</span>
+            <span>Transaction ID: TXN-{{ activeDecaissement?.id?.toString().padStart(4, '0') }}-BK</span>
           </div>
         </div>
 
@@ -857,4 +1028,74 @@ textarea.input-std { resize: vertical; min-height: 80px; }
 .btn-danger-solid { flex: 1.5; padding: 0.875rem; background: #e11d48; color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer;}
 .btn-danger-solid:hover { background: #be123c; }
 .btn-danger-solid:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Bandeau d'erreur métier dans la modale */
+.form-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #b91c1c;
+  font-size: 0.875rem;
+  font-weight: 500;
+  animation: shakeIn 0.3s ease-out;
+}
+.form-error-banner svg { flex-shrink: 0; color: #ef4444; }
+.form-error-banner span { flex: 1; }
+.close-error-btn {
+  background: none; border: none; color: #b91c1c; font-size: 1.25rem;
+  cursor: pointer; padding: 0 0.25rem; opacity: 0.6; transition: opacity 0.15s;
+}
+.close-error-btn:hover { opacity: 1; }
+
+@keyframes shakeIn {
+  0% { transform: translateX(-8px); opacity: 0; }
+  50% { transform: translateX(4px); }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+/* CATEGORY SELECTOR */
+.category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 0.25rem; }
+.category-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; cursor: pointer; transition: all 0.2s; background: white; text-align: center; }
+.category-card:hover { border-color: #3b82f6; background: #f0f7ff; }
+.category-card.active { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+.cat-icon { font-size: 1.5rem; }
+.cat-label { font-size: 0.75rem; font-weight: 600; color: #374151; line-height: 1.2; }
+.category-card.active .cat-label { color: #1d4ed8; }
+
+/* UPLOAD ZONE */
+.upload-zone { margin-top: 0.25rem; }
+.upload-input { display: none; }
+.upload-label { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; border: 2px dashed #d1d5db; border-radius: 10px; cursor: pointer; transition: all 0.2s; background: #f9fafb; color: #6b7280; gap: 0.5rem; }
+.upload-label:hover { border-color: #3b82f6; background: #f0f7ff; color: #2563eb; }
+.upload-label svg { opacity: 0.6; }
+.upload-label span { font-size: 0.875rem; font-weight: 500; }
+.upload-hint { font-size: 0.7rem; opacity: 0.7; }
+
+.uploaded-files { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.file-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; background: #f3f4f6; border-radius: 6px; border: 1px solid #e5e7eb; font-size: 0.75rem; color: #374151; }
+.file-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.file-size { color: #6b7280; font-size: 0.65rem; }
+.file-remove { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 1.125rem; line-height: 1; padding: 0; margin-left: 0.25rem; }
+.file-remove:hover { color: #ef4444; }
+
+/* CUSTOM SCROLLBAR FOR MODAL */
+.modal-split::-webkit-scrollbar { width: 6px; }
+.modal-split::-webkit-scrollbar-track { background: transparent; }
+.modal-split::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+.modal-split::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+/* JUSTIFICATIFS DISPLAY (APPROVE MODAL) */
+.justificatifs-display-section { margin-top: 1rem; }
+.justificatif-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+.justif-item { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+.justif-info { display: flex; align-items: center; gap: 0.75rem; }
+.justif-info svg { color: #64748b; }
+.justif-text { display: flex; flex-direction: column; }
+.justif-name { font-size: 0.8rem; font-weight: 600; color: #1e293b; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.justif-size { font-size: 0.7rem; color: #64748b; }
+.btn-justif-view { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; background: white; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: #475569; text-decoration: none; transition: all 0.2s; }
+.btn-justif-view:hover { background: #f1f5f9; border-color: #94a3b8; color: #1e293b; }
 </style>

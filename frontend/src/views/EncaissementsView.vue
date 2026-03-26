@@ -13,7 +13,8 @@ const compteStore = useCompteStore()
 const showModal = ref(false)
 const showPreview = ref(false)
 const previewUrl = ref(null)
-const selectedMode = ref('ESPECES') // Passer ESPECES par défaut pour plus de sûreté
+const selectedMode = ref('ESPECES')
+const formError = ref('')
 
 const openPreview = async (id) => {
   try {
@@ -100,6 +101,11 @@ const form = ref({
   telephone: ''
 })
 
+const selectedClientObj = computed(() => {
+  if (!form.value.clientId) return null
+  return tierStore.clients.find(c => c.id === form.value.clientId)
+})
+
 onMounted(async () => {
   await store.fetchEncaissements()
   await tierStore.fetchTiers()
@@ -127,6 +133,7 @@ watch(watchMode, (newMode) => {
 })
 
 const submitForm = async () => {
+  formError.value = ''
   try {
     const dataToSend = {
       clientId: form.value.clientId,
@@ -159,6 +166,7 @@ const submitForm = async () => {
 
   } catch(e) {
     console.error(e)
+    formError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Une erreur est survenue lors de l\'enregistrement.'
   }
 }
 
@@ -300,6 +308,13 @@ const getStatusClass = (statut) => {
         <div class="modal-split">
           <!-- Colonne Gauche -->
           <form id="encaissement-form" @submit.prevent="submitForm" class="modal-left">
+
+            <!-- Bandeau d'erreur métier -->
+            <div v-if="formError" class="form-error-banner">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span>{{ formError }}</span>
+              <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
+            </div>
             
             <div class="form-group search-group">
               <div class="label-row">
@@ -314,6 +329,11 @@ const getStatusClass = (statut) => {
                   </option>
                 </select>
                 <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </div>
+
+              <div v-if="selectedClientObj" class="p-2 border border-blue-100 bg-blue-50 rounded-md mt-1 flex justify-between items-center">
+                <span class="text-xs font-semibold text-blue-700 uppercase">Reste à payer :</span>
+                <span class="text-sm font-bold text-blue-800">{{ selectedClientObj.solde?.toLocaleString() }} XAF</span>
               </div>
               
               <div class="alert-box alert-error mt-2" v-if="tierStore.clients.length === 0">
@@ -604,4 +624,32 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246,
 .btn-primary-large:hover { background: #1d4ed8; }
 .btn-primary-large:disabled { opacity: 0.6; cursor: not-allowed; }
 .dark-kbd { background: rgba(0,0,0,0.2) !important; color: white !important; border-bottom: none !important;}
+
+/* Bandeau d'erreur métier dans la modale */
+.form-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #b91c1c;
+  font-size: 0.875rem;
+  font-weight: 500;
+  animation: shakeIn 0.3s ease-out;
+}
+.form-error-banner svg { flex-shrink: 0; color: #ef4444; }
+.form-error-banner span { flex: 1; }
+.close-error-btn {
+  background: none; border: none; color: #b91c1c; font-size: 1.25rem;
+  cursor: pointer; padding: 0 0.25rem; opacity: 0.6; transition: opacity 0.15s;
+}
+.close-error-btn:hover { opacity: 1; }
+
+@keyframes shakeIn {
+  0% { transform: translateX(-8px); opacity: 0; }
+  50% { transform: translateX(4px); }
+  100% { transform: translateX(0); opacity: 1; }
+}
 </style>

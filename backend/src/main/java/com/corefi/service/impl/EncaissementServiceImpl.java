@@ -95,7 +95,16 @@ public class EncaissementServiceImpl implements IEncaissementService {
         // 7. Mettre à jour le solde du tiers (diminue la dette globale dès l'encaissement)
         if (client.getSolde() == null) client.setSolde(BigDecimal.ZERO);
         BigDecimal ancienSolde = client.getSolde();
-        client.setSolde(ancienSolde.subtract(request.getMontant()));
+
+        // Validation : ne pas payer plus que le montant dû
+        if (request.getMontant().compareTo(ancienSolde) > 0) {
+             throw new RuntimeException("Le montant de l'encaissement (" + request.getMontant() + ") ne peut pas dépasser le solde dû (" + ancienSolde + ")");
+        }
+
+        BigDecimal nouveauSolde = ancienSolde.subtract(request.getMontant());
+        if (nouveauSolde.compareTo(BigDecimal.ZERO) < 0) nouveauSolde = BigDecimal.ZERO;
+        
+        client.setSolde(nouveauSolde);
         tiersRepository.save(client);
 
         // 8. Sauvegarder l'encaissement

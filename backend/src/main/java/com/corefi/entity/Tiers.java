@@ -42,5 +42,8 @@ public class Tiers {
     @Column(precision = 18, scale = 2)
     private BigDecimal solde = BigDecimal.ZERO;
 
+    @Column(name = "total_dette", precision = 18, scale = 2)
+    private BigDecimal totalDette = BigDecimal.ZERO;
+
     private boolean actif = true;
 }

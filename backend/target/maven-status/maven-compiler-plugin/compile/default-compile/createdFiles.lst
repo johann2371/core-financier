@@ -10,6 +10,7 @@ com\corefi\enums\TypeMouvement.class
 com\corefi\service\interfaces\IFactureService.class
 com\corefi\config\CorsConfig.class
 com\corefi\service\impl\TableauBordServiceImpl.class
+com\corefi\dto\request\utilisateur\ProfileUpdateRequest.class
 com\corefi\repository\UtilisateurRepository.class
 com\corefi\repository\FournisseurRepository.class
 com\corefi\dto\response\tiers\TiersResponse.class
@@ -67,8 +68,10 @@ com\corefi\entity\Caisse.class
 com\corefi\dto\request\decaissement\DecaissementCreateRequest.class
 com\corefi\controller\CompteFinancierController.class
 com\corefi\dto\response\decaissement\DecaissementResponse.class
+com\corefi\service\interfaces\IFileStorageService.class
 com\corefi\repository\NotificationRepository.class
 com\corefi\service\impl\JournalAuditServiceImpl.class
+com\corefi\service\impl\FileStorageServiceImpl.class
 com\corefi\repository\ParametrageRepository.class
 com\corefi\config\SecurityConfig.class
 com\corefi\controller\TableauBordController.class
@@ -76,6 +79,7 @@ com\corefi\repository\TauxChangeRepository.class
 com\corefi\dto\request\decaissement\ValidationRFRequest.class
 com\corefi\entity\JournalAudit.class
 com\corefi\dto\request\facture\LigneFactureRequest.class
+com\corefi\config\WebConfig.class
 com\corefi\repository\LigneFactureRepository.class
 com\corefi\service\impl\NotificationServiceImpl.class
 com\corefi\config\DataInitializer.class

@@ -8,4 +8,6 @@ public interface EncaissementRepository extends JpaRepository<Encaissement, Long
     Optional<Encaissement> findByNumero(String numero);
 
     boolean existsByNumero(String numero);
+
+    java.util.List<com.corefi.entity.Encaissement> findByClientId(Long clientId);
 }

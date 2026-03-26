@@ -1,5 +1,6 @@
 package com.corefi.service.impl;
 
+import com.corefi.dto.request.utilisateur.ProfileUpdateRequest;
 import com.corefi.dto.request.utilisateur.UtilisateurCreateRequest;
 import com.corefi.dto.response.utilisateur.UtilisateurResponse;
 import com.corefi.entity.Utilisateur;
@@ -163,6 +164,44 @@ public class UtilisateurServiceImpl implements IUtilisateurService {
                 "actif=false (désactivation)",
                 null
         );
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // METTRE À JOUR LE PROFIL (Utilisateur connecté)
+    // ────────────────────────────────────────────────────────────────────────
+    @Override
+    @Transactional
+    public UtilisateurResponse updateProfile(String email, ProfileUpdateRequest request) {
+        // 1. Trouver l'utilisateur par son email (issu du SecurityContext)
+        Utilisateur utilisateur = utilisateurRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé avec l'email : " + email));
+
+        // 2. Vérifier si le nouvel email est disponible (si changé)
+        if (!utilisateur.getEmail().equalsIgnoreCase(request.getEmail())) {
+            if (utilisateurRepository.findByEmail(request.getEmail()).isPresent()) {
+                throw new WorkflowException("L'email '" + request.getEmail() + "' est déjà utilisé.");
+            }
+        }
+
+        // 3. Mettre à jour les infos
+        String anciennesValeurs = "nom=" + utilisateur.getNom() + ", prenom=" + utilisateur.getPrenom() + ", photo=" + utilisateur.getPhotoUrl();
+        
+        utilisateur.setNom(request.getNom());
+        utilisateur.setPrenom(request.getPrenom());
+        utilisateur.setEmail(request.getEmail());
+        utilisateur.setPhotoUrl(request.getPhotoUrl());
+
+        Utilisateur saved = utilisateurRepository.save(utilisateur);
+
+        // 4. Audit
+        journalAuditService.enregistrer(
+                "UPDATE", "Utilisateur", saved.getId(),
+                anciennesValeurs,
+                "Profil mis à jour via interface utilisateur",
+                null
+        );
+
+        return utilisateurMapper.toResponse(saved);
     }
 
     // ────────────────────────────────────────────────────────────────────────

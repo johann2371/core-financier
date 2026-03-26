@@ -9,6 +9,7 @@ public class TableauBordResponse {
     private BigDecimal soldeTotalCaisses;
     private BigDecimal soldeTotalBanques;
     private long decaissementsEnAttente;
-    private BigDecimal totalFacturesImpayees;
+    private BigDecimal totalCreancesClients;
+    private BigDecimal totalDettesFournisseurs;
     private List<ActiviteResponse> activitesRecentes;
 }

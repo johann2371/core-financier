@@ -4,6 +4,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class DecaissementResponse {
@@ -18,4 +19,16 @@ public class DecaissementResponse {
     private BigDecimal montant;
     private String statut;
     private boolean seuilPdgRequis;
+    private String categorie;
+    private String moyenPaiement;
+    private int nbJustificatifs;
+    private List<JustificatifInfo> justificatifs;
+
+    @Data
+    public static class JustificatifInfo {
+        private Long id;
+        private String nomOriginal;
+        private String typeFichier;
+        private Long tailleFichier;
+    }
 }

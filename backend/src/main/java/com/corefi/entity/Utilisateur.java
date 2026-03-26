@@ -35,6 +35,7 @@ public class Utilisateur {
     private Role role;
 
     private boolean actif = true;
+    private String photoUrl;
 
     private int tentativesConnexion = 0;
 

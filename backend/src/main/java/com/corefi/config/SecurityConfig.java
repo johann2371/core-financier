@@ -57,6 +57,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()   // login & refresh publics
                 .requestMatchers("/ws/**").permitAll()         // WebSockets
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs").permitAll() // Swagger
+                .requestMatchers("/uploads/**").permitAll()    // Photos de profil
                 .requestMatchers("/error").permitAll()         // Évite le faux 401 sur les erreurs
                 .anyRequest().authenticated()
             )

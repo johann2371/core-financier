@@ -10,7 +10,7 @@ import java.time.LocalDate;
 
 @Data
 public class DecaissementCreateRequest {
-    @NotNull
+    // Optionnel — requis uniquement pour PAIEMENT_FOURNISSEUR
     private Long fournisseurId;
 
     @NotNull
@@ -22,6 +22,9 @@ public class DecaissementCreateRequest {
 
     private Long deviseId;
     private String motif;
+
+    /** Catégorie du décaissement (PAIEMENT_FOURNISSEUR, SALAIRES, FRAIS_FONCTIONNEMENT, etc.) */
+    private String categorie;
 
     @NotBlank
     private String moyenPaiement;

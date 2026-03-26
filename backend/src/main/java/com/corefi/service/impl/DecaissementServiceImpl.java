@@ -5,6 +5,7 @@ import com.corefi.dto.response.decaissement.DecaissementResponse;
 import com.corefi.entity.*;
 import com.corefi.enums.MoyenPaiement;
 import com.corefi.enums.StatutDecaissement;
+import com.corefi.enums.CategorieDecaissement;
 import com.corefi.enums.TypeTiers;
 import com.corefi.exception.ResourceNotFoundException;
 import com.corefi.exception.WorkflowException;
@@ -46,12 +47,30 @@ public class DecaissementServiceImpl implements IDecaissementService {
     @Override
     @Transactional
     public DecaissementResponse creer(DecaissementCreateRequest request) {
-        // Vérifier le fournisseur
-        Tiers fournisseur = tiersRepository.findById(request.getFournisseurId())
-                .orElseThrow(() -> new ResourceNotFoundException("Fournisseur introuvable ID : " + request.getFournisseurId()));
+        // Déterminer la catégorie
+        CategorieDecaissement categorie = CategorieDecaissement.PAIEMENT_FOURNISSEUR;
+        if (request.getCategorie() != null && !request.getCategorie().isBlank()) {
+            try {
+                categorie = CategorieDecaissement.valueOf(request.getCategorie());
+            } catch (IllegalArgumentException e) {
+                throw new WorkflowException("Catégorie invalide : " + request.getCategorie());
+            }
+        }
 
-        if (fournisseur.getType() != TypeTiers.FOURNISSEUR) {
-            throw new WorkflowException("Un décaissement doit être associé à un FOURNISSEUR.");
+        // Vérifier le fournisseur (obligatoire uniquement pour PAIEMENT_FOURNISSEUR)
+        Tiers fournisseur = null;
+        if (categorie == CategorieDecaissement.PAIEMENT_FOURNISSEUR) {
+            if (request.getFournisseurId() == null) {
+                throw new WorkflowException("Le fournisseur est obligatoire pour un paiement fournisseur.");
+            }
+            fournisseur = tiersRepository.findById(request.getFournisseurId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Fournisseur introuvable ID : " + request.getFournisseurId()));
+            if (fournisseur.getType() != TypeTiers.FOURNISSEUR) {
+                throw new WorkflowException("Un paiement fournisseur doit être associé à un FOURNISSEUR.");
+            }
+        } else if (request.getFournisseurId() != null) {
+            // Fournisseur optionnel pour les autres catégories
+            fournisseur = tiersRepository.findById(request.getFournisseurId()).orElse(null);
         }
 
         // Devise (XAF par défaut)
@@ -69,6 +88,7 @@ public class DecaissementServiceImpl implements IDecaissementService {
         decaissement.setNumero(genererNumero("DEC"));
         decaissement.setDateDecaissement(LocalDate.now());
         decaissement.setDateSaisie(LocalDateTime.now());
+        decaissement.setCategorie(categorie);
 
         // Vérifier si le seuil PDG est atteint
         decaissement.setSeuilPdgRequis(request.getMontant().compareTo(SEUIL_PDG) >= 0);
@@ -93,6 +113,13 @@ public class DecaissementServiceImpl implements IDecaissementService {
                 "Nouveau décaissement à valider",
                 "Un nouveau décaissement " + saved.getNumero() + " de " + saved.getMontant() + " XAF a été créé et attend votre validation.",
                 "RESPONSABLE_FINANCIER");
+
+        // Notification au PDG (visibilité sur tous les décaissements)
+        notificationService.creerEtEnvoyer(
+                "Nouveau décaissement créé",
+                "Un décaissement " + saved.getNumero() + " de " + saved.getMontant() + " XAF a été créé par " + saisiPar.getPrenom() + " " + saisiPar.getNom() + "."
+                        + (saved.isSeuilPdgRequis() ? " ⚠ Votre approbation sera requise (seuil dépassé)." : ""),
+                "PDG");
 
         return decaissementMapper.toResponse(saved);
     }
@@ -164,6 +191,13 @@ public class DecaissementServiceImpl implements IDecaissementService {
                 "CAISSIER");
         }
 
+        // Notification au comptable que le RF a traité le décaissement
+        notificationService.creerEtEnvoyer(
+                "Décaissement validé par le RF",
+                "Le décaissement " + d.getNumero() + " de " + d.getMontant() + " XAF a été " 
+                        + (d.isSeuilPdgRequis() ? "transmis au PDG pour approbation." : "validé et envoyé au caissier pour exécution."),
+                "COMPTABLE");
+
         return decaissementMapper.toResponse(saved);
     }
 
@@ -192,6 +226,12 @@ public class DecaissementServiceImpl implements IDecaissementService {
 
         journalAuditService.enregistrer("UPDATE", "Decaissement", id,
                 "statut=EN_ATTENTE", "statut=REJETEE_RF — motif: " + request.getMotif(), null);
+
+        // Notifier le comptable du rejet
+        notificationService.creerEtEnvoyer(
+                "Décaissement rejeté par le RF",
+                "Le décaissement " + d.getNumero() + " a été rejeté par le Responsable Financier. Motif : " + request.getMotif(),
+                "COMPTABLE");
 
         return decaissementMapper.toResponse(saved);
     }
@@ -222,6 +262,12 @@ public class DecaissementServiceImpl implements IDecaissementService {
                 "Le décaissement " + d.getNumero() + " a été approuvé par le PDG et attend votre exécution en caisse.",
                 "CAISSIER");
 
+        // Notifier le comptable de l'approbation PDG
+        notificationService.creerEtEnvoyer(
+                "Décaissement approuvé par le PDG",
+                "Le décaissement " + d.getNumero() + " de " + d.getMontant() + " XAF a été approuvé par le PDG et envoyé au caissier.",
+                "COMPTABLE");
+
         return decaissementMapper.toResponse(saved);
     }
 
@@ -250,6 +296,16 @@ public class DecaissementServiceImpl implements IDecaissementService {
 
         journalAuditService.enregistrer("UPDATE", "Decaissement", id,
                 "statut=EN_ATTENTE_PDG", "statut=REJETEE_PDG — motif: " + request.getMotif(), null);
+
+        // Notifier le comptable et le RF du rejet PDG
+        notificationService.creerEtEnvoyer(
+                "Décaissement rejeté par le PDG",
+                "Le décaissement " + d.getNumero() + " a été rejeté par le PDG. Motif : " + request.getMotif(),
+                "COMPTABLE");
+        notificationService.creerEtEnvoyer(
+                "Décaissement rejeté par le PDG",
+                "Le décaissement " + d.getNumero() + " a été rejeté par le PDG. Motif : " + request.getMotif(),
+                "RESPONSABLE_FINANCIER");
 
         return decaissementMapper.toResponse(saved);
     }
@@ -290,7 +346,17 @@ public class DecaissementServiceImpl implements IDecaissementService {
         // Soustraire du solde fournisseur (on a payé notre dette)
         Tiers fournisseur = d.getFournisseur();
         if (fournisseur.getSolde() == null) fournisseur.setSolde(java.math.BigDecimal.ZERO);
-        fournisseur.setSolde(fournisseur.getSolde().subtract(d.getMontant()));
+        BigDecimal ancienSolde = fournisseur.getSolde();
+
+        // Validation : ne pas payer plus que le montant dû
+        if (d.getMontant().compareTo(ancienSolde) > 0) {
+            throw new RuntimeException("Le montant du décaissement (" + d.getMontant() + ") ne peut pas dépasser le solde dû (" + ancienSolde + ")");
+        }
+
+        BigDecimal nouveauSolde = ancienSolde.subtract(d.getMontant());
+        if (nouveauSolde.compareTo(BigDecimal.ZERO) < 0) nouveauSolde = BigDecimal.ZERO;
+
+        fournisseur.setSolde(nouveauSolde);
         tiersRepository.save(fournisseur);
 
         // Mettre à jour le décaissement

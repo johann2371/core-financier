@@ -34,7 +34,7 @@ public class PdfServiceImpl implements IPdfService {
     @Transactional(readOnly = true)
     public byte[] genererFacturePdf(Long factureId) {
         System.out.println("Début génération PDF pour Facture ID: " + factureId);
-        Facture facture = factureRepository.findById(factureId)
+        Facture facture = factureRepository.findByIdWithDetails(factureId)
                 .orElseThrow(() -> new ResourceNotFoundException("Facture introuvable"));
 
         System.out.println("Facture trouvée: " + facture.getNumero());

@@ -2,6 +2,7 @@ package com.corefi.entity;
 
 import com.corefi.enums.MoyenPaiement;
 import com.corefi.enums.StatutDecaissement;
+import com.corefi.enums.CategorieDecaissement;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -9,6 +10,8 @@ import lombok.AllArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "decaissement")
@@ -50,6 +53,19 @@ public class Decaissement {
     private String beneficiaire;
     private String reference;
     private String motif; // Raison de la demande de décaissement
+
+    // --- Catégorie de décaissement ---
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    private CategorieDecaissement categorie = CategorieDecaissement.PAIEMENT_FOURNISSEUR;
+
+    // --- Justificatifs joints ---
+    @OneToMany(mappedBy = "decaissement", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<JustificatifDecaissement> justificatifs = new ArrayList<>();
+
+    // --- Checklist de vérification RF (stocké en JSON) ---
+    @Column(columnDefinition = "TEXT")
+    private String checklistRF;
 
     // --- Métadonnées Paiement (Chèque, Virement, Mobile Money) ---
     private String banqueEmettrice;

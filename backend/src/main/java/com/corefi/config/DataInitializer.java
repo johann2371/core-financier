@@ -30,12 +30,51 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final DeviseRepository deviseRepository;
     private final CompteFinancierRepository compteFinancierRepository;
+    private final com.corefi.repository.TiersRepository tiersRepository;
+    private final com.corefi.repository.FactureRepository factureRepository;
+    private final com.corefi.repository.EncaissementRepository encaissementRepository;
+    private final com.corefi.repository.DecaissementRepository decaissementRepository;
 
     @Override
     public void run(String... args) {
         creerAdminParDefaut();
         creerComptableParDefaut();
         creerDeviseEtCompteParDefaut();
+        synchroniserDettesHistoriques();
+    }
+
+    private void synchroniserDettesHistoriques() {
+        log.info("--- Début synchronisation des dettes historiques ---");
+        tiersRepository.findAll().forEach(tiers -> {
+            // Cumul factures (Dette Totale)
+            BigDecimal totalFactures = factureRepository.findByTiersId(tiers.getId()).stream()
+                    .filter(f -> f.getStatut() != com.corefi.enums.StatutFacture.ANNULEE)
+                    .map(com.corefi.entity.Facture::getMontantTtc)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Cumul règlements
+            BigDecimal totalReglements = BigDecimal.ZERO;
+            if (tiers.getType() == com.corefi.enums.TypeTiers.CLIENT) {
+                totalReglements = encaissementRepository.findByClientId(tiers.getId()).stream()
+                        .filter(e -> e.getStatut() != com.corefi.enums.StatutEncaissement.ANNULEE)
+                        .map(com.corefi.entity.Encaissement::getMontant)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+            } else {
+                totalReglements = decaissementRepository.findByFournisseurId(tiers.getId()).stream()
+                        .filter(d -> d.getStatut() != com.corefi.enums.StatutDecaissement.ANNULEE)
+                        .map(com.corefi.entity.Decaissement::getMontant)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+            }
+
+            BigDecimal nouveauSolde = totalFactures.subtract(totalReglements);
+            if (nouveauSolde.compareTo(BigDecimal.ZERO) < 0) nouveauSolde = BigDecimal.ZERO;
+
+            tiers.setTotalDette(totalFactures);
+            tiers.setSolde(nouveauSolde);
+            tiersRepository.save(tiers);
+            log.info(" Tier {} : Total {} | Solde {}", tiers.getRaisonSociale(), totalFactures, nouveauSolde);
+        });
+        log.info("--- Fin synchronisation des dettes historiques ---");
     }
 
     private void creerAdminParDefaut() {

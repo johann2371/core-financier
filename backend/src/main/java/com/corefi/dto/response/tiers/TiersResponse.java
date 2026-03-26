@@ -1,6 +1,7 @@
 package com.corefi.dto.response.tiers;
 
 import lombok.Data;
+import java.math.BigDecimal;
 
 @Data
 public class TiersResponse {
@@ -13,8 +14,9 @@ public class TiersResponse {
     private String adresse;
     private String ville;
     private String pays;
-    private boolean actif;
-    private Double solde;
+    private BigDecimal solde; // Changed type from Double to BigDecimal
+    private BigDecimal totalDette; // Added new field
+    private boolean actif; // Reordered
 
     // Champs spécifiques CLIENT
     private String typeClient;

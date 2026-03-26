@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import MainLayout from "../components/MainLayout.vue";
 import { useTierStore } from "../stores/tier.store";
 import { useRoute, useRouter } from "vue-router";
@@ -8,9 +8,11 @@ const store = useTierStore();
 const route = useRoute();
 const router = useRouter();
 const showModal = ref(false);
+const formError = ref('');
 
 // Onglets pour filtrer la vue (Tous, Clients, Fournisseurs)
 const activeTab = ref("TOUS");
+const searchQuery = ref("");
 
 // Formulaire de création complet
 const form = ref({
@@ -76,8 +78,24 @@ const submitForm = async () => {
     };
   } catch (e) {
     console.error(e);
+    formError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Erreur lors de la création du tier.';
   }
 };
+
+const filteredTiers = computed(() => {
+  let list = store.tiers.filter(t => activeTab.value === 'TOUS' || t.type === activeTab.value);
+  
+  if (searchQuery.value) {
+    const s = searchQuery.value.toLowerCase();
+    list = list.filter(t => 
+      (t.raisonSociale && t.raisonSociale.toLowerCase().includes(s)) ||
+      (t.code && t.code.toLowerCase().includes(s)) ||
+      (t.email && t.email.toLowerCase().includes(s)) ||
+      (t.telephone && t.telephone.toLowerCase().includes(s))
+    );
+  }
+  return list;
+});
 </script>
 
 <template>
@@ -129,6 +147,22 @@ const submitForm = async () => {
       </button>
     </div>
 
+    <!-- Barre de Recherche -->
+    <div class="search-bar-container">
+      <div class="search-input-wrapper">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input 
+          v-model="searchQuery" 
+          type="text" 
+          placeholder="Rechercher par nom, code, email ou téléphone..." 
+          class="search-input"
+        />
+        <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+    </div>
+
     <!-- Tableau -->
     <div class="table-card">
       <div
@@ -149,26 +183,20 @@ const submitForm = async () => {
             <th>Code</th>
             <th>Type</th>
             <th>Désignation</th>
-            <th>Contact</th>
-            <th class="text-right">Dette / Créance (XAF)</th>
+            <th class="text-right">Dette Totale</th>
+            <th class="text-right">Reste à payer</th>
           </tr>
         </thead>
         <tbody>
           <tr
-            v-if="
-              store.tiers.filter(
-                (t) => activeTab === 'TOUS' || t.type === activeTab,
-              ).length === 0
-            "
+            v-if="filteredTiers.length === 0"
             class="empty-row text-center"
           >
             <td colspan="5">Aucun tier trouvé.</td>
           </tr>
 
           <tr
-            v-for="item in store.tiers.filter(
-              (t) => activeTab === 'TOUS' || t.type === activeTab,
-            )"
+            v-for="item in filteredTiers"
             :key="item.id"
           >
             <td class="font-semibold text-dark">{{ item.code }}</td>
@@ -186,12 +214,14 @@ const submitForm = async () => {
               <div class="motif-cell">
                 <span class="motif-text">{{ item.raisonSociale }}</span>
                 <span class="text-muted" style="font-size: 0.75rem">{{
-                  item.email || "Pas d'email"
+                  item.email || item.telephone || "Pas de contact"
                 }}</span>
               </div>
             </td>
-            <td>{{ item.telephone || "---" }}</td>
-            <td class="text-right font-semibold text-dark">
+            <td class="text-right text-muted">
+              {{ item.totalDette?.toLocaleString() || "0" }}
+            </td>
+            <td class="text-right font-bold text-dark" :class="{ 'text-danger': item.solde > 0 }">
               {{ item.solde?.toLocaleString() || "0" }} XAF
             </td>
           </tr>
@@ -220,6 +250,14 @@ const submitForm = async () => {
           </button>
         </div>
         <form @submit.prevent="submitForm" class="modal-body">
+
+          <!-- Bandeau d'erreur métier -->
+          <div v-if="formError" class="form-error-banner">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>{{ formError }}</span>
+            <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
+          </div>
+
           <div class="form-row">
             <div class="form-group half">
               <label>Type de Tier <span class="req">*</span></label>
@@ -473,6 +511,53 @@ const submitForm = async () => {
   border-color: #2563eb;
 }
 
+/* SEARCH BAR */
+.search-bar-container {
+  margin-bottom: 1.5rem;
+}
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 500px;
+}
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  color: #9ca3af;
+}
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 3rem;
+  font-size: 0.95rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  outline: none;
+  background: white;
+  transition: all 0.2s;
+}
+.search-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.clear-search {
+  position: absolute;
+  right: 0.75rem;
+  background: #f3f4f6;
+  border: none;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  cursor: pointer;
+}
+.clear-search:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
 /* ACTIONS */
 .btn-primary {
   display: flex;
@@ -624,4 +709,17 @@ const submitForm = async () => {
   background: #fee2e2;
   border-radius: 6px;
 }
+
+/* Bandeau d'erreur métier dans la modale */
+.form-error-banner {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.875rem 1rem; background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 1px solid #fecaca; border-radius: 10px; color: #b91c1c;
+  font-size: 0.875rem; font-weight: 500; animation: shakeIn 0.3s ease-out;
+}
+.form-error-banner svg { flex-shrink: 0; color: #ef4444; }
+.form-error-banner span { flex: 1; }
+.close-error-btn { background: none; border: none; color: #b91c1c; font-size: 1.25rem; cursor: pointer; padding: 0 0.25rem; opacity: 0.6; transition: opacity 0.15s; }
+.close-error-btn:hover { opacity: 1; }
+@keyframes shakeIn { 0% { transform: translateX(-8px); opacity: 0; } 50% { transform: translateX(4px); } 100% { transform: translateX(0); opacity: 1; } }
 </style>

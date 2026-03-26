@@ -27,8 +27,10 @@ api.interceptors.response.use(
   (error) => {
     // On ne redirige pas si l'erreur 401 vient de la tentative de connexion elle-même
     const isLoginRequest = error.config && error.config.url && error.config.url.includes('/auth/login');
+    // On ne redirige pas si c'est une requête blob (PDF) — le catch local gère l'erreur
+    const isBlobRequest = error.config && error.config.responseType === 'blob';
     
-    if (error.response && error.response.status === 401 && !isLoginRequest) {
+    if (error.response && error.response.status === 401 && !isLoginRequest && !isBlobRequest) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

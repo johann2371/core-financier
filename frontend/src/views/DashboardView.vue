@@ -12,7 +12,8 @@ const kpis = ref({
   soldeTotalCaisses: 0,
   soldeTotalBanques: 0,
   decaissementsEnAttente: 0,
-  totalFacturesImpayees: 0,
+  totalCreancesClients: 0,
+  totalDettesFournisseurs: 0,
   activitesRecentes: []
 })
 const loading = ref(true)
@@ -133,9 +134,16 @@ const getActivityIconClass = (type) => {
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">Dettes Clients (Impayées)</span>
+              <span class="kpi-label">Créances Clients</span>
               <div class="kpi-body">
-                <span class="kpi-value warning">{{ kpis.totalFacturesImpayees?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span class="kpi-value success">{{ kpis.totalCreancesClients?.toLocaleString() }}<span class="currency">XAF</span></span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <span class="kpi-label">Dettes Fournisseurs</span>
+              <div class="kpi-body">
+                <span class="kpi-value danger">{{ kpis.totalDettesFournisseurs?.toLocaleString() }}<span class="currency">XAF</span></span>
               </div>
             </div>
 
@@ -327,7 +335,7 @@ const getActivityIconClass = (type) => {
 /* KPI GRID */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1.25rem;
 }
 
@@ -363,6 +371,8 @@ const getActivityIconClass = (type) => {
 }
 
 .kpi-value.warning { color: #f59e0b; }
+.kpi-value.success { color: #10b981; }
+.kpi-value.danger { color: #ef4444; }
 .currency { font-size: 1rem; color: #4b5563; font-weight: 600; margin-left: 2px; }
 
 .kpi-trend {
