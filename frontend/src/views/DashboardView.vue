@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
 import MainLayout from '../components/MainLayout.vue'
@@ -12,8 +12,11 @@ const kpis = ref({
   soldeTotalCaisses: 0,
   soldeTotalBanques: 0,
   decaissementsEnAttente: 0,
+  decaissementsEnAttenteRF: 0,
+  decaissementsEnAttentePDG: 0,
   totalCreancesClients: 0,
   totalDettesFournisseurs: 0,
+  repartitionDecaissementsParCategorie: {},
   activitesRecentes: []
 })
 const loading = ref(true)
@@ -73,6 +76,34 @@ const getActivityIconClass = (type) => {
     default: return 'bg-gray'
   }
 }
+
+const isRF = computed(() => authStore.userRole === 'RESPONSABLE_FINANCIER')
+const isAdmin = computed(() => authStore.userRole === 'ADMINISTRATEUR')
+const isComptable = computed(() => authStore.userRole === 'COMPTABLE')
+
+const categoryLabels = {
+  'PAIEMENT_FOURNISSEUR': 'Fournisseurs',
+  'SALAIRES': 'Salaires',
+  'FRAIS_FONCTIONNEMENT': 'Frais Fonctionnement',
+  'MISSION_DEPLACEMENT': 'Missions',
+  'ACHAT_MATERIEL': 'Matériel',
+  'AUTRE': 'Autres'
+}
+
+const sortedCategories = computed(() => {
+  if (!kpis.value.repartitionDecaissementsParCategorie) return []
+  return Object.entries(kpis.value.repartitionDecaissementsParCategorie)
+    .map(([key, value]) => ({
+      key,
+      label: categoryLabels[key] || key,
+      value
+    }))
+    .sort((a, b) => b.value - a.value)
+})
+
+const totalBudget = computed(() => {
+  return sortedCategories.value.reduce((acc, cat) => acc + cat.value, 0)
+})
 </script>
 
 <template>
@@ -81,32 +112,39 @@ const getActivityIconClass = (type) => {
     <div class="dashboard-section">
       <h3 class="section-title">ACTIONS RAPIDES</h3>
       <div class="quick-actions-grid">
-        <router-link to="/encaissements" class="action-card">
+        <router-link v-if="isAdmin || isComptable || authStore.userRole === 'CAISSIER'" to="/encaissements" class="action-card">
           <div class="action-icon light-blue">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           </div>
           <h4>Nouvel<br/>Encaissement</h4>
         </router-link>
+
+        <router-link v-if="isAdmin || isRF || authStore.userRole === 'PDG'" to="/decaissements" class="action-card highlight">
+          <div class="action-icon light-orange">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+          <h4>Valider les<br/>Demandes</h4>
+        </router-link>
         
-        <router-link to="/factures?create=VENTE" class="action-card">
+        <router-link v-if="isAdmin || isComptable" to="/factures?create=VENTE" class="action-card">
           <div class="action-icon light-indigo">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
           </div>
           <h4>Nouvelle<br/>Facture</h4>
         </router-link>
 
-        <router-link to="/decaissements" class="action-card">
+        <router-link v-if="isAdmin || isComptable" to="/decaissements" class="action-card">
           <div class="action-icon light-blue">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
           </div>
-          <h4>Nouveau<br/>Décaissement</h4>
+          <h4>Saisir un<br/>Décaissement</h4>
         </router-link>
 
-        <router-link to="/tiers?create=CLIENT" class="action-card">
+        <router-link to="/tiers" class="action-card">
           <div class="action-icon light-indigo">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
           </div>
-          <h4>Nouveau<br/>Tier</h4>
+          <h4>Consulter<br/>les Tiers</h4>
         </router-link>
       </div>
     </div>
@@ -147,11 +185,45 @@ const getActivityIconClass = (type) => {
               </div>
             </div>
 
-            <div class="kpi-card">
+            <div class="kpi-card highlight-card" v-if="isRF">
+              <span class="kpi-label">Pipeline de Validation</span>
+              <div class="pipeline-display">
+                <div class="pipeline-step">
+                  <span class="step-count">{{ kpis.decaissementsEnAttenteRF }}</span>
+                  <span class="step-label">Attente RF</span>
+                </div>
+                <div class="pipeline-arrow">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+                <div class="pipeline-step">
+                  <span class="step-count">{{ kpis.decaissementsEnAttentePDG }}</span>
+                  <span class="step-label">Attente PDG</span>
+                </div>
+              </div>
+              <router-link to="/decaissements" class="kpi-action-link">Gérer le flux</router-link>
+            </div>
+
+            <div class="kpi-card" v-if="!isRF">
               <span class="kpi-label">Décaissements en attente</span>
               <div class="kpi-body">
                 <span class="kpi-value" :class="{ 'warning': kpis.decaissementsEnAttente > 0 }">{{ kpis.decaissementsEnAttente }}</span>
                 <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttente > 0">Action requise</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RÉPARTITION DU BUDGET (Uniquement pour RF/ADMIN) -->
+        <div class="dashboard-section" v-if="isRF && sortedCategories.length > 0">
+          <h3 class="section-title">RÉPARTITION DU BUDGET DÉCAISSÉ</h3>
+          <div class="budget-chart-container">
+            <div v-for="cat in sortedCategories" :key="cat.key" class="budget-row">
+              <div class="budget-row-header">
+                <span class="cat-label">{{ cat.label }}</span>
+                <span class="cat-amount">{{ cat.value.toLocaleString() }} XAF</span>
+              </div>
+              <div class="budget-progress-bg">
+                <div class="budget-progress-fill" :style="{ width: (cat.value / totalBudget * 100) + '%' }"></div>
               </div>
             </div>
           </div>
@@ -175,16 +247,27 @@ const getActivityIconClass = (type) => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="kpis.decaissementsEnAttente > 0">
+                <tr v-if="kpis.decaissementsEnAttenteRF > 0 && isRF">
+                  <td><span class="badge badge-urgent">Critique</span></td>
+                  <td>
+                    <div class="task-info">
+                      <strong>{{ kpis.decaissementsEnAttenteRF }} dossiers à VOTRE validation</strong>
+                      <span>Délai moyen constaté : 2h</span>
+                    </div>
+                  </td>
+                  <td class="task-amount">--</td>
+                  <td><router-link to="/decaissements" class="task-action highlight">Valider</router-link></td>
+                </tr>
+                <tr v-if="kpis.decaissementsEnAttente > 0 && !isRF">
                   <td><span class="badge badge-urgent">Urgent</span></td>
                   <td>
                     <div class="task-info">
-                      <strong>{{ kpis.decaissementsEnAttente }} décaissement(s) à valider</strong>
+                      <strong>{{ kpis.decaissementsEnAttente }} décaissement(s) en attente</strong>
                       <span>Plusieurs demandes en attente de traitement</span>
                     </div>
                   </td>
                   <td class="task-amount">--</td>
-                  <td><router-link to="/decaissements" class="task-action">Traiter</router-link></td>
+                  <td><router-link to="/decaissements" class="task-action">Voir</router-link></td>
                 </tr>
                 <tr>
                   <td><span class="badge badge-normal">Normale</span></td>
@@ -280,7 +363,7 @@ const getActivityIconClass = (type) => {
 /* ACTIONS RAPIDES GRID */
 .quick-actions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 260px));
   gap: 1.25rem;
 }
 
@@ -313,6 +396,12 @@ const getActivityIconClass = (type) => {
 }
 .light-blue { background: #eff6ff; color: #2563eb; }
 .light-indigo { background: #e0e7ff; color: #4f46e5; }
+.light-orange { background: #fff7ed; color: #f97316; }
+
+.action-card.highlight {
+  border: 1px solid #fed7aa;
+  background: linear-gradient(to bottom right, #ffffff, #fff7ed);
+}
 
 .action-card h4 {
   font-size: 1rem;
@@ -321,13 +410,121 @@ const getActivityIconClass = (type) => {
   line-height: 1.2;
 }
 
+/* KPI HIGHLIGHT */
+.highlight-card {
+  background: linear-gradient(135deg, #ffffff, #f8fafc);
+  border: 1px solid #e2e8f0;
+}
+
+.pipeline-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  margin: 0.5rem 0;
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.step-count {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.step-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.pipeline-arrow {
+  color: #cbd5e1;
+}
+
+.kpi-action-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--c-primary);
+  text-decoration: none;
+  margin-top: 0.5rem;
+  display: inline-block;
+}
+
+/* BUDGET CHART */
+.budget-chart-container {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.budget-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.budget-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.cat-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.cat-amount {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.budget-progress-bg {
+  width: 100%;
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.budget-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  border-radius: 4px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.task-action.highlight {
+  background: var(--c-primary);
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  text-decoration: none !important;
+}
+.task-action.highlight:hover {
+  background: #1d4ed8;
+}
+
 
 
 /* MAIN SPLIT */
 .main-dashboard-grid {
   display: grid;
-  grid-template-columns: 2.5fr 1fr;
-  gap: 2rem;
+  grid-template-columns: 2.4fr 1.1fr;
+  gap: 3rem;
 }
 .left-col { display: flex; flex-direction: column; }
 .right-col { display: flex; flex-direction: column; gap: 2rem; }
@@ -335,8 +532,8 @@ const getActivityIconClass = (type) => {
 /* KPI GRID */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 320px));
+  gap: 2rem;
 }
 
 .kpi-card {

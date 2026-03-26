@@ -4,6 +4,7 @@ import com.corefi.dto.response.tableaubord.ActiviteResponse;
 import com.corefi.dto.response.tableaubord.TableauBordResponse;
 import com.corefi.entity.CompteFinancier;
 import com.corefi.entity.Facture;
+import com.corefi.entity.Decaissement;
 import com.corefi.entity.JournalAudit;
 import com.corefi.enums.StatutFacture;
 import com.corefi.enums.StatutDecaissement;
@@ -14,6 +15,7 @@ import com.corefi.repository.FactureRepository;
 import com.corefi.repository.JournalAuditRepository;
 import com.corefi.service.interfaces.ITableauBordService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TableauBordServiceImpl implements ITableauBordService {
 
     private final CompteFinancierRepository compteFinancierRepository;
@@ -51,11 +54,29 @@ public class TableauBordServiceImpl implements ITableauBordService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         kpis.setSoldeTotalBanques(soldeBanques);
 
-        // 3. Nombre de décaissements en attente
-        long enAttente = decaissementRepository.findByStatut(StatutDecaissement.EN_ATTENTE).size();
-        long enAttentePdg = decaissementRepository.findByStatut(StatutDecaissement.EN_ATTENTE_PDG).size();
-        kpis.setDecaissementsEnAttente(enAttente + enAttentePdg);
+        // 3. Nombre de décaissements en attente (Pipeline)
+        List<Decaissement> allDecaissements = decaissementRepository.findAll();
+        long enAttenteRF = allDecaissements.stream()
+                .filter(d -> d.getStatut() == StatutDecaissement.EN_ATTENTE)
+                .count();
+        long enAttentePDG = allDecaissements.stream()
+                .filter(d -> d.getStatut() == StatutDecaissement.EN_ATTENTE_PDG)
+                .count();
+        
+        kpis.setDecaissementsEnAttente(enAttenteRF + enAttentePDG);
+        kpis.setDecaissementsEnAttenteRF(enAttenteRF);
+        kpis.setDecaissementsEnAttentePDG(enAttentePDG);
 
+        // 3b. Répartition par catégorie (sur les décaissements validés ou exécutés)
+        java.util.Map<String, BigDecimal> repartition = allDecaissements.stream()
+                .filter(d -> d.getStatut() != StatutDecaissement.BROUILLON && d.getStatut() != StatutDecaissement.REJETEE_RF && d.getStatut() != StatutDecaissement.REJETEE_PDG && d.getStatut() != StatutDecaissement.ANNULEE)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        d -> d.getCategorie() != null ? d.getCategorie().name() : "AUTRE",
+                        java.util.stream.Collectors.reducing(BigDecimal.ZERO, Decaissement::getMontant, BigDecimal::add)
+                ));
+        kpis.setRepartitionDecaissementsParCategorie(repartition);
+
+        // 4. Créances Clients (Factures de VENTE impayées)
         // 4. Créances Clients (Factures de VENTE impayées)
         List<Facture> factures = factureRepository.findAll();
         BigDecimal totalCreances = factures.stream()
@@ -81,6 +102,9 @@ public class TableauBordServiceImpl implements ITableauBordService {
                 .collect(Collectors.toList())
         );
 
+        log.info("Dashboard KPIs: Caisses={}, Banques={}, Creances={}, Dettes={}, Activites={}", 
+                soldeCaisses, soldeBanques, totalCreances, totalDettes, kpis.getActivitesRecentes().size());
+        
         return kpis;
     }
 

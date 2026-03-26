@@ -42,6 +42,7 @@ C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\bac
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\controller\CompteFinancierController.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\enums\TypeTiers.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\service\impl\TableauBordServiceImpl.java
+C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\util\DbCheckRunner.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\service\impl\EmailServiceImpl.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\service\interfaces\IPdfService.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\service\impl\TiersServiceImpl.java
@@ -52,6 +53,7 @@ C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\bac
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\service\interfaces\IAuthService.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\dto\request\utilisateur\UtilisateurCreateRequest.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\exception\WorkflowException.java
+C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\repository\JustificatifRepository.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\security\UserDetailsServiceImpl.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\exception\ResourceNotFoundException.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\entity\TauxChange.java
@@ -64,6 +66,7 @@ C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\bac
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\repository\EncaissementRepository.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\service\impl\FileStorageServiceImpl.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\security\JwtTokenProvider.java
+C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\enums\CategorieDecaissement.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\enums\StatutDecaissement.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\repository\MouvementCompteRepository.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\enums\TypeCompte.java
@@ -76,6 +79,7 @@ C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\bac
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\entity\CompteFinancier.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\controller\FactureController.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\CoreFinancierApplication.java
+C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\entity\JustificatifDecaissement.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\mapper\EncaissementMapper.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\controller\TiersController.java
 C:\Users\Johann Gouaffo\Desktop\projet tutoré\implementation\core-financier\backend\src\main\java\com\corefi\config\WebSocketConfig.java

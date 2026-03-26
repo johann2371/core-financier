@@ -10,7 +10,8 @@ export const useCompteStore = defineStore('compte', {
 
   getters: {
     caisses: (state) => state.comptes.filter(c => c.type === 'CAISSE' && c.actif),
-    banques: (state) => state.comptes.filter(c => c.type === 'BANQUE' && c.actif)
+    banques: (state) => state.comptes.filter(c => c.type === 'BANQUE' && c.actif),
+    totalSolde: (state) => state.comptes.reduce((sum, c) => sum + (c.actif ? c.solde : 0), 0)
   },
 
   actions: {

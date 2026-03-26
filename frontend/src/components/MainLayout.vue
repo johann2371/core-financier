@@ -79,43 +79,44 @@ onMounted(() => {
           Décaissements
         </router-link>
 
-        <router-link to="/encaissements" class="nav-item" :class="{ active: isActive('/encaissements') }">
+        <router-link v-if="['ADMINISTRATEUR', 'COMPTABLE', 'CAISSIER'].includes(authStore.userRole)" to="/encaissements" class="nav-item" :class="{ active: isActive('/encaissements') }">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>
           Encaissements
         </router-link>
 
-        <router-link to="/factures" class="nav-item" :class="{ active: isActive('/factures') }">
+        <router-link v-if="['ADMINISTRATEUR', 'COMPTABLE'].includes(authStore.userRole)" to="/factures" class="nav-item" :class="{ active: isActive('/factures') }">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
           Factures
         </router-link>
         
-        <router-link to="/tiers" class="nav-item" :class="{ active: isActive('/tiers') }">
+        <router-link v-if="['ADMINISTRATEUR', 'COMPTABLE', 'RESPONSABLE_FINANCIER'].includes(authStore.userRole)" to="/tiers" class="nav-item" :class="{ active: isActive('/tiers') }">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
           Annuaire Tiers
         </router-link>
 
         <div class="nav-section-title">SYSTÈME</div>
         
-        <a href="#" class="nav-item">
+        <router-link v-if="['ADMINISTRATEUR', 'RESPONSABLE_FINANCIER', 'PDG'].includes(authStore.userRole)" to="/parametres" class="nav-item">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           Paramètres
-        </a>
-      </nav>
-
-      <div class="sidebar-footer">
-        <router-link to="/profile" class="user-info-link">
-          <div class="user-info">
-            <div class="user-avatar" :style="{ backgroundImage: authStore.user?.photoUrl ? 'url(' + authStore.user.photoUrl + ')' : 'url(https://ui-avatars.com/api/?name=' + (authStore.user?.prenom || 'A') + '&background=e0e7ff&color=1d4ed8)' }"></div>
-            <div class="user-details">
-              <span class="user-name">{{ authStore.user?.prenom || 'Alex' }} {{ authStore.user?.nom || 'Henderson' }}</span>
-              <span class="user-role">{{ authStore.userRole?.toLowerCase() || 'Utilisateur' }}</span>
-            </div>
-          </div>
         </router-link>
-        <button @click="handleLogout" class="sidebar-logout" title="Déconnexion">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-        </button>
-      </div>
+
+        <!-- Profil déplacé juste après Paramètres -->
+        <div class="sidebar-user-block">
+          <router-link to="/profile" class="user-info-link">
+            <div class="user-info">
+              <div class="user-avatar" :style="{ backgroundImage: authStore.user?.photoUrl ? 'url(' + authStore.user.photoUrl + ')' : 'url(https://ui-avatars.com/api/?name=' + (authStore.user?.prenom || 'A') + '&background=e0e7ff&color=1d4ed8)' }"></div>
+              <div class="user-details">
+                <span class="user-name">{{ authStore.user?.prenom || 'Alex' }} {{ authStore.user?.nom || 'Henderson' }}</span>
+                <span class="user-role">{{ authStore.userRole?.toLowerCase() || 'Utilisateur' }}</span>
+              </div>
+            </div>
+          </router-link>
+          <button @click="handleLogout" class="sidebar-logout" title="Déconnexion">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
+        </div>
+      </nav>
     </aside>
 
     <!-- Main Content Area -->
@@ -275,10 +276,11 @@ onMounted(() => {
   letter-spacing: 0.05em;
 }
 
-/* Sidebar Footer */
-.sidebar-footer {
-  padding: 1.25rem 1rem;
-  border-top: 1px solid #e5e7eb;
+/* Sidebar User Block (remonté) */
+.sidebar-user-block {
+  margin-top: 2rem;
+  padding: 1rem 0;
+  border-top: 1px solid #f3f4f6;
   display: flex;
   align-items: center;
   justify-content: space-between;

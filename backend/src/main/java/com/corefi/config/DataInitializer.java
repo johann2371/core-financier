@@ -39,7 +39,9 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         creerAdminParDefaut();
         creerComptableParDefaut();
+        creerRFParDefaut();
         creerDeviseEtCompteParDefaut();
+        creerDonneesTestDashboard();
         synchroniserDettesHistoriques();
     }
 
@@ -128,6 +130,75 @@ public class DataInitializer implements CommandLineRunner {
                 log.info(" Comptable créé : jgouaffo@gmail.com ");
             }
         );
+    }
+
+    private void creerRFParDefaut() {
+        utilisateurRepository.findByEmail("gouaffojohann5@gmail.com").ifPresentOrElse(
+            rf -> {
+                rf.setPassword(passwordEncoder.encode("Dorcasbemmo123*"));
+                rf.setActif(true);
+                rf.setTentativesConnexion(0);
+                rf.setBloqueJusqua(null);
+                rf.setRole(Role.RESPONSABLE_FINANCIER);
+                utilisateurRepository.save(rf);
+                log.info(" Responsable Financier déjà présent, mis à jour ");
+            },
+            () -> {
+                Utilisateur rf = new Utilisateur();
+                rf.setNom("Gouaffo");
+                rf.setPrenom("Albert");
+                rf.setEmail("gouaffojohann5@gmail.com");
+                rf.setPassword(passwordEncoder.encode("Dorcasbemmo123*"));
+                rf.setRole(Role.RESPONSABLE_FINANCIER);
+                rf.setActif(true);
+                rf.setTentativesConnexion(0);
+                rf.setDateCreation(LocalDateTime.now());
+                utilisateurRepository.save(rf);
+                log.info(" Responsable Financier créé : gouaffojohann5@gmail.com ");
+            }
+        );
+    }
+
+    private void creerDonneesTestDashboard() {
+        if (tiersRepository.count() == 0) {
+            com.corefi.entity.Tiers client = new com.corefi.entity.Tiers();
+            client.setRaisonSociale("Client Test");
+            client.setType(com.corefi.enums.TypeTiers.CLIENT);
+            client.setActif(true);
+            tiersRepository.save(client);
+
+            com.corefi.entity.Tiers fournisseur = new com.corefi.entity.Tiers();
+            fournisseur.setRaisonSociale("Fournisseur Test");
+            fournisseur.setType(com.corefi.enums.TypeTiers.FOURNISSEUR);
+            fournisseur.setActif(true);
+            tiersRepository.save(fournisseur);
+
+            if (factureRepository.count() == 0) {
+                // Facture VENTE
+                com.corefi.entity.Facture fVente = new com.corefi.entity.Facture();
+                fVente.setNumero("F-VENTE-001");
+                fVente.setType("VENTE");
+                fVente.setTiers(client);
+                fVente.setMontantHt(new BigDecimal("1000000.00"));
+                fVente.setMontantTtc(new BigDecimal("1192500.00"));
+                fVente.setStatut(com.corefi.enums.StatutFacture.VALIDEE);
+                fVente.setDateFacture(LocalDateTime.now().toLocalDate());
+                factureRepository.save(fVente);
+
+                // Facture ACHAT
+                com.corefi.entity.Facture fAchat = new com.corefi.entity.Facture();
+                fAchat.setNumero("F-ACHAT-001");
+                fAchat.setType("ACHAT");
+                fAchat.setTiers(fournisseur);
+                fAchat.setMontantHt(new BigDecimal("500000.00"));
+                fAchat.setMontantTtc(new BigDecimal("596250.00"));
+                fAchat.setStatut(com.corefi.enums.StatutFacture.EN_ATTENTE_PAIEMENT);
+                fAchat.setDateFacture(LocalDateTime.now().toLocalDate());
+                factureRepository.save(fAchat);
+                
+                log.info("Données de test créées : 1 facture VENTE, 1 facture ACHAT.");
+            }
+        }
     }
 
     private void creerDeviseEtCompteParDefaut() {

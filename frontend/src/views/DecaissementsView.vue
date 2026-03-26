@@ -37,6 +37,11 @@ const openPreview = async (id) => {
     showPreview.value = true
   } catch (err) {
     console.error('Erreur lors de la prévisualisation:', err)
+    if (err.response?.status === 404) {
+      alert("Le fichier PDF n'est pas encore disponible ou le dossier est introuvable sur le serveur.")
+    } else {
+      alert("Impossible d'ouvrir l'aperçu pour le moment.")
+    }
   }
 }
 
@@ -58,8 +63,12 @@ const filters = ref({
   fournisseurId: '',
   statut: '',
   dateDebut: '',
+  dateDebut: '',
   dateFin: ''
 })
+const showMyTasksOnly = ref(false)
+
+const isRF = computed(() => authStore.userRole === 'RESPONSABLE_FINANCIER' || authStore.userRole === 'ADMINISTRATEUR')
 
 const resetFilters = () => {
   filters.value = { search: '', fournisseurId: '', statut: '', dateDebut: '', dateFin: '' }
@@ -72,6 +81,10 @@ watch(filters, () => {
 
 const filteredDecaissements = computed(() => {
   let list = store.decaissements
+
+  if (showMyTasksOnly.value && isRF.value) {
+    list = list.filter(d => d.statut === 'EN_ATTENTE' || d.statut === 'SOUMIS')
+  }
   
   if (filters.value.search) {
     const s = filters.value.search.toLowerCase()
@@ -176,16 +189,16 @@ const removeFile = (index) => {
 const downloadJustificatif = async (id, originalName) => {
   try {
     const response = await api.get(`/decaissements/justificatifs/${id}/download`, { responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', originalName)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    const mimeType = response.headers['content-type'] || 'application/octet-stream'
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: mimeType }))
+    window.open(url, '_blank')
   } catch (err) {
     console.error('Erreur lors du téléchargement du justificatif:', err)
-    alert('Impossible de télécharger le fichier.')
+    if (err.response?.status === 404) {
+      alert("Ce justificatif est introuvable sur le serveur. Il se peut que le fichier ait été supprimé ou que le dossier de stockage soit manquant.")
+    } else {
+      alert("Impossible d'ouvrir le document.")
+    }
   }
 }
 
@@ -267,7 +280,8 @@ const submitCreate = async () => {
 
 const openApprove = (item) => {
   activeDecaissement.value = item
-  approveForm.value.checks = [false, false, false, false]
+  const checklistItems = getChecklistItems(item.categorie || 'PAIEMENT_FOURNISSEUR')
+  approveForm.value.checks = new Array(checklistItems.length).fill(false)
   showApproveModal.value = true
 }
 
@@ -333,8 +347,18 @@ const getStatusClass = (statut) => {
 }
 
 const bankBalance = computed(() => {
-  if (!activeDecaissement.value || !activeDecaissement.value.compteFinancierId) return 0
-  const c = compteStore.comptes.find(acc => acc.id === activeDecaissement.value.compteFinancierId)
+  // Si un compte est explicitement lié au décaissement (ex: après exécution)
+  if (activeDecaissement.value?.compteFinancierId) {
+    const c = compteStore.comptes.find(acc => acc.id === activeDecaissement.value.compteFinancierId)
+    return c ? c.solde : 0
+  }
+  // Sinon, pour le valideur (RF/PDG), on affiche la liquidité totale disponible
+  return compteStore.totalSolde
+})
+
+const selectedCompteBalance = computed(() => {
+  if (!executeForm.value.compteFinancierId) return 0
+  const c = compteStore.comptes.find(acc => acc.id === executeForm.value.compteFinancierId)
   return c ? c.solde : 0
 })
 </script>
@@ -357,6 +381,13 @@ const bankBalance = computed(() => {
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           <input v-model="filters.search" type="text" placeholder="Motif ou Bénéficiaire..." class="filter-input-std" />
         </div>
+      </div>
+
+      <div class="filter-group" v-if="isRF">
+        <button @click="showMyTasksOnly = !showMyTasksOnly" class="btn-toggle-tasks" :class="{ active: showMyTasksOnly }">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          Mes dossiers à valider
+        </button>
       </div>
       
       <div class="filter-group">
@@ -674,8 +705,8 @@ const bankBalance = computed(() => {
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
           </div>
           <div class="title-block">
-            <h3>Confirm Disbursement</h3>
-            <span>Security validation required for transaction #TXN-{{ activeDecaissement?.id?.toString().padStart(4, '0') }}-BK</span>
+            <h3>Confirmer le Décaissement</h3>
+            <span>Validation de sécurité requise pour la transaction #{{ activeDecaissement?.numero }}</span>
           </div>
         </div>
 
@@ -712,20 +743,20 @@ const bankBalance = computed(() => {
         <div class="balance-calc-box">
           <div class="balance-row">
             <div class="b-col">
-              <span class="label">CURRENT BALANCE</span>
+              <span class="label">{{ activeDecaissement?.compteFinancierId ? 'SOLDE DU COMPTE' : 'LIQUIDITÉ TOTALE' }}</span>
               <strong class="val">{{ bankBalance.toLocaleString() }} XAF</strong>
             </div>
             <div class="arrow-ext">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </div>
             <div class="b-col text-right">
-              <span class="label">POST-TRANSACTION</span>
+              <span class="label">APRÈS TRANSACTION</span>
               <strong class="val text-blue">{{ (bankBalance - (activeDecaissement?.montant || 0)).toLocaleString() }} XAF</strong>
             </div>
           </div>
           <div class="divider"></div>
           <div class="balance-row amounts-row">
-            <span class="label">Transaction Amount:</span>
+            <span class="label">Montant du décaissement :</span>
             <strong class="val-dark">-{{ activeDecaissement?.montant?.toLocaleString() }} XAF</strong>
           </div>
         </div>
@@ -735,15 +766,15 @@ const bankBalance = computed(() => {
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
           </div>
           <p>
-            <strong>Attention:</strong> This action is irreversible. The account will be debited immediately and the funds will be queued for transfer. Ensure all details are accurate before executing.
+            <strong>Attention :</strong> Cette action est irréversible. Le compte sera débité immédiatement une fois le paiement exécuté. Veuillez vérifier tous les détails avant de valider.
           </p>
         </div>
 
         <div class="approve-footer">
-          <button @click="showApproveModal = false" class="btn-outline-wide">Cancel Request</button>
+          <button @click="showApproveModal = false" class="btn-outline-wide">Annuler la demande</button>
           <button @click="submitApprove" class="btn-confirm-execute" :disabled="!approveForm.checks.every(c => c) && (activeDecaissement?.statut === 'EN_ATTENTE' || activeDecaissement?.statut === 'SOUMIS')">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            Confirm Approval
+            Confirmer la Validation
           </button>
         </div>
       </div>
@@ -778,8 +809,21 @@ const bankBalance = computed(() => {
 
           <div class="balance-calc-box">
              <div class="balance-row">
+               <span>Solde du compte choisi :</span>
+               <strong :class="selectedCompteBalance >= (activeDecaissement?.montant || 0) ? 'text-green' : 'text-red'">
+                 {{ selectedCompteBalance.toLocaleString() }} XAF
+               </strong>
+             </div>
+             <div class="balance-row">
                <span>Montant à décaisser :</span>
                <strong class="text-red">-{{ activeDecaissement?.montant?.toLocaleString() }} XAF</strong>
+             </div>
+             <div class="divider"></div>
+             <div class="balance-row">
+               <span>Solde après opération :</span>
+               <strong :class="(selectedCompteBalance - (activeDecaissement?.montant || 0)) >= 0 ? 'text-blue' : 'text-red'">
+                 {{ (selectedCompteBalance - (activeDecaissement?.montant || 0)).toLocaleString() }} XAF
+               </strong>
              </div>
           </div>
         </div>
@@ -802,49 +846,49 @@ const bankBalance = computed(() => {
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </div>
           <div class="title-block">
-            <h3>Reject Disbursement</h3>
-            <span>Transaction ID: TXN-{{ activeDecaissement?.id?.toString().padStart(4, '0') }}-BK</span>
+            <h3>Rejeter le Décaissement</h3>
+            <span>Transaction ID: {{ activeDecaissement?.numero }}</span>
           </div>
         </div>
 
         <div class="radios-section">
-          <span class="section-label">Select Rejection Reason <span class="req">*</span></span>
+          <span class="section-label">Choisir le motif du rejet <span class="req">*</span></span>
           <div class="radio-list">
             <label class="radio-item" :class="{ 'active': rejectForm.reason === 'missing_docs' }">
               <input type="radio" v-model="rejectForm.reason" value="missing_docs" class="hidden-radio" />
               <div class="custom-radio"></div>
-              <span>Missing/Invalid Documents</span>
+              <span>Documents manquants ou invalides</span>
             </label>
             <label class="radio-item" :class="{ 'active': rejectForm.reason === 'insufficient_funds' }">
               <input type="radio" v-model="rejectForm.reason" value="insufficient_funds" class="hidden-radio" />
               <div class="custom-radio"></div>
-              <span>Insufficient Funds</span>
+              <span>Fonds insuffisants</span>
             </label>
             <label class="radio-item" :class="{ 'active': rejectForm.reason === 'non_compliant' }">
               <input type="radio" v-model="rejectForm.reason" value="non_compliant" class="hidden-radio" />
               <div class="custom-radio"></div>
-              <span>Non-compliant Supplier</span>
+              <span>Fournisseur non conforme</span>
             </label>
             <label class="radio-item" :class="{ 'active': rejectForm.reason === 'incorrect_amount' }">
               <input type="radio" v-model="rejectForm.reason" value="incorrect_amount" class="hidden-radio" />
               <div class="custom-radio"></div>
-              <span>Incorrect Amount</span>
+              <span>Montant incorrect</span>
             </label>
             <label class="radio-item" :class="{ 'active': rejectForm.reason === 'other' }">
               <input type="radio" v-model="rejectForm.reason" value="other" class="hidden-radio" />
               <div class="custom-radio"></div>
-              <span>Other</span>
+              <span>Autre</span>
             </label>
           </div>
         </div>
 
         <div class="comments-section">
           <div class="label-row-mb">
-            <span class="section-label">Additional Comments <span class="req">*</span></span>
-            <span class="charlimit">MIN. 20 CHARACTERS</span>
+            <span class="section-label">Commentaires additionnels <span class="req">*</span></span>
+            <span class="charlimit">MIN. 20 CARACTÈRES</span>
           </div>
-          <textarea v-model="rejectForm.comments" rows="3" placeholder="Please provide a detailed explanation for this rejection..." class="input-std"></textarea>
-          <span class="help-text">This feedback will be shared directly with the Accountant to rectify the submission.</span>
+          <textarea v-model="rejectForm.comments" rows="3" placeholder="Veuillez fournir une explication détaillée de ce rejet..." class="input-std"></textarea>
+          <span class="help-text">Ce retour sera partagé directement avec le comptable pour corriger la demande.</span>
         </div>
 
         <div class="alert-box alert-danger-light mt-1">
@@ -852,13 +896,13 @@ const bankBalance = computed(() => {
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
           </div>
           <p class="text-xs">
-            <strong class="text-red">SYSTEM ACTION:</strong> Upon confirmation, the Accountant will be notified via email and the status will be set to <strong class="text-red underline">CANCELLED</strong>.
+            <strong class="text-red">ACTION SYSTÈME :</strong> Suite à la confirmation, le comptable sera notifié par email et le statut passera à <strong class="text-red underline">REJETÉ</strong>.
           </p>
         </div>
 
         <div class="approve-footer border-none">
-          <button @click="showRejectModal = false" class="btn-text font-semibold">Go Back</button>
-          <button @click="submitReject" class="btn-danger-solid" :disabled="rejectForm.comments.length < 20">Confirm Rejection</button>
+          <button @click="showRejectModal = false" class="btn-text font-semibold">Retour</button>
+          <button @click="submitReject" class="btn-danger-solid" :disabled="rejectForm.comments.length < 20">Confirmer le Rejet</button>
         </div>
       </div>
     </div>
@@ -893,6 +937,45 @@ const bankBalance = computed(() => {
 .btn-icon:hover { background: #f3f4f6; }
 .icon-btn { background: #f3f4f6; border: none; padding: 0.4rem; border-radius: 6px; color: #4b5563; cursor: pointer; transition: 0.15s;}
 .icon-btn:hover { background: #e5e7eb; color: #111827; }
+.btn-clear-filters:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.btn-toggle-tasks {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-toggle-tasks svg {
+  color: #94a3b8;
+}
+
+.btn-toggle-tasks:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.btn-toggle-tasks.active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #2563eb;
+}
+
+.btn-toggle-tasks.active svg {
+  color: #3b82f6;
+}
 .text-green { color: #10b981; }
 .text-red { color: #ef4444; }
 
@@ -957,7 +1040,7 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246,
 .alert-success svg { color: #10b981; margin-top: 2px;}
 
 /* EXPERT MODAL : APPROVE (MOCKUP 4) */
-.modal-approve { max-width: 500px; padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.modal-approve { max-width: 500px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
 
 .approve-header-group { display: flex; align-items: center; gap: 1rem; }
 .icon-warning-rounded { width: 48px; height: 48px; border-radius: 50%; background: #fef3c7; display: flex; align-items: center; justify-content: center; }
@@ -968,18 +1051,18 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246,
 .section-label { font-size: 0.65rem; font-weight: 700; color: #9ca3af; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.5rem; display: block; }
 
 .checklist { border: 1px solid #f3f4f6; border-radius: 8px; overflow: hidden; }
-.check-item { padding: 1rem; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 1rem; cursor: pointer; background: white;}
+.check-item { padding: 0.75rem 1rem; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 0.875rem; cursor: pointer; background: white;}
 .check-item:last-child { border-bottom: none; }
 .check-item input { display: none; }
 .custom-check { width: 18px; height: 18px; border: 2px solid #d1d5db; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.15s;}
 .check-item input:checked ~ .custom-check { background: #10b981; border-color: #10b981;  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E"); background-size: 12px; background-position: center; background-repeat: no-repeat; }
 .check-item span { font-size: 0.85rem; color: #111827; font-weight: 500; }
 
-.balance-calc-box { background: #f9fafb; border: 1px solid #f3f4f6; border-radius: 8px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+.balance-calc-box { background: #f9fafb; border: 1px solid #f3f4f6; border-radius: 8px; padding: 0.875rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
 .balance-row { display: flex; justify-content: space-between; align-items: center; }
-.b-col { display: flex; flex-direction: column; gap: 0.25rem; }
-.b-col .label { font-size: 0.65rem; font-weight: 700; color: #9ca3af; letter-spacing: 0.05em; }
-.b-col .val { font-size: 1.125rem; font-weight: 700; color: #111827; }
+.b-col { display: flex; flex-direction: column; gap: 0.15rem; }
+.b-col .label { font-size: 0.6rem; font-weight: 700; color: #9ca3af; letter-spacing: 0.05em; }
+.b-col .val { font-size: 1rem; font-weight: 700; color: #111827; }
 .b-col .text-blue { color: #2563eb; }
 .divider { height: 1px; background: #e5e7eb; width: 100%; }
 .amounts-row .label { font-size: 0.8rem; color: #6b7280; font-weight: 500; }
@@ -995,9 +1078,9 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246,
 
 .approve-footer { display: flex; gap: 1rem; padding-top: 0.5rem; }
 .border-none { border: none !important; }
-.btn-outline-wide { flex: 1; padding: 0.875rem; background: white; border: 1px solid #d1d5db; border-radius: 8px; color: #4b5563; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
+.btn-outline-wide { flex: 1; padding: 0.625rem; background: white; border: 1px solid #d1d5db; border-radius: 8px; color: #4b5563; font-weight: 600; font-size: 0.875rem; cursor: pointer; }
 .btn-outline-wide:hover { background: #f9fafb; }
-.btn-confirm-execute { flex: 1.5; padding: 0.875rem; background: #9ca3af; color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; transition: background 0.15s;}
+.btn-confirm-execute { flex: 1.5; padding: 0.625rem; background: #9ca3af; color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 0.875rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; transition: background 0.15s;}
 .btn-confirm-execute:not(:disabled) { background: #2563eb; }
 .btn-confirm-execute:not(:disabled):hover { background: #1d4ed8; }
 
@@ -1098,4 +1181,74 @@ textarea.input-std { resize: vertical; min-height: 80px; }
 .justif-size { font-size: 0.7rem; color: #64748b; }
 .btn-justif-view { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; background: white; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: #475569; text-decoration: none; transition: all 0.2s; }
 .btn-justif-view:hover { background: #f1f5f9; border-color: #94a3b8; color: #1e293b; }
+/* MODALE DE PRÉVISUALISATION PDF */
+.modal-backdrop-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 2200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.preview-container {
+  background: white;
+  width: 100%;
+  max-width: 1000px;
+  height: 90vh;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.preview-header {
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preview-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.close-btn-preview {
+  background: #f1f5f9;
+  border: none;
+  color: #64748b;
+  padding: 0.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  transition: all 0.2s;
+}
+
+.close-btn-preview:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.preview-body {
+  flex: 1;
+  background: #525659;
+}
+
+.preview-body iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
 </style>

@@ -9,7 +9,10 @@ public class TableauBordResponse {
     private BigDecimal soldeTotalCaisses;
     private BigDecimal soldeTotalBanques;
     private long decaissementsEnAttente;
+    private long decaissementsEnAttenteRF;
+    private long decaissementsEnAttentePDG;
     private BigDecimal totalCreancesClients;
     private BigDecimal totalDettesFournisseurs;
+    private java.util.Map<String, BigDecimal> repartitionDecaissementsParCategorie;
     private List<ActiviteResponse> activitesRecentes;
 }
