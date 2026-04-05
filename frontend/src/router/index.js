@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUiStore } from '../stores/ui.store'
+import { useAuthStore } from '../stores/auth.store'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -44,6 +45,24 @@ const router = createRouter({
       name: 'profile',
       component: () => import('../views/ProfileView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/audit',
+      name: 'audit',
+      component: () => import('../views/AuditView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/parametres',
+      name: 'parametres',
+      component: () => import('../views/ParametresView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('../views/DashboardAdminView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })
@@ -62,6 +81,8 @@ router.beforeEach((to, from, next) => {
     return next('/login');
   }
 
+  const authStore = useAuthStore()
+  // L'Administrateur a désormais accès au métier suite à la demande utilisateur
   next();
 })
 

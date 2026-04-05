@@ -14,6 +14,8 @@ import java.math.BigDecimal;
 public class Client extends Tiers {
 
     private String typeClient; // PARTICULIER ou ENTREPRISE
+    private String cni; // Carte Nationale d'Identité
+    private String photoUrl;
 
     private BigDecimal creditLimite;
 

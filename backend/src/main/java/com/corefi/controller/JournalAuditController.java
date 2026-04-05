@@ -9,18 +9,22 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/journal-audit")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('ADMINISTRATEUR')")
+@PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'PDG', 'RESPONSABLE_FINANCIER', 'COMPTABLE')")
 public class JournalAuditController {
 
     private final IJournalAuditService journalAuditService;
 
     @GetMapping
-    public ResponseEntity<Page<JournalAudit>> findAll(Pageable pageable) {
-        return ResponseEntity.ok(journalAuditService.findAll(pageable));
+    public ResponseEntity<Page<JournalAudit>> findAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String action,
+            Pageable pageable) {
+        return ResponseEntity.ok(journalAuditService.findAll(search, action, pageable));
     }
 }

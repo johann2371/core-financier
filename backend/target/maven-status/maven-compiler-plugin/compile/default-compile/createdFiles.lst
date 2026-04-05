@@ -13,6 +13,7 @@ com\corefi\service\impl\TableauBordServiceImpl.class
 com\corefi\dto\request\utilisateur\ProfileUpdateRequest.class
 com\corefi\repository\UtilisateurRepository.class
 com\corefi\repository\FournisseurRepository.class
+com\corefi\util\DbCheckRunner.class
 com\corefi\dto\response\tiers\TiersResponse.class
 com\corefi\repository\FactureRepository.class
 com\corefi\dto\request\tiers\TiersCreateRequest.class
@@ -30,6 +31,7 @@ com\corefi\dto\response\compte\CompteFinancierResponse.class
 com\corefi\entity\Utilisateur.class
 com\corefi\dto\response\tableaubord\TableauBordResponse.class
 com\corefi\repository\JournalAuditRepository.class
+com\corefi\dto\response\tableaubord\TableauBordResponse$TopFournisseur.class
 com\corefi\service\interfaces\ITableauBordService.class
 com\corefi\security\JwtAuthenticationFilter.class
 com\corefi\service\impl\FactureServiceImpl.class
@@ -51,6 +53,7 @@ com\corefi\controller\EncaissementController.class
 com\corefi\mapper\TiersMapper.class
 com\corefi\service\impl\EmailServiceImpl.class
 com\corefi\service\interfaces\IJournalAuditService.class
+com\corefi\repository\JustificatifRepository.class
 com\corefi\enums\StatutFacture.class
 com\corefi\security\UserDetailsServiceImpl.class
 com\corefi\mapper\UtilisateurMapper.class
@@ -71,6 +74,7 @@ com\corefi\dto\response\decaissement\DecaissementResponse.class
 com\corefi\service\interfaces\IFileStorageService.class
 com\corefi\repository\NotificationRepository.class
 com\corefi\service\impl\JournalAuditServiceImpl.class
+com\corefi\entity\JustificatifDecaissement.class
 com\corefi\service\impl\FileStorageServiceImpl.class
 com\corefi\repository\ParametrageRepository.class
 com\corefi\config\SecurityConfig.class
@@ -83,6 +87,7 @@ com\corefi\config\WebConfig.class
 com\corefi\repository\LigneFactureRepository.class
 com\corefi\service\impl\NotificationServiceImpl.class
 com\corefi\config\DataInitializer.class
+com\corefi\enums\CategorieDecaissement.class
 com\corefi\dto\request\encaissement\AffectationRequest.class
 com\corefi\entity\Tiers.class
 com\corefi\service\interfaces\IEmailService.class
@@ -106,6 +111,7 @@ com\corefi\controller\JournalAuditController.class
 com\corefi\service\impl\UtilisateurServiceImpl.class
 com\corefi\enums\StatutEncaissement.class
 com\corefi\repository\AffectationPaiementRepository.class
+com\corefi\dto\response\decaissement\DecaissementResponse$JustificatifInfo.class
 com\corefi\dto\response\encaissement\EncaissementResponse.class
 com\corefi\entity\Decaissement.class
 com\corefi\service\impl\PdfServiceImpl.class
@@ -115,6 +121,7 @@ com\corefi\service\impl\CompteFinancierServiceImpl.class
 com\corefi\security\JwtAuthenticationEntryPoint.class
 com\corefi\mapper\FactureMapper.class
 com\corefi\service\interfaces\IEncaissementService.class
+com\corefi\dto\response\tableaubord\TableauBordResponse$EvolutionMois.class
 com\corefi\security\JwtTokenProvider.class
 com\corefi\repository\DecaissementRepository.class
 com\corefi\config\ApplicationConfig$1.class

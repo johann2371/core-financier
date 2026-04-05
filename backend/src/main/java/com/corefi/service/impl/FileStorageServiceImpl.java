@@ -19,26 +19,36 @@ public class FileStorageServiceImpl implements IFileStorageService {
 
     private final Path fileStorageLocation;
 
-    public FileStorageServiceImpl(@Value("${file.upload-dir:uploads/profiles}") String uploadDir) {
+    public FileStorageServiceImpl(@Value("${file.upload-dir:uploads}") String uploadDir) {
         this.fileStorageLocation = Paths.get(uploadDir)
                 .toAbsolutePath().normalize();
 
         try {
             Files.createDirectories(this.fileStorageLocation);
         } catch (Exception ex) {
-            throw new WorkflowException("Impossible de créer le répertoire où les fichiers téléchargés seront stockés.", ex);
+            throw new WorkflowException("Impossible de créer le répertoire racine de stockage.", ex);
         }
     }
 
     @Override
     public String storeProfilePhoto(MultipartFile file) {
+        return storeFile(file, "profiles");
+    }
+
+    @Override
+    public String storeFile(MultipartFile file, String subDir) {
         // Normaliser le nom du fichier
         String originalFileName = StringUtils.cleanPath(file.getOriginalFilename());
         
         try {
-            // Vérifier si le nom du fichier contient des caractères invalides
             if (originalFileName.contains("..")) {
-                throw new WorkflowException("Désolé ! Le nom du fichier contient une séquence de chemin invalide " + originalFileName);
+                throw new WorkflowException("Nom de fichier invalide : " + originalFileName);
+            }
+
+            // Créer le sous-répertoire s'il n'existe pas
+            Path targetDir = this.fileStorageLocation.resolve(subDir);
+            if (!Files.exists(targetDir)) {
+                Files.createDirectories(targetDir);
             }
 
             // Générer un nom unique
@@ -48,13 +58,13 @@ public class FileStorageServiceImpl implements IFileStorageService {
             }
             String fileName = UUID.randomUUID().toString() + fileExtension;
 
-            // Copier le fichier au bon endroit (écraser si existe déjà, mais UUID prévient ça)
-            Path targetLocation = this.fileStorageLocation.resolve(fileName);
+            // Copier le fichier
+            Path targetLocation = targetDir.resolve(fileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
-            return fileName;
+            return subDir + "/" + fileName;
         } catch (IOException ex) {
-            throw new WorkflowException("Impossible de stocker le fichier " + originalFileName + ". Veuillez réessayer !", ex);
+            throw new WorkflowException("Impossible de stocker le fichier " + originalFileName, ex);
         }
     }
 

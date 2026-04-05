@@ -3,13 +3,18 @@ package com.corefi.controller;
 import com.corefi.dto.request.tiers.TiersCreateRequest;
 import com.corefi.dto.response.tiers.TiersResponse;
 import com.corefi.service.interfaces.ITiersService;
+import com.corefi.service.interfaces.IFileStorageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * ÉTAPE 3 — Controller : dépend UNIQUEMENT de ITiersService (interface)
@@ -20,7 +25,23 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TiersController {
 
-    private final ITiersService tiersService; // ← interface ✅
+    private final ITiersService tiersService;
+    private final IFileStorageService fileStorageService;
+
+    @PostMapping("/upload-photo")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE')")
+    public ResponseEntity<Map<String, String>> uploadPhoto(@RequestParam("file") MultipartFile file) {
+        String fileName = fileStorageService.storeFile(file, "tiers");
+        
+        String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/uploads/")
+                .path(fileName)
+                .toUriString();
+
+        Map<String, String> response = new HashMap<>();
+        response.put("url", fileDownloadUri);
+        return ResponseEntity.ok(response);
+    }
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG','CAISSIER')")

@@ -1,0 +1,15 @@
+package com.corefi.dto.response.parametrage;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class ParametrageResponse {
+    private Long id;
+    private String cle;
+    private String valeur;
+    private String description;
+}

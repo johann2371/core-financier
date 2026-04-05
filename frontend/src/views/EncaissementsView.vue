@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api'
 import MainLayout from '../components/MainLayout.vue'
 import Pagination from '../components/Pagination.vue'
@@ -122,7 +122,7 @@ const availableComptes = computed(() => {
 
 // Auto-select first available account when mode changes
 const watchMode = computed(() => selectedMode.value)
-import { watch } from 'vue'
+
 watch(watchMode, (newMode) => {
   const list = newMode === 'ESPECES' ? compteStore.caisses : compteStore.banques
   if (list.length > 0) {
@@ -134,6 +134,19 @@ watch(watchMode, (newMode) => {
 
 const submitForm = async () => {
   formError.value = ''
+  if (!form.value.montant || form.value.montant <= 0) {
+    formError.value = "Le Montant est obligatoire et doit être supérieur à 0."
+    return
+  }
+  if (!form.value.clientId) {
+    formError.value = "Veuillez sélectionner un Client."
+    return
+  }
+  if (!form.value.compteFinancierId) {
+    formError.value = "Veuillez sélectionner le compte de destination (Banque/Caisse)."
+    return
+  }
+
   try {
     const dataToSend = {
       clientId: form.value.clientId,
@@ -185,14 +198,26 @@ const getStatusClass = (statut) => {
     <template #title>Encaissements</template>
 
     <template #actions>
-      <button @click="showModal = true" class="btn-primary">
+      <button class="icon-btn show-on-mobile" @click="showMobileFilters = !showMobileFilters" title="Filtrer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+      </button>
+      <button @click="showModal = true" class="btn-primary hide-on-mobile">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         Nouveau Encaissement
       </button>
     </template>
     
+    <div class="show-on-mobile w-100" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+      <button @click="showModal = true" class="btn-primary w-100" style="justify-content: center; padding: 0.75rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        Nouveau Encaissement
+      </button>
+    </div>
+
     <!-- Barre de Filtres -->
-    <div class="filter-bar">
+    <div class="filter-bar" :class="{ 'mobile-collapsed': !showMobileFilters }">
       <div class="filter-group group-search">
         <div class="input-with-icon-left">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -492,7 +517,7 @@ const getStatusClass = (statut) => {
         <!-- Footer Actions -->
         <div class="modal-footer pt-0 justify-end">
           <div class="actions-group">
-            <button type="submit" form="encaissement-form" class="btn-primary-large" :disabled="store.loading || !form.montant">
+            <button type="submit" form="encaissement-form" class="btn-primary-large" :disabled="store.loading">
               {{ store.loading ? 'En cours...' : 'Confirmer et Enregistrer' }}
             </button>
           </div>
@@ -651,5 +676,36 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246,
   0% { transform: translateX(-8px); opacity: 0; }
   50% { transform: translateX(4px); }
   100% { transform: translateX(0); opacity: 1; }
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 768px) {
+  .modal-lg {
+    width: 95vw;
+    margin: 1rem;
+    max-height: 95vh;
+  }
+  .modal-split {
+    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-left, .modal-right {
+    padding: 1.5rem 1rem;
+  }
+  .payment-modes {
+    grid-template-columns: 1fr 1fr;
+  }
+  .form-row {
+    flex-direction: column;
+  }
+  .actions-group {
+    flex-direction: column;
+    width: 100%;
+  }
+  .btn-primary-large {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>

@@ -11,7 +11,7 @@ import java.nio.file.Paths;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${file.upload-dir:uploads/profiles}")
+    @Value("${file.upload-dir:uploads}")
     private String uploadDir;
 
     @Override
@@ -21,11 +21,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     private void exposeDirectory(String dirName, ResourceHandlerRegistry registry) {
         Path uploadDirPath = Paths.get(dirName);
-        String uploadPath = uploadDirPath.toFile().getAbsolutePath();
+        String uploadPath = uploadDirPath.toFile().getAbsolutePath().replace("\\", "/");
 
-        if (dirName.startsWith("../")) dirName = dirName.replace("../", "");
-
-        registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:/" + uploadPath + "/");
+        registry.addResourceHandler("/api/uploads/**")
+                .addResourceLocations("file:///" + uploadPath + "/");
     }
 }

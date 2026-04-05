@@ -16,7 +16,11 @@ const togglePassword = () => {
 const handleLogin = async () => {
   await authStore.login(email.value, password.value)
   if (!authStore.error) {
-    router.push('/')
+    if (authStore.userRole === 'ADMINISTRATEUR') {
+      router.push('/audit')
+    } else {
+      router.push('/')
+    }
   }
 }
 </script>

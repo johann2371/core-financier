@@ -45,5 +45,8 @@ public class Tiers {
     @Column(name = "total_dette", precision = 18, scale = 2)
     private BigDecimal totalDette = BigDecimal.ZERO;
 
+    private String nui; // Numéro d'Identifiant Unique
+    private String rccm; // Registre du Commerce
+
     private boolean actif = true;
 }

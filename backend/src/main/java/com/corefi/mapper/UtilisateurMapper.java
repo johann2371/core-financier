@@ -29,7 +29,7 @@ public class UtilisateurMapper {
         r.setPrenom(u.getPrenom());
         r.setEmail(u.getEmail());
         r.setRole(u.getRole().name());
-        r.setPhotoUrl(u.getPhotoUrl());
+        r.setPhotoUrl(formatPhotoUrl(u.getPhotoUrl()));
         r.setActif(u.isActif());
         r.setDateCreation(u.getDateCreation());
         r.setDernierAcces(u.getDernierAcces());
@@ -45,7 +45,14 @@ public class UtilisateurMapper {
                 utilisateur.getPrenom(),
                 utilisateur.getEmail(),
                 utilisateur.getRole().name(),
-                utilisateur.getPhotoUrl()
+                formatPhotoUrl(utilisateur.getPhotoUrl())
         );
+    }
+
+    private String formatPhotoUrl(String photoUrl) {
+        if (photoUrl == null || photoUrl.isEmpty() || photoUrl.startsWith("http") || photoUrl.startsWith("/")) {
+            return photoUrl;
+        }
+        return "/api/uploads/" + photoUrl;
     }
 }

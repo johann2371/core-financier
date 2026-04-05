@@ -167,6 +167,29 @@ public class UtilisateurServiceImpl implements IUtilisateurService {
     }
 
     // ────────────────────────────────────────────────────────────────────────
+    // RÉACTIVER UN UTILISATEUR
+    // ────────────────────────────────────────────────────────────────────────
+    @Override
+    @Transactional
+    public void reactiver(Long id) {
+        Utilisateur utilisateur = trouverOuExcepion(id);
+
+        if (utilisateur.isActif()) {
+            throw new WorkflowException("Ce compte est déjà actif.");
+        }
+
+        utilisateur.setActif(true);
+        utilisateurRepository.save(utilisateur);
+
+        journalAuditService.enregistrer(
+                "UPDATE", "Utilisateur", id,
+                "actif=false",
+                "actif=true (réactivation)",
+                null
+        );
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
     // METTRE À JOUR LE PROFIL (Utilisateur connecté)
     // ────────────────────────────────────────────────────────────────────────
     @Override

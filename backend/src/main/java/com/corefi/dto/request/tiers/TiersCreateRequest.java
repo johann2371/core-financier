@@ -17,9 +17,13 @@ public class TiersCreateRequest {
     private String adresse;
     private String ville;
     private String pays;
+    private String nui;
+    private String rccm;
 
     // Champs spécifiques CLIENT
     private String typeClient;      // PARTICULIER ou ENTREPRISE
+    private String cni;
+    private String photoUrl;
     private Double creditLimite;
     private Integer delaiPaiement;
 

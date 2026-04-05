@@ -81,6 +81,7 @@ const filters = ref({
   dateDebut: '',
   dateFin: ''
 })
+const showMobileFilters = ref(false)
 
 const resetFilters = () => {
   filters.value = {
@@ -102,7 +103,7 @@ const form = ref({
   type: 'VENTE',
   tiersId: '',
   lignes: [
-    { designation: '', quantite: 1, prixUnitaire: 0 }
+    { designation: '', quantite: '', prixUnitaire: '' }
   ]
 })
 
@@ -121,7 +122,7 @@ onMounted(async () => {
 
 // Logique ajout/suppression de lignes
 const addLigne = () => {
-  form.value.lignes.push({ designation: '', quantite: 1, prixUnitaire: 0 })
+  form.value.lignes.push({ designation: '', quantite: '', prixUnitaire: '' })
 }
 const removeLigne = (index) => {
   if (form.value.lignes.length > 1) {
@@ -180,7 +181,28 @@ const paginatedList = computed(() => {
   return filteredFactures.value.slice(start, start + itemsPerPage)
 })
 
+// Soumission
 const submitForm = async () => {
+  formError.value = ''
+  
+  // Validation manuelle supplémentaire
+  if (!form.value.tiersId) {
+    formError.value = form.value.type === 'VENTE' ? "Veuillez sélectionner un Client valide." : "Veuillez sélectionner un Fournisseur valide."
+    return
+  }
+  
+  if (form.value.lignes.length === 0) {
+    formError.value = "Veuillez ajouter au moins une ligne d'article à la facture."
+    return
+  }
+
+  // Vérifier chaque ligne
+  const ligneInvalide = form.value.lignes.find(l => !l.designation || !l.quantite || l.prixUnitaire === null || l.prixUnitaire === '')
+  if (ligneInvalide) {
+    formError.value = "Veuillez remplir correctement toutes les lignes d'articles (Description, Qté et Prix Unitaire requis)."
+    return
+  }
+
   try {
     const dataToSend = {
       type: form.value.type,
@@ -213,22 +235,33 @@ const submitForm = async () => {
     <template #title>Gestion des Factures</template>
 
     <template #actions>
-      <button @click="showModal = true" class="btn-primary">
+      <button class="icon-btn show-on-mobile" @click="showMobileFilters = !showMobileFilters" title="Filtrer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+      </button>
+      <button @click="showModal = true" class="btn-primary hide-on-mobile">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
         Nouvelle Facture
-
       </button>
     </template>
 
+    <div class="show-on-mobile w-100" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+      <button @click="showModal = true" class="btn-primary w-100" style="justify-content: center; padding: 0.75rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
+        Nouvelle Facture
+      </button>
+    </div>
+
     <!-- Navigation par Onglets -->
-    <div class="tabs-nav">
+    <div class="tabs-nav" :class="{ 'mobile-collapsed': !showMobileFilters }">
       <button class="tab-btn" :class="{ active: activeTab === 'TOUS' }" @click="setTab('TOUS')">Toutes ({{ store.factures.length }})</button>
       <button class="tab-btn" :class="{ active: activeTab === 'VENTE' }" @click="setTab('VENTE')">Ventes ({{ store.ventes.length }})</button>
       <button class="tab-btn" :class="{ active: activeTab === 'ACHAT' }" @click="setTab('ACHAT')">Achats ({{ store.achats.length }})</button>
     </div>
 
     <!-- Barre de Filtres -->
-    <div class="filter-bar">
+    <div class="filter-bar" :class="{ 'mobile-collapsed': !showMobileFilters }">
       <div class="filter-group group-search">
         <div class="input-with-icon-left">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -377,16 +410,16 @@ const submitForm = async () => {
 
           <div class="form-row">
             <div class="form-group half">
-               <label>Type de Facture <span class="req">*</span></label>
-               <select v-model="form.type" required class="input-std" @change="form.tiersId = ''"> <!-- Reset Tiers on type switch -->
+               <label class="hide-on-mobile">Type de Facture <span class="req">*</span></label>
+               <select v-model="form.type" required class="input-std" @change="form.tiersId = ''">
                  <option value="VENTE">Facture de Vente (Client)</option>
                  <option value="ACHAT">Facture d'Achat (Fournisseur)</option>
                </select>
             </div>
             <div class="form-group half input-with-icon">
-               <label>{{ form.type === 'VENTE' ? 'Client Associé' : 'Fournisseur Associé' }} <span class="req">*</span></label>
+               <label class="hide-on-mobile">{{ form.type === 'VENTE' ? 'Client Associé' : 'Fournisseur Associé' }} <span class="req">*</span></label>
                <select v-model="form.tiersId" required class="input-std">
-                 <option value="" disabled>Sélectionner...</option>
+                 <option value="" disabled>{{ form.type === 'VENTE' ? 'Sélectionner un Client...' : 'Sélectionner un Fournisseur...' }}</option>
                  <option v-for="t in tiersDisponibles" :key="t.id" :value="t.id">{{ t.raisonSociale }}</option>
                </select>
             </div>
@@ -395,7 +428,7 @@ const submitForm = async () => {
           <div class="section-divider mt-2">Détails des Articles/Lignes</div>
           
           <div class="lines-container">
-            <div class="line-header form-row">
+            <div class="line-header form-row hide-on-mobile">
                <div class="line-col design-col"><label>Description</label></div>
                <div class="line-col qty-col"><label>Qté</label></div>
                <div class="line-col price-col"><label>Prix Unitaire (XAF)</label></div>
@@ -408,12 +441,12 @@ const submitForm = async () => {
                  <input v-model="ligne.designation" type="text" required class="input-std" placeholder="Nom de l'article ou service..." />
                </div>
                <div class="line-col qty-col">
-                 <input v-model.number="ligne.quantite" type="number" required min="1" step="1" class="input-std text-center" />
+                 <input v-model.number="ligne.quantite" type="number" required min="1" step="1" class="input-std text-center" placeholder="Qté" />
                </div>
                <div class="line-col price-col">
-                 <input v-model.number="ligne.prixUnitaire" type="number" required min="0" step="25" class="input-std text-right" />
+                 <input v-model.number="ligne.prixUnitaire" type="number" required min="0" step="25" class="input-std text-right" placeholder="Prix Unitaire (XAF)" />
                </div>
-               <div class="line-col total-col v-center">
+               <div class="line-col total-col v-center hide-on-mobile">
                  <span class="font-semibold text-dark">{{ (ligne.quantite * ligne.prixUnitaire).toLocaleString() }}</span>
                </div>
                <div class="line-col act-col v-center">
@@ -440,7 +473,7 @@ const submitForm = async () => {
 
           <div class="modal-footer pt-3 pb-0">
              <button type="button" class="btn-text" @click="showModal = false">Annuler</button>
-             <button type="submit" class="btn-primary" :disabled="!form.tiersId || form.lignes.length === 0 || store.loading">
+             <button type="submit" class="btn-primary" :disabled="store.loading">
                {{ store.loading ? 'Création...' : 'Générer la Facture' }}
              </button>
           </div>
@@ -532,4 +565,67 @@ const submitForm = async () => {
 .close-error-btn { background: none; border: none; color: #b91c1c; font-size: 1.25rem; cursor: pointer; padding: 0 0.25rem; opacity: 0.6; transition: opacity 0.15s; }
 .close-error-btn:hover { opacity: 1; }
 @keyframes shakeIn { 0% { transform: translateX(-8px); opacity: 0; } 50% { transform: translateX(4px); } 100% { transform: translateX(0); opacity: 1; } }
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 768px) {
+  .modal-large {
+    width: 95vw;
+    margin: 1rem;
+    max-height: 95vh;
+  }
+  .complex-body {
+    padding: 1rem;
+  }
+  .form-row {
+    flex-direction: column;
+  }
+  .lines-container {
+    padding: 0.25rem;
+    overflow: visible;
+  }
+  .line-item {
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-areas: 
+      "design design design"
+      "qty price act";
+    grid-template-columns: 1fr 1fr auto;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px dotted #d1d5db;
+  }
+  .line-header {
+    display: none !important;
+  }
+  .design-col { 
+    grid-area: design; 
+    width: 100%; 
+  }
+  .qty-col { 
+    grid-area: qty; 
+    width: 100%; 
+    min-width: auto;
+  }
+  .price-col { 
+    grid-area: price; 
+    width: 100%; 
+    min-width: auto;
+  }
+  .act-col { 
+    grid-area: act;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .totaux-card {
+    align-items: stretch;
+  }
+  .tot-row {
+    width: 100%;
+  }
+  .tabs-nav {
+    flex-wrap: wrap;
+  }
+}
 </style>

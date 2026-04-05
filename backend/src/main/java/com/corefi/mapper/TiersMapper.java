@@ -40,10 +40,14 @@ public class TiersMapper {
         r.setActif(tiers.isActif());
         r.setSolde(tiers.getSolde());
         r.setTotalDette(tiers.getTotalDette());
+        r.setNui(tiers.getNui());
+        r.setRccm(tiers.getRccm());
 
         // Champs spécifiques Client
         if (tiers instanceof Client client) {
             r.setTypeClient(client.getTypeClient());
+            r.setCni(client.getCni());
+            r.setPhotoUrl(client.getPhotoUrl());
             r.setCreditLimite(client.getCreditLimite() != null
                     ? client.getCreditLimite().doubleValue() : null);
             r.setDelaiPaiement(client.getDelaiPaiement());

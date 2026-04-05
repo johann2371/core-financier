@@ -11,5 +11,6 @@ public interface IUtilisateurService {
     UtilisateurResponse findById(Long id);
     List<UtilisateurResponse> findAll();
     void desactiver(Long id);
+    void reactiver(Long id);
     UtilisateurResponse updateProfile(String email, ProfileUpdateRequest request);
 }

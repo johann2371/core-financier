@@ -11,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.security.Principal;
 
 import java.util.List;
@@ -56,6 +55,13 @@ public class UtilisateurController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/{id}/reactiver")
+    @PreAuthorize("hasAuthority('ADMINISTRATEUR')")
+    public ResponseEntity<Void> reactiver(@PathVariable Long id) {
+        utilisateurService.reactiver(id);
+        return ResponseEntity.noContent().build();
+    }
+
     /** Mettre à jour son propre profil (Accessible à tout utilisateur connecté) */
     @PutMapping("/profile")
     @PreAuthorize("isAuthenticated()")
@@ -67,27 +73,21 @@ public class UtilisateurController {
     @PostMapping("/profile/photo")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<UtilisateurResponse> uploadProfilePhoto(Principal principal, @RequestParam("file") MultipartFile file) {
-        // 1. Stocker le fichier
+        // 1. Stocker le fichier (retourne un chemin relatif ex: profiles/uuid.jpg)
         String fileName = fileStorageService.storeProfilePhoto(file);
         
-        // 2. Générer l'URL complète
-        String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/uploads/")
-                .path(fileName)
-                .toUriString();
-
-        // 3. Récupérer les infos actuelles pour ne pas les écraser
+        // 2. Récupérer les infos actuelles
         UtilisateurResponse current = utilisateurService.findAll().stream()
                 .filter(u -> u.getEmail().equalsIgnoreCase(principal.getName()))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        // 4. Mettre à jour uniquement la photo
+        // 3. Mettre à jour uniquement la photo (on stocke le chemin relatif)
         ProfileUpdateRequest updateRequest = new ProfileUpdateRequest();
         updateRequest.setNom(current.getNom());
         updateRequest.setPrenom(current.getPrenom());
         updateRequest.setEmail(current.getEmail());
-        updateRequest.setPhotoUrl(fileDownloadUri);
+        updateRequest.setPhotoUrl(fileName);
 
         return ResponseEntity.ok(utilisateurService.updateProfile(principal.getName(), updateRequest));
     }

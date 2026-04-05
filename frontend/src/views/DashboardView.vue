@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
 import MainLayout from '../components/MainLayout.vue'
+import FluxChart from '../components/FluxChart.vue'
 import api from '../services/api'
 
 const authStore = useAuthStore()
@@ -17,7 +18,20 @@ const kpis = ref({
   totalCreancesClients: 0,
   totalDettesFournisseurs: 0,
   repartitionDecaissementsParCategorie: {},
-  activitesRecentes: []
+  activitesRecentes: [],
+  dernierMouvementCaisse: 0,
+  dernierMouvementBanque: 0,
+  derniereCreanceClient: 0,
+  derniereDetteFournisseur: 0,
+  evolutionMensuelle: [],
+  topFournisseurs: [],
+  burnRateMensuel: 0,
+  seuilApprobationActuel: 500000,
+  decaissementsAExecuter: 0,
+  montantTotalAExecuter: 0,
+  encaissementsDuJour: 0,
+  decaissementsExecutesDuJour: 0,
+  operationsDuJour: 0
 })
 const loading = ref(true)
 
@@ -52,6 +66,30 @@ onUnmounted(() => {
   if (refreshInterval) clearInterval(refreshInterval)
 })
 
+const showSeuilModal = ref(false)
+const newSeuil = ref(0)
+const updatingSeuil = ref(false)
+
+const openSeuilModal = () => {
+  newSeuil.value = kpis.value.seuilApprobationActuel
+  showSeuilModal.value = true
+}
+
+const updateSeuil = async () => {
+  if (newSeuil.value < 0) return
+  updatingSeuil.value = true
+  try {
+    await api.put(`/tableau-bord/seuil?montant=${newSeuil.value}`)
+    kpis.value.seuilApprobationActuel = newSeuil.value
+    showSeuilModal.value = false
+    // Pas besoin de fetchKpis complet, on a mis à jour localement
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du seuil:', error)
+  } finally {
+    updatingSeuil.value = false
+  }
+}
+
 const formatTime = (dateStr) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
@@ -80,6 +118,8 @@ const getActivityIconClass = (type) => {
 const isRF = computed(() => authStore.userRole === 'RESPONSABLE_FINANCIER')
 const isAdmin = computed(() => authStore.userRole === 'ADMINISTRATEUR')
 const isComptable = computed(() => authStore.userRole === 'COMPTABLE')
+const isPDG = computed(() => authStore.userRole === 'PDG')
+const isCaissier = computed(() => authStore.userRole === 'CAISSIER')
 
 const categoryLabels = {
   'PAIEMENT_FOURNISSEUR': 'Fournisseurs',
@@ -104,6 +144,10 @@ const sortedCategories = computed(() => {
 const totalBudget = computed(() => {
   return sortedCategories.value.reduce((acc, cat) => acc + cat.value, 0)
 })
+
+const totalTresorerie = computed(() => {
+  return (kpis.value.soldeTotalCaisses || 0) + (kpis.value.soldeTotalBanques || 0)
+})
 </script>
 
 <template>
@@ -119,11 +163,18 @@ const totalBudget = computed(() => {
           <h4>Nouvel<br/>Encaissement</h4>
         </router-link>
 
-        <router-link v-if="isAdmin || isRF || authStore.userRole === 'PDG'" to="/decaissements" class="action-card highlight">
+        <router-link v-if="isCaissier" to="/decaissements" class="action-card highlight">
           <div class="action-icon light-orange">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
           </div>
-          <h4>Valider les<br/>Demandes</h4>
+          <h4>Exécuter un<br/>Paiement</h4>
+        </router-link>
+
+        <router-link v-if="isAdmin || isRF || isPDG" to="/decaissements" class="action-card highlight" :class="{ 'pdg-primary': isPDG }">
+          <div class="action-icon light-orange">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+          <h4>{{ isPDG ? 'Signer les\nDécaissements' : 'Valider les\nDemandes' }}</h4>
         </router-link>
         
         <router-link v-if="isAdmin || isComptable" to="/factures?create=VENTE" class="action-card">
@@ -153,21 +204,84 @@ const totalBudget = computed(() => {
     <div class="main-dashboard-grid">
       <!-- LEFTSIDE COL -->
       <div class="left-col">
-        <!-- STATISTIQUES GLOBALES -->
-        <div class="dashboard-section">
-          <h3 class="section-title">ÉTAT FINANCIER GLOBAL</h3>
+        <!-- POSTE DE CAISSE (CAISSIER UNIQUEMENT) -->
+        <div class="dashboard-section" v-if="isCaissier">
+          <h3 class="section-title">POSTE DE CAISSE</h3>
           <div class="kpi-grid">
-            <div class="kpi-card">
-              <span class="kpi-label">Solde Caisses</span>
+            <div class="kpi-card tresorerie-globale-card">
+              <span class="kpi-label">Solde de Caisse</span>
               <div class="kpi-body">
-                <span class="kpi-value">{{ kpis.soldeTotalCaisses?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span class="kpi-value tresorerie-value">{{ kpis.soldeTotalCaisses?.toLocaleString() }}<span class="currency light">XAF</span></span>
+              </div>
+            </div>
+
+            <div class="kpi-card caissier-highlight">
+              <span class="kpi-label">Paiements à Exécuter</span>
+              <div class="kpi-body">
+                <span class="kpi-value" :class="{ 'urgent-gold': kpis.decaissementsAExecuter > 0 }">{{ kpis.decaissementsAExecuter }}</span>
+                <span class="kpi-trend attention" v-if="kpis.decaissementsAExecuter > 0">{{ kpis.montantTotalAExecuter?.toLocaleString() }} XAF</span>
+                <span class="kpi-trend" v-else>Aucun dossier en attente</span>
+              </div>
+              <router-link to="/decaissements" class="kpi-action-link" v-if="kpis.decaissementsAExecuter > 0">Traiter maintenant</router-link>
+            </div>
+
+            <div class="kpi-card">
+              <span class="kpi-label">Encaissé Aujourd'hui</span>
+              <div class="kpi-body">
+                <span class="kpi-value success">{{ kpis.encaissementsDuJour?.toLocaleString() }}<span class="currency">XAF</span></span>
               </div>
             </div>
 
             <div class="kpi-card">
+              <span class="kpi-label">Décaissé Aujourd'hui</span>
+              <div class="kpi-body">
+                <span class="kpi-value danger">{{ kpis.decaissementsExecutesDuJour?.toLocaleString() }}<span class="currency">XAF</span></span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <span class="kpi-label">Opérations du Jour</span>
+              <div class="kpi-body">
+                <span class="kpi-value">{{ kpis.operationsDuJour }}</span>
+                <span class="kpi-trend">transactions traitées</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ÉTAT FINANCIER GLOBAL (non-CAISSIER) -->
+        <div class="dashboard-section" v-if="!isCaissier">
+          <h3 class="section-title">ÉTAT FINANCIER GLOBAL</h3>
+          <div class="kpi-grid">
+            <!-- Widget Trésorerie Globale (PDG Uniquement) -->
+            <div class="kpi-card tresorerie-globale-card" v-if="isPDG">
+              <span class="kpi-label">Trésorerie Globale Disponbile</span>
+              <div class="kpi-body">
+                <span class="kpi-value gold">{{ totalTresorerie?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <div class="tresorerie-split">
+                  <span class="split-item">Caisse: {{ kpis.soldeTotalCaisses?.toLocaleString() }}</span>
+                  <span class="split-item">Banque: {{ kpis.soldeTotalBanques?.toLocaleString() }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="kpi-card" v-if="!isPDG">
+              <span class="kpi-label">Solde Caisses</span>
+              <div class="kpi-body">
+                <span class="kpi-value">{{ kpis.soldeTotalCaisses?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span v-if="kpis.dernierMouvementCaisse" class="kpi-trend" :class="kpis.dernierMouvementCaisse >= 0 ? 'positive' : 'negative'">
+                  {{ kpis.dernierMouvementCaisse >= 0 ? '+' : '' }} {{ kpis.dernierMouvementCaisse.toLocaleString() }} XAF
+                </span>
+              </div>
+            </div>
+
+            <div class="kpi-card" v-if="!isPDG">
               <span class="kpi-label">Solde Banques</span>
               <div class="kpi-body">
                 <span class="kpi-value">{{ kpis.soldeTotalBanques?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span v-if="kpis.dernierMouvementBanque" class="kpi-trend" :class="kpis.dernierMouvementBanque >= 0 ? 'positive' : 'negative'">
+                  {{ kpis.dernierMouvementBanque >= 0 ? '+' : '' }} {{ kpis.dernierMouvementBanque.toLocaleString() }} XAF
+                </span>
               </div>
             </div>
 
@@ -175,6 +289,9 @@ const totalBudget = computed(() => {
               <span class="kpi-label">Créances Clients</span>
               <div class="kpi-body">
                 <span class="kpi-value success">{{ kpis.totalCreancesClients?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span v-if="kpis.derniereCreanceClient" class="kpi-trend" :class="kpis.derniereCreanceClient >= 0 ? 'positive' : 'negative'">
+                  {{ kpis.derniereCreanceClient >= 0 ? '+' : '' }} {{ kpis.derniereCreanceClient.toLocaleString() }} XAF
+                </span>
               </div>
             </div>
 
@@ -182,6 +299,9 @@ const totalBudget = computed(() => {
               <span class="kpi-label">Dettes Fournisseurs</span>
               <div class="kpi-body">
                 <span class="kpi-value danger">{{ kpis.totalDettesFournisseurs?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span v-if="kpis.derniereDetteFournisseur" class="kpi-trend" :class="kpis.derniereDetteFournisseur >= 0 ? 'negative' : 'positive'">
+                   {{ kpis.derniereDetteFournisseur > 0 ? '+' : '' }} {{ kpis.derniereDetteFournisseur.toLocaleString() }} XAF
+                </span>
               </div>
             </div>
 
@@ -203,11 +323,76 @@ const totalBudget = computed(() => {
               <router-link to="/decaissements" class="kpi-action-link">Gérer le flux</router-link>
             </div>
 
-            <div class="kpi-card" v-if="!isRF">
+            <div class="kpi-card highlight-card pdg-alert-card" v-if="isPDG">
+              <span class="kpi-label">Approbation PDG Requise</span>
+              <div class="kpi-body">
+                <span class="kpi-value" :class="{ 'urgent-gold': kpis.decaissementsEnAttentePDG > 0 }">{{ kpis.decaissementsEnAttentePDG }}</span>
+                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttentePDG > 0">Signature attendue</span>
+              </div>
+              <router-link to="/decaissements" class="kpi-action-link">Ouvrir le parapheur</router-link>
+            </div>
+
+            <div class="kpi-card" v-if="!isRF && !isPDG">
               <span class="kpi-label">Décaissements en attente</span>
               <div class="kpi-body">
                 <span class="kpi-value" :class="{ 'warning': kpis.decaissementsEnAttente > 0 }">{{ kpis.decaissementsEnAttente }}</span>
                 <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttente > 0">Action requise</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PILOTAGE STRATÉGIQUE (PDG UNIQUEMENT) -->
+        <div class="dashboard-section" v-if="isPDG">
+          <h3 class="section-title">PILOTAGE STRATÉGIQUE</h3>
+          <div class="strategic-grid">
+            <!-- Graphique de Flux -->
+            <div class="strategic-card flux-chart-card">
+              <div class="card-header">
+                <h4>Flux de Trésorerie Mensuel</h4>
+                <span class="card-subtitle">Évolution des encaissements et décaissements sur 6 mois</span>
+              </div>
+              <FluxChart :data="kpis.evolutionMensuelle" />
+            </div>
+
+            <!-- Top Fournisseurs & Burn Rate -->
+            <div class="strategic-subgrid">
+              <div class="strategic-card top-suppliers-card">
+                <h4>Top 5 Fournisseurs</h4>
+                <div class="suppliers-list">
+                  <div v-for="sup in kpis.topFournisseurs" :key="sup.nom" class="supplier-row">
+                    <div class="sup-info">
+                      <span class="sup-name">{{ sup.nom }}</span>
+                      <span class="sup-amount">{{ sup.total.toLocaleString() }} XAF</span>
+                    </div>
+                    <div class="sup-progress">
+                      <div class="sup-bar" :style="{ width: (sup.total / (kpis.topFournisseurs[0]?.total || 1) * 100) + '%' }"></div>
+                    </div>
+                  </div>
+                  <div v-if="!kpis.topFournisseurs?.length" class="empty-mini">Aucune donnée</div>
+                </div>
+              </div>
+
+              <div class="strategic-card burn-rate-card">
+                <div class="burn-header">
+                  <h4>Paramètres de Gestion</h4>
+                </div>
+                <div class="burn-body">
+                  <div class="burn-item">
+                    <span class="burn-label">Burn Rate Mensuel (Moyen)</span>
+                    <span class="burn-value">{{ kpis.burnRateMensuel?.toLocaleString() }} <span class="unit">XAF / mois</span></span>
+                  </div>
+                  <div class="divider"></div>
+                  <div class="threshold-item">
+                    <div class="threshold-info">
+                      <span class="burn-label">Seuil de Signature PDG</span>
+                      <span class="threshold-value">{{ kpis.seuilApprobationActuel?.toLocaleString() }} XAF</span>
+                    </div>
+                    <button @click="openSeuilModal" class="btn-setup" title="Modifier le seuil">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -258,7 +443,18 @@ const totalBudget = computed(() => {
                   <td class="task-amount">--</td>
                   <td><router-link to="/decaissements" class="task-action highlight">Valider</router-link></td>
                 </tr>
-                <tr v-if="kpis.decaissementsEnAttente > 0 && !isRF">
+                <tr v-if="kpis.decaissementsEnAttentePDG > 0 && isPDG">
+                  <td><span class="badge badge-urgent">Direction</span></td>
+                  <td>
+                    <div class="task-info">
+                      <strong>{{ kpis.decaissementsEnAttentePDG }} dossier(s) en attente de signature</strong>
+                      <span>Seuil de validation PDG atteint</span>
+                    </div>
+                  </td>
+                  <td class="task-amount">--</td>
+                  <td><router-link to="/decaissements" class="task-action highlight gold-btn">Signer</router-link></td>
+                </tr>
+                <tr v-if="kpis.decaissementsEnAttente > 0 && !isRF && !isPDG">
                   <td><span class="badge badge-urgent">Urgent</span></td>
                   <td>
                     <div class="task-info">
@@ -342,6 +538,31 @@ const totalBudget = computed(() => {
         </div>
       </div>
     </div>
+    <!-- MODAL MODIFICATION SEUIL (PDG) -->
+    <div v-if="showSeuilModal" class="modal-overlay">
+      <div class="modal-content mini-modal">
+        <div class="modal-header">
+          <h3>Réglage du Seuil</h3>
+          <button @click="showSeuilModal = false" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Définissez le montant au-delà duquel votre signature est requise pour tout décaissement.</p>
+          <div class="form-group">
+            <label>Seuil d'approbation (XAF)</label>
+            <div class="input-with-unit">
+              <input type="number" v-model="newSeuil" class="form-input" placeholder="Ex: 1000000" />
+              <span class="unit">XAF</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="showSeuilModal = false" class="btn-secondary">Annuler</button>
+          <button @click="updateSeuil" class="btn-primary gold-btn" :disabled="updatingSeuil">
+            {{ updatingSeuil ? 'Confirmer' : 'Enregistrer' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </MainLayout>
 </template>
 
@@ -410,10 +631,65 @@ const totalBudget = computed(() => {
   line-height: 1.2;
 }
 
-/* KPI HIGHLIGHT */
+/* KPI HIGHLIGHT & PDG SPECIFIC */
 .highlight-card {
   background: linear-gradient(135deg, #ffffff, #f8fafc);
   border: 1px solid #e2e8f0;
+}
+
+.pdg-alert-card {
+  border-left: 4px solid #f59e0b;
+}
+
+.caissier-highlight {
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(135deg, #fffbeb, #ffffff);
+}
+
+.tresorerie-globale-card {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  color: white;
+  border: none;
+}
+
+.tresorerie-globale-card .kpi-label { color: #94a3b8; }
+.tresorerie-globale-card .currency { color: #64748b; }
+
+.kpi-value.gold {
+  color: #fbbf24;
+  text-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+}
+
+.urgent-gold {
+  color: #f59e0b;
+}
+
+.tresorerie-split {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-end;
+}
+
+.split-item {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pdg-primary {
+  background: linear-gradient(135deg, #fefce8, #fef9c3) !important;
+  border: 1px solid #fde047 !important;
+}
+
+.gold-btn {
+  background: #f59e0b !important;
+  color: white !important;
+}
+.gold-btn:hover {
+  background: #d97706 !important;
 }
 
 .pipeline-display {
@@ -573,10 +849,13 @@ const totalBudget = computed(() => {
 .currency { font-size: 1rem; color: #4b5563; font-weight: 600; margin-left: 2px; }
 
 .kpi-trend {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-top: 2px;
+  white-space: nowrap;
 }
 .kpi-trend.positive { color: #10b981; }
+.kpi-trend.negative { color: #ef4444; }
 .kpi-trend.attention { color: #f59e0b; font-size: 0.7rem; }
 
 .kpi-subtrend {
@@ -763,5 +1042,289 @@ const totalBudget = computed(() => {
 @keyframes spin { 
   from { transform: rotate(0deg); } 
   to { transform: rotate(360deg); } 
+}
+
+/* STRATEGIC DASHBOARD (PDG) */
+.strategic-grid {
+  display: grid;
+  grid-template-columns: 1.8fr 1.2fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.strategic-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+}
+
+.strategic-card h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.card-subtitle {
+  font-size: 0.75rem;
+  color: #6b7280;
+  display: block;
+  margin-bottom: 1.5rem;
+}
+
+/* FLUX CHART */
+.flux-chart {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 180px;
+  padding: 1rem 0;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 1rem;
+}
+
+.flux-bar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.bar-pair {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 140px;
+}
+
+.bar {
+  width: 14px;
+  border-radius: 3px 3px 0 0;
+  transition: height 1s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: help;
+}
+
+.bar-enc { background: #10b981; }
+.bar-dec { background: #ef4444; }
+
+.mois-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+}
+
+.flux-legend {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.dot { width: 8px; height: 8px; border-radius: 2px; }
+.dot.enc { background: #10b981; }
+.dot.dec { background: #ef4444; }
+
+/* TOP SUPPLIERS */
+.strategic-subgrid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.suppliers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.supplier-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sup-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.sup-name { font-weight: 500; color: #374151; }
+.sup-amount { font-weight: 700; color: #111827; }
+
+.sup-progress {
+  width: 100%;
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sup-bar {
+  height: 100%;
+  background: #6366f1;
+  border-radius: 3px;
+  transition: width 0.8s ease;
+}
+
+/* BURN RATE & SETTINGS */
+.burn-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.burn-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  display: block;
+}
+
+.burn-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.burn-value .unit { font-size: 0.8rem; color: #9ca3af; }
+
+.divider { height: 1px; background: #f3f4f6; }
+
+.threshold-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.threshold-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.btn-setup {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #f59e0b;
+  border: 1px solid #fef3c7;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-setup:hover { background: #fef3c7; transform: rotate(30deg); }
+
+/* MODAL STYLES (Enrichis) */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000;
+}
+.modal-content {
+  background: white; padding: 2rem; border-radius: 16px; width: 500px;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+}
+.mini-modal { width: 400px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.modal-header h3 { font-size: 1.25rem; font-weight: 700; color: #111827; }
+.close-btn { background: none; border: none; font-size: 1.5rem; color: #9ca3af; cursor: pointer; }
+.modal-desc { font-size: 0.875rem; color: #6b7280; line-height: 1.5; margin-bottom: 1.5rem; }
+.input-with-unit { position: relative; display: flex; align-items: center; }
+.input-with-unit .unit { position: absolute; right: 1rem; font-size: 0.875rem; font-weight: 600; color: #9ca3af; }
+.btn-secondary { background: #f9fafb; border: 1px solid #e5e7eb; padding: 0.6rem 1.25rem; border-radius: 8px; cursor: pointer; font-weight: 600; color: #374151; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
+
+@media (max-width: 1024px) {
+  .strategic-grid { grid-template-columns: 1fr; }
+  .main-dashboard-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .quick-actions-grid { 
+    grid-template-columns: 1fr 1fr; 
+    gap: 0.75rem; 
+  }
+  .action-card { 
+    height: auto; 
+    padding: 1rem; 
+  }
+  .action-icon { 
+    margin-bottom: 0.5rem; 
+  }
+  .kpi-grid { 
+    grid-template-columns: 1fr; 
+    gap: 1rem; 
+  }
+  
+  .kpi-card {
+    padding: 1.25rem;
+  }
+  
+  .kpi-value {
+    font-size: 1.5rem;
+  }
+  
+  .kpi-label {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .right-panel {
+    padding: 1rem;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .tasks-table th, .tasks-table td {
+    padding: 0.75rem 0.5rem;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .timeline-item {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .timeline-content {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .flux-legend { 
+    flex-wrap: wrap; 
+    gap: 0.5rem; 
+    margin-top: 1rem; 
+  }
+  
+  .budget-chart-container {
+    padding: 1rem;
+  }
 }
 </style>

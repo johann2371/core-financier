@@ -37,9 +37,13 @@ public class DecaissementServiceImpl implements IDecaissementService {
     private final DecaissementMapper decaissementMapper;
     private final IJournalAuditService journalAuditService;
     private final com.corefi.service.interfaces.INotificationService notificationService;
+    private final ParametrageRepository parametrageRepository;
 
-    // Seuil au-delà duquel l'approbation du PDG est requise (en XAF)
-    private static final BigDecimal SEUIL_PDG = new BigDecimal("500000");
+    private BigDecimal getSeuilPdg() {
+        return parametrageRepository.findByCle("SEUIL_APPROBATION_PDG")
+                .map(p -> new BigDecimal(p.getValeur()))
+                .orElse(new BigDecimal("500000"));
+    }
 
     // ────────────────────────────────────────────────────────────────────────
     // ÉTAPE 1 : COMPTABLE CRÉE LE DÉCAISSEMENT (statut → BROUILLON)
@@ -91,7 +95,7 @@ public class DecaissementServiceImpl implements IDecaissementService {
         decaissement.setCategorie(categorie);
 
         // Vérifier si le seuil PDG est atteint
-        decaissement.setSeuilPdgRequis(request.getMontant().compareTo(SEUIL_PDG) >= 0);
+        decaissement.setSeuilPdgRequis(request.getMontant().compareTo(getSeuilPdg()) >= 0);
 
         // Utilisateur connecté
         Utilisateur saisiPar = getUtilisateurConnecte();
@@ -399,6 +403,35 @@ public class DecaissementServiceImpl implements IDecaissementService {
             if (d.getFournisseur() != null) d.getFournisseur().getRaisonSociale();
         }
         return list.stream().map(decaissementMapper::toResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public DecaissementResponse updateStatut(Long id, String nouveauStatut, String commentaire) {
+        Decaissement d = trouverOuException(id);
+        StatutDecaissement ancienStatut = d.getStatut();
+        
+        if ("REJETE".equalsIgnoreCase(nouveauStatut) || "REJETEE".equalsIgnoreCase(nouveauStatut)) {
+            if (ancienStatut == StatutDecaissement.EN_ATTENTE || ancienStatut == StatutDecaissement.BROUILLON) {
+                ValidationRFRequest rfReq = new ValidationRFRequest();
+                rfReq.setRejeter(true);
+                rfReq.setMotif(commentaire != null ? commentaire : "Rejeté via interface");
+                return rejeterRF(id, rfReq);
+            } else if (ancienStatut == StatutDecaissement.EN_ATTENTE_PDG || ancienStatut == StatutDecaissement.VALIDEE_RF) {
+                ApprobationPDGRequest pdgReq = new ApprobationPDGRequest();
+                pdgReq.setRejeter(true);
+                pdgReq.setMotif(commentaire != null ? commentaire : "Rejeté par la direction");
+                return rejeterPDG(id, pdgReq);
+            } else {
+                throw new com.corefi.exception.WorkflowException("Impossible de rejeter un décaissement avec le statut actuel : " + ancienStatut);
+            }
+        } else if ("ANNULEE".equalsIgnoreCase(nouveauStatut)) {
+            d.setStatut(StatutDecaissement.ANNULEE);
+            Decaissement saved = decaissementRepository.save(d);
+            return decaissementMapper.toResponse(saved);
+        }
+
+        throw new com.corefi.exception.WorkflowException("Action de mise à jour de statut non supportée : " + nouveauStatut);
     }
 
     // ────────────────────────────────────────────────────────────────────────

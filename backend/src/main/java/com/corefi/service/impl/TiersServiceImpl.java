@@ -52,6 +52,8 @@ public class TiersServiceImpl implements ITiersService {
         if (type == TypeTiers.CLIENT) {
             Client client = new Client();
             client.setTypeClient(request.getTypeClient() != null ? request.getTypeClient() : "ENTREPRISE");
+            client.setCni(request.getCni());
+            client.setPhotoUrl(request.getPhotoUrl());
             if (request.getCreditLimite() != null)
                 client.setCreditLimite(java.math.BigDecimal.valueOf(request.getCreditLimite()));
             if (request.getDelaiPaiement() != null)
@@ -73,6 +75,8 @@ public class TiersServiceImpl implements ITiersService {
         tiers.setAdresse(request.getAdresse());
         tiers.setVille(request.getVille());
         tiers.setPays(request.getPays() != null ? request.getPays() : "Cameroun");
+        tiers.setNui(request.getNui());
+        tiers.setRccm(request.getRccm());
         tiers.setActif(true);
 
         // 5. Sauvegarder
@@ -143,7 +147,12 @@ public class TiersServiceImpl implements ITiersService {
         tiers.setPays(request.getPays());
 
         // Mise à jour des champs spécifiques
+        tiers.setNui(request.getNui());
+        tiers.setRccm(request.getRccm());
+
         if (tiers instanceof Client client) {
+            client.setCni(request.getCni());
+            client.setPhotoUrl(request.getPhotoUrl());
             if (request.getCreditLimite() != null)
                 client.setCreditLimite(java.math.BigDecimal.valueOf(request.getCreditLimite()));
             if (request.getDelaiPaiement() != null)

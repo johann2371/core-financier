@@ -45,6 +45,15 @@ public class DecaissementController {
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
+    @PutMapping("/{id}/statut")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'RESPONSABLE_FINANCIER', 'PDG')")
+    public ResponseEntity<DecaissementResponse> updateStatut(
+            @PathVariable Long id,
+            @RequestParam String statut,
+            @RequestParam(required = false) String commentaire) {
+        return ResponseEntity.ok(decaissementService.updateStatut(id, statut, commentaire));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'COMPTABLE', 'RESPONSABLE_FINANCIER', 'PDG', 'CAISSIER')")
     public ResponseEntity<List<DecaissementResponse>> findAll() {

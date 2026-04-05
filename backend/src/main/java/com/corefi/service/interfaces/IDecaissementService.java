@@ -22,4 +22,6 @@ public interface IDecaissementService {
     DecaissementResponse rejeterPDG(Long id, ApprobationPDGRequest request);
 
     DecaissementResponse executer(Long id, ExecutionCaissierRequest request);
+    
+    DecaissementResponse updateStatut(Long id, String nouveauStatut, String commentaire);
 }

@@ -40,6 +40,23 @@ export const useTierStore = defineStore('tier', {
       } finally {
         this.loading = false
       }
+    },
+
+    async uploadTierPhoto(formData) {
+      this.loading = true
+      try {
+        const response = await api.post('/tiers/upload-photo', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        return response.data
+      } catch (err) {
+        this.error = err.response?.data?.error || 'Erreur lors de l upload de la photo'
+        throw err
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

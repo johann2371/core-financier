@@ -14,12 +14,16 @@ public class TiersResponse {
     private String adresse;
     private String ville;
     private String pays;
-    private BigDecimal solde; // Changed type from Double to BigDecimal
-    private BigDecimal totalDette; // Added new field
-    private boolean actif; // Reordered
+    private BigDecimal solde;
+    private BigDecimal totalDette;
+    private String nui;
+    private String rccm;
+    private boolean actif;
 
     // Champs spécifiques CLIENT
     private String typeClient;
+    private String cni;
+    private String photoUrl;
     private Double creditLimite;
     private Integer delaiPaiement;
 

@@ -59,16 +59,18 @@ const itemsPerPage = 8
 
 // Filtres
 const filters = ref({
-  search: '', // Motif, Beneficiaire, TXN
-  fournisseurId: '',
+  search: '',
   statut: '',
-  dateDebut: '',
+  fournisseurId: '',
   dateDebut: '',
   dateFin: ''
 })
+const showMobileFilters = ref(false)
 const showMyTasksOnly = ref(false)
 
 const isRF = computed(() => authStore.userRole === 'RESPONSABLE_FINANCIER' || authStore.userRole === 'ADMINISTRATEUR')
+const isPDG = computed(() => authStore.userRole === 'PDG')
+const isAdmin = computed(() => authStore.userRole === 'ADMINISTRATEUR')
 
 const resetFilters = () => {
   filters.value = { search: '', fournisseurId: '', statut: '', dateDebut: '', dateFin: '' }
@@ -82,8 +84,12 @@ watch(filters, () => {
 const filteredDecaissements = computed(() => {
   let list = store.decaissements
 
-  if (showMyTasksOnly.value && isRF.value) {
-    list = list.filter(d => d.statut === 'EN_ATTENTE' || d.statut === 'SOUMIS')
+  if (showMyTasksOnly.value) {
+    if (isRF.value) {
+      list = list.filter(d => d.statut === 'EN_ATTENTE' || d.statut === 'SOUMIS')
+    } else if (isPDG.value) {
+      list = list.filter(d => d.statut === 'EN_ATTENTE_PDG' || d.statut === 'VALIDEE_RF')
+    }
   }
   
   if (filters.value.search) {
@@ -124,7 +130,7 @@ const defaultCreateForm = { motif: '', montant: '', fournisseurId: '', beneficia
 const createForm = ref({ ...defaultCreateForm })
 const rejectForm = ref({ reason: 'missing_docs', comments: '' })
 const approveForm = ref({ checks: [false, false, false, false] })
-const executeForm = ref({ compteFinancierId: 1 })
+const executeForm = ref({ compteFinancierId: null, moyenPaiement: '', referenceExecution: '' })
 const uploadFiles = ref([])
 
 // Catégories de décaissement
@@ -217,7 +223,8 @@ onMounted(async () => {
 
 const availableComptes = computed(() => {
   if (!activeDecaissement.value) return []
-  if (activeDecaissement.value.moyenPaiement === 'ESPECES') {
+  const currentMoyen = executeForm.value.moyenPaiement || activeDecaissement.value.moyenPaiement
+  if (currentMoyen === 'ESPECES') {
     return compteStore.caisses
   } else {
     return compteStore.banques
@@ -227,6 +234,19 @@ const availableComptes = computed(() => {
 
 const submitCreate = async () => {
   formError.value = ''
+  if (!createForm.value.montant || createForm.value.montant <= 0) {
+    formError.value = "Veuillez renseigner un montant valide."
+    return
+  }
+  if (createForm.value.categorie === 'PAIEMENT_FOURNISSEUR' && !createForm.value.fournisseurId) {
+    formError.value = "Veuillez sélectionner un Fournisseur."
+    return
+  }
+  if (createForm.value.categorie !== 'PAIEMENT_FOURNISSEUR' && !createForm.value.beneficiaire) {
+    formError.value = "Veuillez saisir le nom exact du Bénéficiaire."
+    return
+  }
+  
   try {
     // Bénéficiaire selon la catégorie
     let beneficiaireStr = createForm.value.beneficiaire || ''
@@ -292,6 +312,11 @@ const openReject = (item) => {
 }
 
 const submitApprove = async () => {
+  formError.value = ''
+  if (!approveForm.value.checks.every(c => c)) {
+    formError.value = "Veuillez vérifier et cocher l'ensemble des points de contrôle avant d'approuver le document."
+    return
+  }
   try {
     if (activeDecaissement.value.statut === 'EN_ATTENTE' || activeDecaissement.value.statut === 'SOUMIS') {
       await store.validerRF(activeDecaissement.value.id, { checks: approveForm.value.checks })
@@ -309,14 +334,25 @@ const submitApprove = async () => {
 const openExecute = (item) => {
   activeDecaissement.value = item
   const list = item.moyenPaiement === 'ESPECES' ? compteStore.caisses : compteStore.banques
-  executeForm.value.compteFinancierId = list.length > 0 ? list[0].id : null
+  executeForm.value = {
+    compteFinancierId: list.length > 0 ? list[0].id : null,
+    moyenPaiement: item.moyenPaiement || 'VIREMENT',
+    referenceExecution: ''
+  }
   showExecuteModal.value = true
 }
 
 const submitExecute = async () => {
+  formError.value = ''
+  if (!executeForm.value.compteFinancierId) {
+    formError.value = "Veuillez sélectionner le compte financier expéditeur (Banque/Caisse)."
+    return
+  }
   try {
     await store.executer(activeDecaissement.value.id, { 
-      compteFinancierId: executeForm.value.compteFinancierId 
+      compteFinancierId: executeForm.value.compteFinancierId,
+      moyenPaiement: executeForm.value.moyenPaiement,
+      referenceExecution: executeForm.value.referenceExecution
     })
     showExecuteModal.value = false
   } catch(e) {
@@ -326,6 +362,11 @@ const submitExecute = async () => {
 }
 
 const submitReject = async () => {
+  formError.value = ''
+  if (rejectForm.value.comments.length < 20) {
+    formError.value = "Le motif de rejet doit comporter au moins 20 caractères pour être justifié."
+    return
+  }
   try {
     const comment = `Raison: ${rejectForm.value.reason}. ${rejectForm.value.comments}`
     await store.updateStatut(activeDecaissement.value.id, 'REJETE', comment)
@@ -368,14 +409,26 @@ const selectedCompteBalance = computed(() => {
     <template #title>Décaissements</template>
 
     <template #actions>
-      <button @click="showCreateModal = true" class="btn-primary">
+      <button class="icon-btn show-on-mobile" @click="showMobileFilters = !showMobileFilters" title="Filtrer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+      </button>
+      <button @click="showCreateModal = true" class="btn-primary hide-on-mobile">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        Nouvelle Demande
+        Nouvel Décaissement
       </button>
     </template>
 
+    <div class="show-on-mobile w-100" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+      <button @click="showCreateModal = true" class="btn-primary w-100" style="justify-content: center; padding: 0.75rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        Nouvel Décaissement
+      </button>
+    </div>
+
     <!-- Barre de Filtres -->
-    <div class="filter-bar">
+    <div class="filter-bar" :class="{ 'mobile-collapsed': !showMobileFilters }">
       <div class="filter-group group-search">
         <div class="input-with-icon-left">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -383,10 +436,10 @@ const selectedCompteBalance = computed(() => {
         </div>
       </div>
 
-      <div class="filter-group" v-if="isRF">
+      <div class="filter-group" v-if="isRF || isPDG">
         <button @click="showMyTasksOnly = !showMyTasksOnly" class="btn-toggle-tasks" :class="{ active: showMyTasksOnly }">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-          Mes dossiers à valider
+          {{ isPDG ? 'Mes signatures en attente' : 'Mes dossiers à valider' }}
         </button>
       </div>
       
@@ -469,7 +522,7 @@ const selectedCompteBalance = computed(() => {
               </td>
               <td class="text-center">
                 <div class="actions-cell">
-                  <template v-if="item.statut === 'SOUMIS' || item.statut === 'EN_ATTENTE'">
+                  <template v-if="(item.statut === 'SOUMIS' || item.statut === 'EN_ATTENTE') && (isRF || isAdmin)">
                     <button class="btn-icon text-green" @click="openApprove(item)" title="Valider (RF)">
                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </button>
@@ -478,9 +531,14 @@ const selectedCompteBalance = computed(() => {
                     </button>
                   </template>
 
-                  <button v-if="item.statut === 'VALIDEE_RF' && (authStore.userRole === 'PDG' || authStore.userRole === 'ADMINISTRATEUR')" @click="openApprove(item)" class="icon-btn text-green" title="Approuver (PDG)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  </button>
+                  <template v-if="(item.statut === 'VALIDEE_RF' || item.statut === 'EN_ATTENTE_PDG') && (isPDG || isAdmin)">
+                    <button class="btn-icon text-green" @click="openApprove(item)" title="Approuver (PDG)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </button>
+                    <button class="btn-icon text-red" @click="openReject(item)" title="Rejeter">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </template>
 
                   <button v-if="(item.statut === 'VALIDEE_PDG' || (item.statut === 'VALIDEE_RF' && item.montant < 500000)) && (authStore.userRole === 'CAISSIER' || authStore.userRole === 'ADMINISTRATEUR')" @click="openExecute(item)" class="icon-btn text-blue" title="Exécuter Paiement">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-3-3.87"></path><path d="M1 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 7l-7 7-3-3"></path></svg>
@@ -690,7 +748,7 @@ const selectedCompteBalance = computed(() => {
         
         <div class="modal-footer bottom-bar">
           <button type="button" class="btn-text" @click="showCreateModal = false">Annuler</button>
-          <button type="submit" form="create-decaissement-form" class="btn-primary-large" :disabled="!createForm.montant || (createForm.categorie === 'PAIEMENT_FOURNISSEUR' && !createForm.fournisseurId) || (createForm.categorie !== 'PAIEMENT_FOURNISSEUR' && !createForm.beneficiaire)">
+          <button type="submit" form="create-decaissement-form" class="btn-primary-large">
             Soumettre Demande
           </button>
         </div>
@@ -708,6 +766,12 @@ const selectedCompteBalance = computed(() => {
             <h3>Confirmer le Décaissement</h3>
             <span>Validation de sécurité requise pour la transaction #{{ activeDecaissement?.numero }}</span>
           </div>
+        </div>
+
+        <div v-if="formError" class="form-error-banner" style="margin: 1rem 1.5rem 0;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <span>{{ formError }}</span>
+          <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
         </div>
 
         <div class="checklist-section">
@@ -772,7 +836,7 @@ const selectedCompteBalance = computed(() => {
 
         <div class="approve-footer">
           <button @click="showApproveModal = false" class="btn-outline-wide">Annuler la demande</button>
-          <button @click="submitApprove" class="btn-confirm-execute" :disabled="!approveForm.checks.every(c => c) && (activeDecaissement?.statut === 'EN_ATTENTE' || activeDecaissement?.statut === 'SOUMIS')">
+          <button @click="submitApprove" class="btn-confirm-execute">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
             Confirmer la Validation
           </button>
@@ -793,18 +857,40 @@ const selectedCompteBalance = computed(() => {
           </div>
         </div>
 
+        <div v-if="formError" class="form-error-banner" style="margin: 1rem 1.5rem 0;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <span>{{ formError }}</span>
+          <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
+        </div>
+
         <div class="modal-body" style="padding: 0;">
           <div class="form-group">
             <label>Compte Financier <span class="req">*</span></label>
             <select v-model="executeForm.compteFinancierId" class="input-std" required>
-              <option value="" disabled>Choisir un compte...</option>
+              <option :value="null" disabled>Choisir un compte...</option>
               <option v-for="c in availableComptes" :key="c.id" :value="c.id">
-                {{ c.type === 'CAISSE' ? 'Compte de Caisse' : 'Compte de Banque' }}
+                {{ c.nom }} ({{ c.type === 'CAISSE' ? 'Caisse' : 'Banque' }}) - {{ c.solde.toLocaleString() }} XAF
               </option>
             </select>
             <div v-if="availableComptes.length === 0" class="alert-box alert-error">
                Aucun compte compatible trouvé.
             </div>
+          </div>
+
+          <div class="form-group mt-3">
+            <label>Moyen de Paiement <span class="req">*</span></label>
+            <select v-model="executeForm.moyenPaiement" class="input-std" required>
+              <option value="ESPECES">Espèces</option>
+              <option value="CHEQUE">Chèque</option>
+              <option value="VIREMENT">Virement Bancaire</option>
+              <option value="CARTE_BANCAIRE">Carte Bancaire</option>
+              <option value="ORANGE_MONEY">Mobile Money</option>
+            </select>
+          </div>
+
+          <div class="form-group mt-3">
+            <label>Référence / N° de Pièce</label>
+            <input type="text" v-model="executeForm.referenceExecution" class="input-std" placeholder="Ex: N° Chèque, Réf Virement..." />
           </div>
 
           <div class="balance-calc-box">
@@ -830,7 +916,7 @@ const selectedCompteBalance = computed(() => {
 
         <div class="approve-footer">
           <button @click="showExecuteModal = false" class="btn-outline-wide">Annuler</button>
-          <button @click="submitExecute" class="btn-confirm-execute" style="background: #2563eb;" :disabled="!executeForm.compteFinancierId">
+          <button @click="submitExecute" class="btn-confirm-execute" style="background: #2563eb;">
             Confirmer le Paiement
           </button>
         </div>
@@ -849,6 +935,12 @@ const selectedCompteBalance = computed(() => {
             <h3>Rejeter le Décaissement</h3>
             <span>Transaction ID: {{ activeDecaissement?.numero }}</span>
           </div>
+        </div>
+
+        <div v-if="formError" class="form-error-banner" style="margin: 1rem 1.5rem 0;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <span>{{ formError }}</span>
+          <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
         </div>
 
         <div class="radios-section">
@@ -902,7 +994,7 @@ const selectedCompteBalance = computed(() => {
 
         <div class="approve-footer border-none">
           <button @click="showRejectModal = false" class="btn-text font-semibold">Retour</button>
-          <button @click="submitReject" class="btn-danger-solid" :disabled="rejectForm.comments.length < 20">Confirmer le Rejet</button>
+          <button @click="submitReject" class="btn-danger-solid">Confirmer le Rejet</button>
         </div>
       </div>
     </div>
@@ -1250,5 +1342,34 @@ textarea.input-std { resize: vertical; min-height: 80px; }
   width: 100%;
   height: 100%;
   border: none;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 768px) {
+  .modal, .modal-lg, .modal-approve, .modal-reject {
+    width: 95vw;
+    margin: 1rem;
+    max-height: 95vh;
+  }
+  .modal-split {
+    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+  .payment-modes, .category-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-left, .modal-right {
+    padding: 1.5rem 1rem;
+  }
+  .form-row {
+    flex-direction: column;
+  }
+  .actions-cell {
+    flex-wrap: wrap;
+  }
+  .justif-name {
+    max-width: 150px;
+  }
 }
 </style>

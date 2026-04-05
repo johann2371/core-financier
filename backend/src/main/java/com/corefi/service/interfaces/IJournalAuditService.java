@@ -8,5 +8,5 @@ public interface IJournalAuditService {
     void enregistrer(String action, String entite, Long entiteId,
             String anciennesValeurs, String nouvellesValeurs, String adresseIp);
 
-    Page<JournalAudit> findAll(Pageable pageable);
+    Page<JournalAudit> findAll(String search, String action, Pageable pageable);
 }
