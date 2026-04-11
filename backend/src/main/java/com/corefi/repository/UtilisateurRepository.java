@@ -10,4 +10,6 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     boolean existsByEmail(String email);
 
     java.util.List<Utilisateur> findByRole(com.corefi.enums.Role role);
+
+    java.util.List<Utilisateur> findByNomContainingIgnoreCaseOrPrenomContainingIgnoreCaseOrEmailContainingIgnoreCase(String nom, String prenom, String email);
 }

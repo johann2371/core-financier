@@ -115,7 +115,7 @@ public class DecaissementServiceImpl implements IDecaissementService {
         // Notification immédiate pour le RF
         notificationService.creerEtEnvoyer(
                 "Nouveau décaissement à valider",
-                "Un nouveau décaissement " + saved.getNumero() + " de " + saved.getMontant() + " XAF a été créé et attend votre validation.",
+                saisiPar.getPrenom() + " " + saisiPar.getNom() + " a soumis une demande de décaissement " + saved.getNumero() + " — " + saved.getMontant() + " XAF.",
                 "RESPONSABLE_FINANCIER");
 
         // Notification au PDG (visibilité sur tous les décaissements)
@@ -186,12 +186,12 @@ public class DecaissementServiceImpl implements IDecaissementService {
         if (d.isSeuilPdgRequis()) {
             notificationService.creerEtEnvoyer(
                 "Approbation requise",
-                "Le décaissement " + d.getNumero() + " (" + d.getMontant() + " XAF) nécessite votre approbation PDG.",
+                validePar.getPrenom() + " " + validePar.getNom() + " a validé le décaissement " + d.getNumero() + " (" + d.getMontant() + " XAF). Votre approbation PDG est requise.",
                 "PDG");
         } else {
             notificationService.creerEtEnvoyer(
                 "Paiement à exécuter",
-                "Le décaissement " + d.getNumero() + " a été validé et attend votre exécution en caisse.",
+                validePar.getPrenom() + " " + validePar.getNom() + " a validé le décaissement " + d.getNumero() + ". Prêt pour exécution.",
                 "CAISSIER");
         }
 
@@ -375,8 +375,13 @@ public class DecaissementServiceImpl implements IDecaissementService {
 
         journalAuditService.enregistrer("UPDATE", "Decaissement", id,
                 "statut=" + (d.isSeuilPdgRequis() ? "VALIDEE_PDG" : "VALIDEE_RF"),
-                "statut=EXECUTEE — " + d.getMontant() + " XAF via " + d.getMoyenPaiement(),
+                "statut=EXECUTEE — " + d.getMontant() + " XAF via " + d.getMoyenPaiement() + " #" + d.getNumero(),
                 null);
+
+        notificationService.creerEtEnvoyer(
+                "Paiement exécuté",
+                d.getExecutePar().getPrenom() + " " + d.getExecutePar().getNom() + " a exécuté le paiement #" + d.getNumero() + " — " + d.getMontant() + " XAF.",
+                "COMPTABLE");
 
         return decaissementMapper.toResponse(saved);
     }

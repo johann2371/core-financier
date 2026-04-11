@@ -12,4 +12,6 @@ public interface TiersRepository extends JpaRepository<Tiers, Long> {
     List<Tiers> findByType(TypeTiers type);
 
     boolean existsByCode(String code);
+
+    List<Tiers> findByRaisonSocialeContainingIgnoreCaseOrCodeContainingIgnoreCase(String raisonSociale, String code);
 }

@@ -250,6 +250,10 @@ onMounted(() => {
               <div v-if="searchStore.loading" class="search-loading">
                 <div class="spinner-small"></div> Chargement...
               </div>
+              <div v-else-if="searchStore.error" class="search-error">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                {{ searchStore.error }}
+              </div>
               <div v-else-if="searchStore.results.length === 0" class="search-empty">
                 Aucun résultat pour "{{ searchStore.query }}"
               </div>
@@ -1064,11 +1068,23 @@ onMounted(() => {
   border-color: #334155;
   box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);
 }
-.search-loading, .search-empty {
+.search-loading, .search-empty, .search-error {
   padding: 1rem;
   text-align: center;
   color: #64748b;
   font-size: 0.875rem;
+}
+.search-error {
+  color: #ef4444;
+  background: #fef2f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.dark-mode .search-error {
+  background: #450a0a;
+  color: #fca5a5;
 }
 .search-result-item {
   display: flex;

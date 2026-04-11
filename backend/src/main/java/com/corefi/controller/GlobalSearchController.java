@@ -20,7 +20,7 @@ public class GlobalSearchController {
     private final IGlobalSearchService globalSearchService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @PreAuthorize("hasAuthority('ADMINISTRATEUR')")
     public ResponseEntity<List<SearchResultDTO>> search(@RequestParam("q") String query) {
         return ResponseEntity.ok(globalSearchService.search(query));
     }

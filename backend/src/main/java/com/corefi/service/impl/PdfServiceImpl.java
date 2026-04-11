@@ -3,6 +3,7 @@ package com.corefi.service.impl;
 import com.corefi.entity.Encaissement;
 import com.corefi.entity.Facture;
 import com.corefi.entity.LigneFacture;
+import com.corefi.entity.Parametrage;
 import com.corefi.entity.Tiers;
 import com.corefi.exception.ResourceNotFoundException;
 import com.corefi.exception.WorkflowException;
@@ -10,6 +11,7 @@ import com.corefi.entity.Decaissement;
 import com.corefi.repository.EncaissementRepository;
 import com.corefi.repository.DecaissementRepository;
 import com.corefi.repository.FactureRepository;
+import com.corefi.repository.ParametrageRepository;
 import com.corefi.service.interfaces.IPdfService;
 import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.PdfPCell;
@@ -29,6 +31,13 @@ public class PdfServiceImpl implements IPdfService {
     private final FactureRepository factureRepository;
     private final EncaissementRepository encaissementRepository;
     private final DecaissementRepository decaissementRepository;
+    private final ParametrageRepository parametrageRepository;
+
+    private String getNomSociete() {
+        return parametrageRepository.findByCle("INFO_SOCIETE_NOM")
+                .map(Parametrage::getValeur)
+                .orElse("SODICA SARL");
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -58,7 +67,7 @@ public class PdfServiceImpl implements IPdfService {
 
             // En-tête de l'entreprise (SODICA SARL)
             Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
-            Paragraph titreApp = new Paragraph("SODICA SARL", fontTitre);
+            Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
             titreApp.setAlignment(Element.ALIGN_CENTER);
             document.add(titreApp);
 
@@ -180,7 +189,7 @@ public class PdfServiceImpl implements IPdfService {
 
             // En-tête
             Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
-            Paragraph titreApp = new Paragraph("SODICA SARL", fontTitre);
+            Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
             titreApp.setAlignment(Element.ALIGN_CENTER);
             document.add(titreApp);
 
@@ -274,7 +283,7 @@ public class PdfServiceImpl implements IPdfService {
 
             // En-tête
             Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
-            Paragraph titreApp = new Paragraph("SODICA SARL", fontTitre);
+            Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
             titreApp.setAlignment(Element.ALIGN_CENTER);
             document.add(titreApp);
             document.add(new Paragraph(" ")); 

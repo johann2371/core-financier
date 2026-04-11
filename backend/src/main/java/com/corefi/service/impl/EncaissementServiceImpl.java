@@ -125,7 +125,7 @@ public class EncaissementServiceImpl implements IEncaissementService {
         // 10. Notification
         notificationService.creerEtEnvoyer(
                 "Nouvel encaissement reçu",
-                "Un encaissement de " + saved.getMontant() + " XAF (" + saved.getNumero() + ") a été enregistré pour le client " + client.getRaisonSociale() + ".",
+                saisiPar.getPrenom() + " " + saisiPar.getNom() + " a enregistré un encaissement — " + saved.getMontant() + " FCFA pour le client " + client.getRaisonSociale() + ".",
                 "RESPONSABLE_FINANCIER");
 
         return encaissementMapper.toResponse(saved);

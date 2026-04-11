@@ -3,23 +3,58 @@ import { ref, onMounted, computed } from 'vue'
 import MainLayout from '../components/MainLayout.vue'
 import { useParametrageStore } from '../stores/parametrage.store'
 import { useAuthStore } from '../stores/auth.store'
+import api from '../services/api'
 
 const authStore = useAuthStore()
 const parametrageStore = useParametrageStore()
 
-const isPDG = computed(() => authStore.userRole === 'PDG')
 const isAdmin = computed(() => authStore.userRole === 'ADMINISTRATEUR')
 
 onMounted(() => {
   parametrageStore.fetchParametres()
 })
 
+const activeTab = ref('IDENTITE')
+const categories = [
+  { id: 'IDENTITE', label: 'Identite & Logo', icon: '🏢', desc: 'Logo, nom et coordonnees de la societe.' },
+  { id: 'FINANCE', label: 'Gestion Financiere', icon: '💰', desc: 'Seuils, devises et alertes financieres.' },
+  { id: 'SECURITE', label: 'Securite & Acces', icon: '🔐', desc: 'Sessions, tentatives et blocages.' },
+  { id: 'SYSTEME', label: 'Systeme', icon: '⚙️', desc: 'Version, notifications et options techniques.' }
+]
+
+const getCategory = (cle) => {
+  const c = cle.toUpperCase()
+  if (c.includes('INFO_SOCIETE') || c.includes('LOGO')) return 'IDENTITE'
+  if (c.includes('SEUIL') || c.includes('MONTANT') || c.includes('DEVISE') || c.includes('APPROBATION') || c.includes('PIECE')) return 'FINANCE'
+  if (c.includes('TENTATIV') || c.includes('BLOCAGE') || c.includes('SESSION') || c.includes('DUREE_SESSION')) return 'SECURITE'
+  return 'SYSTEME'
+}
+
+const filteredParametres = computed(() => {
+  return (parametrageStore.parametres || []).filter(p => getCategory(p.cle) === activeTab.value)
+})
+
+const getParamIcon = (cle) => {
+  const c = cle.toUpperCase()
+  if (c.includes('SEUIL') || c.includes('MONTANT')) return 'dollar'
+  if (c.includes('DEVISE')) return 'currency'
+  if (c.includes('TENTATIV') || c.includes('BLOCAGE')) return 'lock'
+  if (c.includes('SESSION') || c.includes('DUREE')) return 'clock'
+  if (c.includes('SOCIETE_NOM')) return 'building'
+  if (c.includes('SOCIETE_ADRESSE')) return 'map'
+  if (c.includes('SOCIETE_TEL')) return 'phone'
+  if (c.includes('SOCIETE_EMAIL')) return 'mail'
+  if (c.includes('LOGO')) return 'image'
+  if (c.includes('NOTIF')) return 'bell'
+  if (c.includes('VERSION')) return 'tag'
+  return 'settings'
+}
+
 // === GESTION CONFIGURATION ===
 const editConfigMode = ref(null)
 const editConfigValue = ref('')
 
 const startEditConfig = (param) => {
-  if (isPDG.value && param.cle !== 'SEUIL_APPROBATION_PDG') return;
   editConfigMode.value = param.cle
   editConfigValue.value = param.valeur
 }
@@ -34,73 +69,727 @@ const saveConfig = async (param) => {
 }
 
 const cancelEditConfig = () => { editConfigMode.value = null }
+
+// === GESTION LOGOS ===
+const uploadingLogo = ref(null) // 'app' ou 'invoice'
+
+const getLogoUrl = (type) => {
+  const cle = type === 'app' ? 'APP_LOGO_URL' : 'INVOICE_LOGO_URL'
+  const param = (parametrageStore.parametres || []).find(p => p.cle === cle)
+  return param?.valeur || ''
+}
+
+const triggerLogoUpload = (type) => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/png,image/jpeg,image/svg+xml'
+  input.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    uploadingLogo.value = type
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      await api.post(`/parametrage/logo/${type}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      await parametrageStore.fetchParametres()
+    } catch (err) {
+      console.error('Erreur upload logo:', err)
+    } finally {
+      uploadingLogo.value = null
+    }
+  }
+  input.click()
+}
+
+const isLogoParam = (cle) => cle.includes('LOGO_URL')
+const isReadOnly = (cle) => cle === 'APP_VERSION'
 </script>
 
 <template>
   <MainLayout>
-    <template #title>Paramètres</template>
-    <template #subtitle>Configuration globale du système.</template>
+    <template #title>Parametres Systeme</template>
+    <template #subtitle>Configuration globale, identite visuelle, seuils d'approbation et regles metier.</template>
 
-    <div class="settings-container">
-
-      <div v-if="parametrageStore.error" class="error-banner mb-4">{{ parametrageStore.error }}</div>
-
-      <div class="feature-card config-list">
-        <div class="config-header">Variables Environnement & Métier</div>
-        
-        <div v-for="param in parametrageStore.parametres" :key="param.cle" class="config-item">
-          <div class="config-info">
-            <strong class="config-key">{{ param.cle }}</strong>
-            <span class="config-desc">{{ param.description || 'Paramètre système interne.' }}</span>
-          </div>
-          
-          <div class="config-action">
-            <template v-if="editConfigMode === param.cle">
-              <input v-model="editConfigValue" type="text" class="config-input" />
-              <button @click="saveConfig(param)" class="btn-primary sm-btn">Sauver</button>
-              <button @click="cancelEditConfig" class="btn-outline sm-btn">Annuler</button>
-            </template>
-            <template v-else>
-              <span class="config-val">{{ param.valeur }}</span>
-              <button 
-                v-if="isAdmin || (isPDG && param.cle === 'SEUIL_APPROBATION_PDG')" 
-                @click="startEditConfig(param)" 
-                class="btn-outline sm-btn"
-              >Modifier</button>
-            </template>
+    <div class="settings-layout">
+      
+      <!-- SIDEBAR NAVIGATION -->
+      <aside class="settings-sidebar">
+        <div class="sidebar-info">
+          <div class="sidebar-icon">⚙️</div>
+          <div class="sidebar-text">
+            <h3>Configuration</h3>
+            <p>Gerez les reglages du systeme</p>
           </div>
         </div>
-      </div>
+        
+        <nav class="settings-nav">
+          <button 
+            v-for="cat in categories" 
+            :key="cat.id"
+            @click="activeTab = cat.id"
+            class="nav-item"
+            :class="{ active: activeTab === cat.id }"
+          >
+            <span class="nav-icon">{{ cat.icon }}</span>
+            <span class="nav-label">{{ cat.label }}</span>
+            <div v-if="activeTab === cat.id" class="nav-active-indicator"></div>
+          </button>
+        </nav>
+      </aside>
 
+      <!-- MAIN CONTENT AREA -->
+      <main class="settings-content">
+        <div v-if="parametrageStore.error" class="error-banner">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <span>{{ parametrageStore.error }}</span>
+        </div>
+
+        <div class="content-header">
+          <h2>{{ categories.find(c => c.id === activeTab)?.label }}</h2>
+          <p>{{ categories.find(c => c.id === activeTab)?.desc }}</p>
+        </div>
+
+        <!-- ======= SECTION IDENTITÉ & LOGOS ======= -->
+        <div v-if="activeTab === 'IDENTITE'" class="identity-section">
+          <!-- Logo Management Cards -->
+          <div class="logo-cards-row">
+            <div class="logo-card">
+              <div class="logo-card-header">
+                <h4>Logo Principal</h4>
+                <span class="logo-hint">Affiche dans la barre laterale et l'en-tete</span>
+              </div>
+              <div class="logo-preview-area" @click="triggerLogoUpload('app')">
+                <img v-if="getLogoUrl('app')" :src="getLogoUrl('app')" alt="Logo principal" class="logo-preview-img" />
+                <div v-else class="logo-placeholder">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                  <span>Cliquer pour uploader</span>
+                </div>
+                <div v-if="uploadingLogo === 'app'" class="logo-uploading">
+                  <div class="spinner"></div>
+                </div>
+              </div>
+              <button class="btn-upload" @click="triggerLogoUpload('app')" :disabled="uploadingLogo === 'app'">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                {{ uploadingLogo === 'app' ? 'Envoi...' : 'Changer le logo' }}
+              </button>
+            </div>
+
+            <div class="logo-card">
+              <div class="logo-card-header">
+                <h4>Logo Facture</h4>
+                <span class="logo-hint">Utilise sur les factures et recus PDF</span>
+              </div>
+              <div class="logo-preview-area" @click="triggerLogoUpload('invoice')">
+                <img v-if="getLogoUrl('invoice')" :src="getLogoUrl('invoice')" alt="Logo facture" class="logo-preview-img" />
+                <div v-else class="logo-placeholder">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5"/></svg>
+                  <span>Cliquer pour uploader</span>
+                </div>
+                <div v-if="uploadingLogo === 'invoice'" class="logo-uploading">
+                  <div class="spinner"></div>
+                </div>
+              </div>
+              <button class="btn-upload" @click="triggerLogoUpload('invoice')" :disabled="uploadingLogo === 'invoice'">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                {{ uploadingLogo === 'invoice' ? 'Envoi...' : 'Changer le logo' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Society info params below logos -->
+          <div class="section-divider">
+            <span>Coordonnees de la societe</span>
+          </div>
+        </div>
+
+        <!-- ======= PARAMS GRID ======= -->
+        <div class="params-grid">
+          <div 
+            v-for="param in filteredParametres" 
+            :key="param.cle"
+            class="param-card"
+            :class="{ editing: editConfigMode === param.cle, readonly: isReadOnly(param.cle) }"
+            v-show="!isLogoParam(param.cle)"
+          >
+            <div class="param-card-icon" :class="'icon-' + getParamIcon(param.cle)">
+              <!-- DOLLAR -->
+              <svg v-if="getParamIcon(param.cle)==='dollar'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              <!-- LOCK -->
+              <svg v-else-if="getParamIcon(param.cle)==='lock'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <!-- CLOCK -->
+              <svg v-else-if="getParamIcon(param.cle)==='clock'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <!-- BUILDING -->
+              <svg v-else-if="getParamIcon(param.cle)==='building'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><line x1="8" y1="6" x2="8" y2="6"></line><line x1="12" y1="6" x2="12" y2="6"></line><line x1="16" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="8" y2="10"></line><line x1="12" y1="10" x2="12" y2="10"></line><line x1="16" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="8" y2="14"></line><line x1="12" y1="14" x2="12" y2="14"></line><line x1="16" y1="14" x2="16" y2="14"></line></svg>
+              <!-- MAP -->
+              <svg v-else-if="getParamIcon(param.cle)==='map'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+              <!-- PHONE -->
+              <svg v-else-if="getParamIcon(param.cle)==='phone'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+              <!-- MAIL -->
+              <svg v-else-if="getParamIcon(param.cle)==='mail'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              <!-- BELL -->
+              <svg v-else-if="getParamIcon(param.cle)==='bell'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              <!-- TAG -->
+              <svg v-else-if="getParamIcon(param.cle)==='tag'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+              <!-- CURRENCY -->
+              <svg v-else-if="getParamIcon(param.cle)==='currency'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              <!-- DEFAULT SETTINGS -->
+              <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </div>
+            
+            <div class="param-card-body">
+              <div class="param-header">
+                <div class="param-title">
+                  <span class="param-key">{{ param.cle.replace(/_/g, ' ') }}</span>
+                  <span class="param-desc">{{ param.description || 'Parametre systeme interne.' }}</span>
+                </div>
+              </div>
+
+              <div class="param-control">
+                <template v-if="editConfigMode === param.cle">
+                  <div class="edit-group">
+                    <input 
+                      v-model="editConfigValue" 
+                      type="text" 
+                      class="premium-input" 
+                      placeholder="Nouvelle valeur..."
+                      @keyup.enter="saveConfig(param)"
+                      @keyup.esc="cancelEditConfig"
+                    />
+                    <div class="edit-actions">
+                      <button @click="saveConfig(param)" class="btn-save" title="Enregistrer">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button @click="cancelEditConfig" class="btn-cancel" title="Annuler">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="value-display">
+                    <div class="current-value">{{ param.valeur }}</div>
+                    <button 
+                      v-if="isAdmin && !isReadOnly(param.cle)" 
+                      @click="startEditConfig(param)" 
+                      class="btn-edit-inline"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                      Modifier
+                    </button>
+                    <span v-if="isReadOnly(param.cle)" class="readonly-badge">Lecture seule</span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="!filteredParametres.filter(p => !isLogoParam(p.cle)).length && activeTab !== 'IDENTITE'" class="empty-params">
+            <div class="empty-icon">📂</div>
+            <p>Aucun parametre trouve dans cette categorie.</p>
+          </div>
+        </div>
+      </main>
     </div>
   </MainLayout>
 </template>
 
 <style scoped>
-.settings-container {
+.settings-layout {
   display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  gap: 2rem;
+  align-items: flex-start;
+  margin-top: 1rem;
 }
 
-.feature-card {
+/* SIDEBAR */
+.settings-sidebar {
+  width: 280px;
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid #f1f5f9;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  position: sticky;
+  top: 1.5rem;
+  flex-shrink: 0;
+}
+
+.sidebar-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sidebar-icon {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+}
+
+.sidebar-text h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.sidebar-text p {
+  margin: 2px 0 0 0;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.85rem 1rem;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  width: 100%;
+  text-align: left;
+}
+
+.nav-icon { font-size: 1.05rem; }
+.nav-label { font-size: 0.85rem; font-weight: 600; color: #64748b; }
+
+.nav-item:hover {
+  background: #f8fafc;
+}
+
+.nav-item.active {
+  background: #eff6ff;
+}
+
+.nav-item.active .nav-label { color: #2563eb; font-weight: 700; }
+
+.nav-active-indicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  background: #3b82f6;
+  border-radius: 0 3px 3px 0;
+}
+
+/* CONTENT AREA */
+.settings-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.content-header {
+  margin-bottom: 1.5rem;
+}
+
+.content-header h2 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.35rem;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.content-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+/* ======= IDENTITY SECTION ======= */
+.identity-section {
+  margin-bottom: 1.5rem;
+}
+
+.logo-cards-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.logo-card {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #f1f5f9;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: all 0.2s;
+}
+
+.logo-card:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04);
+}
+
+.logo-card-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.logo-hint {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.logo-preview-area {
+  background: #f8fafc;
+  border: 2px dashed #e2e8f0;
+  border-radius: 12px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
   overflow: hidden;
 }
 
-/* Config Style */
-.config-header { padding: 1.25rem 1.5rem; background: #f8fafc; font-weight: 700; color: #334155; border-bottom: 1px solid #e2e8f0; }
-.config-item { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
-.config-item:last-child { border-bottom: none; }
-.config-info { display: flex; flex-direction: column; gap: 0.25rem; }
-.config-key { font-family: ui-monospace, SFMono-Regular, monospace; color: #0f172a; font-size: 0.95rem; }
-.config-desc { color: #64748b; font-size: 0.85rem; }
-.config-action { display: flex; align-items: center; gap: 1rem; }
-.config-val { font-weight: 700; color: #2563eb; padding: 0.25rem 0.5rem; background: #eff6ff; border-radius: 6px; }
-.config-input { border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; outline: none; }
-.config-input:focus { border-color: #3b82f6; }
-.sm-btn { padding: 6px 12px; font-size: 0.85rem; }
+.logo-preview-area:hover {
+  border-color: #3b82f6;
+  background: #f0f7ff;
+}
+
+.logo-preview-img {
+  max-height: 120px;
+  max-width: 90%;
+  object-fit: contain;
+}
+
+.logo-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+}
+
+.logo-placeholder span {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.logo-uploading {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn-upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-upload:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.btn-upload:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.5rem 0 0 0;
+}
+
+.section-divider span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #f1f5f9;
+}
+
+/* ======= PARAMS GRID ======= */
+.params-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.param-card {
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #f1f5f9;
+  padding: 1.25rem;
+  display: flex;
+  gap: 1.25rem;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.param-card:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04);
+}
+
+.param-card.editing {
+  border-color: #3b82f6;
+  background: #fafbff;
+}
+
+.param-card.readonly {
+  opacity: 0.7;
+}
+
+.param-card-icon {
+  width: 44px;
+  height: 44px;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.param-card-icon.icon-dollar { background: #fff7ed; color: #f97316; }
+.param-card-icon.icon-currency { background: #fff7ed; color: #f97316; }
+.param-card-icon.icon-lock { background: #eef2ff; color: #6366f1; }
+.param-card-icon.icon-clock { background: #eef2ff; color: #6366f1; }
+.param-card-icon.icon-building { background: #ecfdf5; color: #10b981; }
+.param-card-icon.icon-map { background: #ecfdf5; color: #10b981; }
+.param-card-icon.icon-phone { background: #ecfdf5; color: #10b981; }
+.param-card-icon.icon-mail { background: #ecfdf5; color: #10b981; }
+.param-card-icon.icon-image { background: #eff6ff; color: #3b82f6; }
+.param-card-icon.icon-bell { background: #fefce8; color: #eab308; }
+.param-card-icon.icon-tag { background: #f1f5f9; color: #475569; }
+
+.param-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.param-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.param-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.param-key {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1e293b;
+  text-transform: capitalize;
+}
+
+.param-desc {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.param-control {
+  margin-top: auto;
+}
+
+.value-display {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.current-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  background: #f8fafc;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.readonly-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  background: #f8fafc;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.btn-edit-inline {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: #3b82f6;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.btn-edit-inline:hover {
+  background: #eff6ff;
+}
+
+/* EDIT MODE */
+.edit-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.premium-input {
+  flex: 1;
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+  outline: none;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-save, .btn-cancel {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-save { background: #3b82f6; color: white; }
+.btn-save:hover { background: #2563eb; }
+
+.btn-cancel { background: #fee2e2; color: #ef4444; }
+.btn-cancel:hover { background: #fecaca; }
+
+.empty-params {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: white;
+  border-radius: 16px;
+  border: 1px dashed #e2e8f0;
+}
+
+.empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.empty-params p { color: #94a3b8; font-weight: 500; font-size: 0.9rem; }
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: #dc2626;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1024px) {
+  .settings-layout { flex-direction: column; }
+  .settings-sidebar { width: 100%; position: static; }
+  .settings-nav { flex-direction: row; flex-wrap: wrap; }
+  .nav-item { width: auto; flex: 1; min-width: 160px; justify-content: center; }
+  .nav-active-indicator { display: none; }
+}
+
+@media (max-width: 768px) {
+  .logo-cards-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .param-card { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+  .edit-group { flex-direction: column; align-items: stretch; width: 100%; }
+  .edit-actions { justify-content: flex-end; }
+  .settings-nav { flex-direction: column; }
+  .nav-item { min-width: 0; }
+}
 </style>

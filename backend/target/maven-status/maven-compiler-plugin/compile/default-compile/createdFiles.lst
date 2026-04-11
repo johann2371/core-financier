@@ -1,5 +1,6 @@
 com\corefi\config\WebSocketConfig.class
 com\corefi\repository\TiersRepository.class
+com\corefi\service\impl\ParametrageServiceImpl.class
 com\corefi\entity\Encaissement.class
 com\corefi\enums\StatutDecaissement.class
 com\corefi\exception\AccesNonAutoriseException.class
@@ -26,6 +27,7 @@ com\corefi\entity\LigneFacture.class
 com\corefi\CoreFinancierApplication.class
 com\corefi\entity\AffectationPaiement.class
 com\corefi\entity\Devise.class
+com\corefi\dto\response\search\SearchResultDTO$SearchResultDTOBuilder.class
 com\corefi\dto\request\utilisateur\UtilisateurCreateRequest.class
 com\corefi\dto\response\compte\CompteFinancierResponse.class
 com\corefi\entity\Utilisateur.class
@@ -45,16 +47,20 @@ com\corefi\exception\SeuilPDGRequiredException.class
 com\corefi\exception\SoldeInsuffisantException.class
 com\corefi\service\interfaces\IPdfService.class
 com\corefi\exception\WorkflowException.class
+com\corefi\service\impl\GlobalSearchServiceImpl.class
 com\corefi\controller\UtilisateurController.class
 com\corefi\mapper\EncaissementMapper.class
+com\corefi\service\interfaces\IGlobalSearchService.class
 com\corefi\entity\Client.class
 com\corefi\enums\TypeTiers.class
 com\corefi\controller\EncaissementController.class
 com\corefi\mapper\TiersMapper.class
 com\corefi\service\impl\EmailServiceImpl.class
 com\corefi\service\interfaces\IJournalAuditService.class
+com\corefi\controller\ParametrageController.class
 com\corefi\repository\JustificatifRepository.class
 com\corefi\enums\StatutFacture.class
+com\corefi\service\interfaces\IParametrageService.class
 com\corefi\security\UserDetailsServiceImpl.class
 com\corefi\mapper\UtilisateurMapper.class
 com\corefi\dto\request\decaissement\ApprobationPDGRequest.class
@@ -68,6 +74,8 @@ com\corefi\repository\MouvementCompteRepository.class
 com\corefi\exception\GlobalExceptionHandler.class
 com\corefi\config\ApplicationConfig.class
 com\corefi\entity\Caisse.class
+com\corefi\controller\GlobalSearchController.class
+com\corefi\dto\response\parametrage\ParametrageResponse.class
 com\corefi\dto\request\decaissement\DecaissementCreateRequest.class
 com\corefi\controller\CompteFinancierController.class
 com\corefi\dto\response\decaissement\DecaissementResponse.class
@@ -83,6 +91,7 @@ com\corefi\repository\TauxChangeRepository.class
 com\corefi\dto\request\decaissement\ValidationRFRequest.class
 com\corefi\entity\JournalAudit.class
 com\corefi\dto\request\facture\LigneFactureRequest.class
+com\corefi\dto\request\parametrage\ParametrageUpdateRequest.class
 com\corefi\config\WebConfig.class
 com\corefi\repository\LigneFactureRepository.class
 com\corefi\service\impl\NotificationServiceImpl.class
@@ -129,5 +138,6 @@ com\corefi\entity\Fournisseur.class
 com\corefi\enums\Role.class
 com\corefi\dto\response\tableaubord\ActiviteResponse$ActiviteResponseBuilder.class
 com\corefi\enums\TypeCompte.class
+com\corefi\dto\response\search\SearchResultDTO.class
 com\corefi\service\impl\TiersServiceImpl.class
 com\corefi\dto\response\facture\FactureResponse.class

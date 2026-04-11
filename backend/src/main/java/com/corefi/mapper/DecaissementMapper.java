@@ -8,6 +8,7 @@ import com.corefi.entity.Tiers;
 import com.corefi.entity.Devise;
 import com.corefi.enums.MoyenPaiement;
 import com.corefi.enums.StatutDecaissement;
+import com.corefi.entity.Utilisateur;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -68,6 +69,17 @@ public class DecaissementMapper {
             r.setJustificatifs(new ArrayList<>());
         }
 
+        // Traçabilité
+        r.setSaisiParNom(formatFullUser(d.getSaisiPar()));
+        r.setValideParNom(formatFullUser(d.getValidePar()));
+        r.setApprouveParPdgNom(formatFullUser(d.getApprouveParPdg()));
+        r.setExecuteParNom(formatFullUser(d.getExecutePar()));
+
         return r;
+    }
+
+    private String formatFullUser(Utilisateur u) {
+        if (u == null) return null;
+        return (u.getPrenom() != null ? u.getPrenom() : "") + " " + (u.getNom() != null ? u.getNom() : "");
     }
 }

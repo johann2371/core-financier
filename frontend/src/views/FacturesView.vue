@@ -315,6 +315,7 @@ const submitForm = async () => {
               <th>Tiers Associé</th>
               <th>Date</th>
               <th>Statut</th>
+              <th>Opérateur</th>
               <th class="text-right">Total TTC (XAF)</th>
               <th class="text-center">Action</th>
             </tr>
@@ -345,6 +346,12 @@ const submitForm = async () => {
                 }">
                   {{ (item.statut === 'VALIDEE' ? 'EN ATTENTE PAIEMENT' : item.statut).replace(/_/g, ' ') }}
                 </span>
+              </td>
+              <td class="text-xs">
+                <div class="cell-stack">
+                  <span v-if="item.creeParNom" class="text-muted" title="Créé par">C: {{ item.creeParNom }}</span>
+                  <span v-if="item.valideParNom" class="text-blue-600" title="Validé par">V: {{ item.valideParNom }}</span>
+                </div>
               </td>
               <td class="text-right font-semibold text-dark">{{ item.montantTtc?.toLocaleString() || '0' }}</td>
               <td class="text-center">

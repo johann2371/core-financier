@@ -7,6 +7,7 @@ import com.corefi.entity.Facture;
 import com.corefi.entity.LigneFacture;
 import com.corefi.entity.Tiers;
 import com.corefi.enums.StatutFacture;
+import com.corefi.entity.Utilisateur;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -81,6 +82,16 @@ public class FactureMapper {
         r.setMontantTtc(f.getMontantTtc());
         r.setResteAPayer(resteAPayer != null ? resteAPayer : f.getMontantTtc());
         r.setStatut(f.getStatut().name());
+
+        // Traçabilité
+        r.setCreeParNom(formatFullUser(f.getCreePar()));
+        r.setValideParNom(formatFullUser(f.getValidePar()));
+
         return r;
+    }
+
+    private String formatFullUser(Utilisateur u) {
+        if (u == null) return null;
+        return (u.getPrenom() != null ? u.getPrenom() : "") + " " + (u.getNom() != null ? u.getNom() : "");
     }
 }

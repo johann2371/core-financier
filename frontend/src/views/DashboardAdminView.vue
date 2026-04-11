@@ -4,15 +4,39 @@ import MainLayout from '../components/MainLayout.vue'
 import { useUtilisateurStore } from '../stores/utilisateur.store'
 import { useAuthStore } from '../stores/auth.store'
 import { useAuditStore } from '../stores/audit.store'
+import { useDashboardStore } from '../stores/dashboard.store'
+import { Line } from 'vue-chartjs'
+import { 
+  Chart as ChartJS, 
+  Title, 
+  Tooltip, 
+  Legend, 
+  LineElement, 
+  CategoryScale, 
+  LinearScale, 
+  PointElement, 
+  Filler 
+} from 'chart.js'
+
+ChartJS.register(Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement, Filler)
 
 const authStore = useAuthStore()
 const utilisateurStore = useUtilisateurStore()
 const auditStore = useAuditStore()
+const dashboardStore = useDashboardStore()
 
 onMounted(async () => {
+  await dashboardStore.fetchKpis()
   await utilisateurStore.fetchUtilisateurs()
   await auditStore.fetchLogs(0, 200, '', '')
 })
+
+const kpis = computed(() => dashboardStore.kpis || {})
+
+const formatCurrency = (val) => {
+  if (val === undefined || val === null) return '0'
+  return new Intl.NumberFormat('fr-FR').format(val)
+}
 
 // === GESTION UTILISATEURS ===
 const searchUser = ref('')
@@ -129,26 +153,113 @@ const donutSegments = computed(() => {
   })
 })
 
-// === GRAPHIQUE ACTIVITÉ 7 DERNIERS JOURS ===
-const activityData = computed(() => {
-  const days = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    d.setHours(0, 0, 0, 0)
-    const dayStr = d.toLocaleDateString('fr-FR', { weekday: 'short' })
-    const count = (auditStore.logs || []).filter(l => {
-      const ld = new Date(l.dateAction)
-      return ld.toDateString() === d.toDateString()
-    }).length
-    days.push({ label: dayStr, count })
+// === GRAPHIQUE ÉVOLUTION TRÉSORERIE (6 MOIS) ===
+const evolutionChartData = computed(() => {
+  const data = kpis.value.evolutionMensuelle || []
+  return {
+    labels: data.map(d => d.mois),
+    datasets: [
+      {
+        label: 'Encaissements',
+        data: data.map(d => d.encaissements),
+        borderColor: '#10b981',
+        backgroundColor: (context) => {
+          const chart = context.chart
+          const { ctx, chartArea } = chart
+          if (!chartArea) return null
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+          gradient.addColorStop(0, 'rgba(16, 185, 129, 0.2)')
+          gradient.addColorStop(1, 'rgba(16, 185, 129, 0)')
+          return gradient
+        },
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#10b981',
+        pointBorderColor: '#fff',
+        pointHoverRadius: 6,
+        pointRadius: 4
+      },
+      {
+        label: 'Décaissements',
+        data: data.map(d => d.decaissements),
+        borderColor: '#f59e0b',
+        backgroundColor: (context) => {
+          const chart = context.chart
+          const { ctx, chartArea } = chart
+          if (!chartArea) return null
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+          gradient.addColorStop(0, 'rgba(245, 158, 11, 0.2)')
+          gradient.addColorStop(1, 'rgba(245, 158, 11, 0)')
+          return gradient
+        },
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#f59e0b',
+        pointBorderColor: '#fff',
+        pointHoverRadius: 6,
+        pointRadius: 4
+      }
+    ]
   }
-  return days
 })
 
-const maxActivity = computed(() => Math.max(...activityData.value.map(d => d.count), 1))
+const evolutionChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: false
+    },
+    tooltip: {
+      mode: 'index',
+      intersect: false,
+      backgroundColor: 'rgba(30, 41, 59, 0.9)',
+      titleColor: '#fff',
+      bodyColor: '#fff',
+      padding: 12,
+      cornerRadius: 8,
+      callbacks: {
+        label: function(context) {
+          let label = context.dataset.label || '';
+          if (label) label += ': ';
+          if (context.parsed.y !== null) {
+            label += new Intl.NumberFormat('fr-FR').format(context.parsed.y) + ' FCFA';
+          }
+          return label;
+        }
+      }
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: 'rgba(226, 232, 240, 0.5)',
+        drawBorder: false
+      },
+      ticks: {
+        color: '#94a3b8',
+        font: { size: 11 },
+        callback: function(value) {
+          if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'
+          if (value >= 1000) return (value / 1000).toFixed(0) + 'k'
+          return value
+        }
+      }
+    },
+    x: {
+      grid: {
+        display: false
+      },
+      ticks: {
+        color: '#94a3b8',
+        font: { size: 11, weight: '600' }
+      }
+    }
+  }
+}
 
-// === FORMAT DATE ===
+// === FORMAT DATE ET ACTIVITÉS ===
 const formatLastLogin = (dateStr) => {
   if (!dateStr) return 'Jamais'
   const d = new Date(dateStr)
@@ -159,6 +270,33 @@ const formatLastLogin = (dateStr) => {
   if (diff < 86400) return `Il y a ${Math.floor(diff / 3600)}h`
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
+
+// === FORMAT DATE ET ACTIVITÉS (Aligné sur DashboardView) ===
+const formatTime = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+const formatDateLabel = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const today = new Date()
+  if (date.toDateString() === today.toDateString()) return "Aujourd'hui"
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+const getActivityIconClass = (type) => {
+  switch (type) {
+    case 'FACTURE': return 'bg-green'
+    case 'ENCAISSEMENT': return 'bg-blue'
+    case 'DECAISSEMENT': return 'bg-indigo'
+    case 'TIERS': return 'bg-yellow'
+    case 'AUTH': return 'bg-indigo'
+    case 'CONNEXION': return 'bg-blue'
+    default: return 'bg-gray'
+  }
+}
 </script>
 
 <template>
@@ -167,47 +305,137 @@ const formatLastLogin = (dateStr) => {
     <template #subtitle>Vue d'ensemble de l'administration des utilisateurs et accès.</template>
 
     <div class="admin-dashboard">
+      <div v-if="utilisateurStore.error" class="error-banner mb-4">{{ utilisateurStore.error }}</div>
 
-      <!-- KPI Cards -->
-      <div class="kpi-row">
-        <div class="kpi-card">
-          <div class="kpi-top">
-            <div>
-              <div class="kpi-label">Total Utilisateurs</div>
-              <div class="kpi-value">{{ totalUsers }}</div>
+      <!-- HEADER SECTION: Main Financial KPIs (2x2) + Recent Activities -->
+      <div class="dashboard-header-row">
+        <!-- 2x2 Financial Grid -->
+        <div class="main-kpis-wrapper">
+          <div class="kpi-card premium highlight-primary">
+            <div class="kpi-inner">
+              <div class="kpi-label">Solde trésorerie</div>
+              <div class="kpi-value text-blue">{{ formatCurrency(kpis.soldeTresorerieTotal) }}</div>
+              <div class="kpi-desc">FCFA disponibles</div>
             </div>
-            <div class="kpi-icon kpi-icon-blue">
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+            <div class="kpi-icon-circ blue">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
             </div>
           </div>
-          <div class="kpi-sub kpi-sub-green">Enregistrés dans le système</div>
+
+          <div class="kpi-card">
+            <div class="kpi-inner">
+              <div class="kpi-label">Décaissements en attente</div>
+              <div class="kpi-value">{{ kpis.decaissementsEnAttente || 0 }}</div>
+              <div class="kpi-desc">dont <span class="fw-700">{{ kpis.decaissementsEnAttentePDG || 0 }}</span> en attente PDG</div>
+            </div>
+            <div class="kpi-icon-circ orange">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-inner">
+              <div class="kpi-label">Factures impayées</div>
+              <div class="kpi-value text-red">{{ kpis.facturesImpayeesCount || 0 }}</div>
+              <div class="kpi-desc" :class="{'text-red fw-700': kpis.facturesEnRetardCount > 0}">{{ kpis.facturesEnRetardCount || 0 }} en retard > 30 j</div>
+            </div>
+            <div class="kpi-icon-circ red">
+               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-inner">
+              <div class="kpi-label">Dettes Fournisseurs</div>
+              <div class="kpi-value text-purple">{{ formatCurrency(kpis.totalDettesFournisseurs) }}</div>
+              <div class="kpi-desc">Total des factures d'achat dues</div>
+            </div>
+            <div class="kpi-icon-circ purple">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activities Card (Style DashboardView) -->
+        <div class="activities-card">
+          <div class="activities-head">
+            <h3 class="activities-title">ACTIVITÉ RÉCENTE</h3>
+            <div class="activities-badge">{{ kpis.activitesRecentes?.length || 0 }}</div>
+          </div>
+          
+          <div class="timeline" v-if="kpis.activitesRecentes?.length > 0">
+            <div class="timeline-item" v-for="(act, idx) in kpis.activitesRecentes" :key="idx">
+              <div class="timeline-icon" :class="getActivityIconClass(act.type)">
+                <svg v-if="act.type === 'FACTURE'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <svg v-else-if="act.type === 'ENCAISSEMENT'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="timeline-content">
+                <h4>{{ act.action === 'CREATE' ? 'Création' : act.action }} {{ act.type.toLowerCase() }}</h4>
+                <p>{{ act.message }}</p>
+                <div class="timeline-meta">
+                  <span class="user">{{ act.utilisateur }}</span>
+                  <span class="time">{{ formatDateLabel(act.date) }} • {{ formatTime(act.date) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="empty-activities" v-else>
+            <p>Aucune activité récente enregistrée.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECONDARY KPIs (Horizontal Row) -->
+      <div class="kpi-grid secondary-kpis-row">
+        <div class="kpi-card">
+          <div class="kpi-inner">
+            <div class="kpi-label">Utilisateurs actifs</div>
+            <div class="kpi-value text-green">{{ kpis.utilisateursActifs || 0 }}</div>
+            <div class="kpi-desc text-danger" v-if="kpis.utilisateursBloques > 0">{{ kpis.utilisateursBloques }} compte(s) bloqué(s)</div>
+            <div class="kpi-desc" v-else>0 compte bloqué</div>
+          </div>
+          <div class="kpi-icon-circ green">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+          </div>
         </div>
 
         <div class="kpi-card">
-          <div class="kpi-top">
-            <div>
-              <div class="kpi-label">Comptes Actifs</div>
-              <div class="kpi-value">{{ activeUsers }}</div>
-            </div>
-            <div class="kpi-icon kpi-icon-green">
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          <div class="kpi-inner">
+            <div class="kpi-label">Encaissements ce mois</div>
+            <div class="kpi-value">{{ formatCurrency(kpis.encaissementsMoisActuel) }}</div>
+            <div class="kpi-desc">
+              FCFA · <span :class="kpis.progressionEncaissements >= 0 ? 'text-green' : 'text-red'">
+                {{ kpis.progressionEncaissements > 0 ? '+' : '' }}{{ kpis.progressionEncaissements?.toFixed(1) }}% vs mois dernier
+              </span>
             </div>
           </div>
-          <div class="kpi-sub kpi-sub-neutral">{{ totalUsers ? ((activeUsers / totalUsers) * 100).toFixed(0) : 0 }}% du total</div>
         </div>
 
         <div class="kpi-card">
-          <div class="kpi-top">
-            <div>
-              <div class="kpi-label">Comptes Bloqués</div>
-              <div class="kpi-value">{{ blockedUsers }}</div>
-            </div>
-            <div class="kpi-icon kpi-icon-red">
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+          <div class="kpi-inner">
+            <div class="kpi-label">Décaissements ce mois</div>
+            <div class="kpi-value">{{ formatCurrency(kpis.decaissementsMoisActuel) }}</div>
+            <div class="kpi-desc">
+              FCFA · <span :class="kpis.progressionDecaissements <= 0 ? 'text-green' : 'text-red'">
+                {{ kpis.progressionDecaissements > 0 ? '+' : '' }}{{ kpis.progressionDecaissements?.toFixed(1) }}% vs mois dernier
+              </span>
             </div>
           </div>
-          <div class="kpi-sub kpi-sub-red" v-if="blockedUsers > 0">⚠ Sécurité à vérifier</div>
-          <div class="kpi-sub kpi-sub-green" v-else>✓ Aucun compte bloqué</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-inner">
+            <div class="kpi-label">Opérations aujourd'hui</div>
+            <div class="kpi-value">{{ kpis.operationsDuJour || 0 }}</div>
+            <div class="kpi-desc">
+              <span class="text-green fw-600">{{ kpis.encaissementsDuJourCount || 0 }} enc.</span> 
+              · <span class="text-blue fw-600">{{ kpis.decaissementsDuJourCount || 0 }} déc.</span>
+            </div>
+          </div>
+          <div class="kpi-icon-circ cyan">
+             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
         </div>
       </div>
 
@@ -241,17 +469,23 @@ const formatLastLogin = (dateStr) => {
           </div>
         </div>
 
-        <!-- Bar Chart: Activité 7 Derniers Jours -->
+        <!-- Line Chart: Évolution Trésorerie (6 mois) -->
         <div class="chart-card">
-          <div class="chart-title">Activité des 7 derniers jours</div>
-          <div class="bar-chart">
-            <div v-for="day in activityData" :key="day.label" class="bar-col">
-              <div class="bar-value">{{ day.count }}</div>
-              <div class="bar-track">
-                <div class="bar-fill" :style="{ height: (day.count / maxActivity * 100) + '%' }"></div>
+          <div class="chart-header">
+            <div class="chart-title">Évolution de la trésorerie — 6 derniers mois</div>
+            <div class="chart-legend-custom">
+              <div class="legend-item-inline">
+                <span class="dot green"></span>
+                <span>Encaissements</span>
               </div>
-              <div class="bar-label">{{ day.label }}</div>
+              <div class="legend-item-inline">
+                <span class="dot orange"></span>
+                <span>Décaissements</span>
+              </div>
             </div>
+          </div>
+          <div class="chart-body" style="height: 220px; position: relative;">
+            <Line :data="evolutionChartData" :options="evolutionChartOptions" />
           </div>
         </div>
       </div>
@@ -465,26 +699,205 @@ const formatLastLogin = (dateStr) => {
 .btn-icon { background: none; border: none; padding: 6px; border-radius: 6px; cursor: pointer; color: #94a3b8; transition: all 0.2s; }
 .btn-icon.danger:hover { background: #fee2e2; color: #ef4444; }
 
-/* KPI CARDS */
-.kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
-.kpi-card { background: white; border-radius: 14px; border: 1px solid #f1f5f9; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); transition: box-shadow 0.2s; }
-.kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
-.kpi-top { display: flex; justify-content: space-between; align-items: flex-start; }
-.kpi-label { font-size: 0.8rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
-.kpi-value { font-size: 2rem; font-weight: 800; color: #0f172a; line-height: 1.1; }
-.kpi-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-.kpi-icon-blue { background: #eff6ff; color: #3b82f6; }
-.kpi-icon-green { background: #f0fdf4; color: #16a34a; }
-.kpi-icon-red { background: #fef2f2; color: #ef4444; }
-.kpi-sub { font-size: 0.78rem; font-weight: 600; margin-top: 0.5rem; }
-.kpi-sub-green { color: #16a34a; }
-.kpi-sub-red { color: #ef4444; }
-.kpi-sub-neutral { color: #64748b; }
+/* KPI GRID & LAYOUT SYSTEM */
+.dashboard-header-row {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+  align-items: stretch;
+}
+
+.main-kpis-wrapper {
+  flex: 2;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+.activities-card {
+  flex: 1;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  min-width: 320px;
+}
+
+.activities-head {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f8fafc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.activities-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.activities-badge {
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+/* TIMELINE STYLE (Copied from DashboardView) */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.timeline::-webkit-scrollbar { width: 4px; }
+.timeline::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+.timeline::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+
+.timeline-item {
+  display: flex;
+  gap: 1rem;
+  position: relative;
+}
+
+.timeline-icon {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.bg-green { background: #10b981; }
+.bg-blue { background: #3b82f6; }
+.bg-indigo { background: #6366f1; }
+.bg-yellow { background: #f59e0b; color: white; }
+.bg-gray { background: #94a3b8; }
+
+.timeline-content { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.timeline-content h4 { font-size: 0.825rem; font-weight: 700; color: #1e293b; margin-bottom: 0.2rem; text-transform: capitalize; }
+.timeline-content p { font-size: 0.8rem; color: #64748b; margin-bottom: 0.4rem; line-height: 1.4; word-break: break-all; }
+
+.timeline-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.timeline-meta .user { font-size: 0.68rem; font-weight: 700; color: #475569; }
+.timeline-meta .time { font-size: 0.65rem; color: #94a3b8; font-weight: 600; }
+
+.empty-activities {
+  padding: 2rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.secondary-kpis-row {
+  grid-template-columns: repeat(4, 1fr) !important;
+  margin-bottom: 1.25rem;
+}
+
+.kpi-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #f1f5f9;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 20px -8px rgba(0,0,0,0.08);
+  border-color: #e2e8f0;
+}
+
+.kpi-card.highlight-primary {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-left: 4px solid #3b82f6;
+}
+
+.kpi-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpi-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.kpi-desc {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.kpi-icon-circ {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kpi-icon-circ.blue { background: #eff6ff; color: #3b82f6; }
+.kpi-icon-circ.green { background: #f0fdf4; color: #16a34a; }
+.kpi-icon-circ.orange { background: #fff7ed; color: #f97316; }
+.kpi-icon-circ.red { background: #fef2f2; color: #ef4444; }
+.kpi-icon-circ.cyan { background: #ecfeff; color: #0891b2; }
+.kpi-icon-circ.purple { background: #f5f3ff; color: #8b5cf6; }
+
+/* Utilities */
+.text-blue { color: #2563eb !important; }
+.text-green { color: #166534 !important; }
+.text-red { color: #dc2626 !important; }
+.text-purple { color: #7c3aed !important; }
+.text-danger { color: #ef4444 !important; }
+.fw-700 { font-weight: 700 !important; }
+.fw-600 { font-weight: 600 !important; }
 
 /* CHARTS ROW */
 .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-.chart-card { background: white; border-radius: 14px; border: 1px solid #f1f5f9; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-.chart-title { font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 1rem; }
+.chart-card { background: white; border-radius: 14px; border: 1px solid #f1f5f9; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; flex-direction: column; }
+.chart-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+.chart-title { font-size: 0.85rem; font-weight: 700; color: #334155; margin: 0; }
+.chart-legend-custom { display: flex; gap: 1rem; }
+.legend-item-inline { display: flex; align-items: center; gap: 6px; font-size: 0.725rem; font-weight: 600; color: #64748b; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.green { background: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1); }
+.dot.orange { background: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.1); }
 
 /* Donut Chart */
 .donut-container { display: flex; align-items: center; gap: 1.5rem; }
@@ -556,8 +969,13 @@ const formatLastLogin = (dateStr) => {
 .um-btn-submit:disabled { background: #94a3b8; box-shadow: none; cursor: not-allowed; }
 
 /* ========== RESPONSIVE ========== */
+@media (max-width: 1200px) {
+  .dashboard-header-row { flex-direction: column; }
+  .activities-card { min-width: 0; }
+  .secondary-kpis-row { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
 @media (max-width: 1024px) {
-  .kpi-row { grid-template-columns: repeat(2, 1fr); }
   .charts-row { grid-template-columns: 1fr; }
   .donut-container { flex-direction: column; align-items: center; }
   .donut-chart { width: 100px; height: 100px; }
@@ -565,14 +983,13 @@ const formatLastLogin = (dateStr) => {
 
 @media (max-width: 768px) {
   .admin-dashboard { gap: 1rem; }
-  .kpi-row { grid-template-columns: 1fr; gap: 0.75rem; }
+  .main-kpis-wrapper { grid-template-columns: 1fr; }
+  .secondary-kpis-row { grid-template-columns: 1fr !important; }
   .kpi-card { padding: 1rem; }
   .kpi-value { font-size: 1.5rem; }
   .charts-row { grid-template-columns: 1fr; gap: 0.75rem; }
   .chart-card { padding: 1rem; }
-  .bar-chart { height: 110px; gap: 0.4rem; }
-  .bar-track { height: 70px; }
-
+  
   .action-bar { flex-direction: column; gap: 0.75rem; align-items: stretch; }
   .input-with-icon { width: 100%; }
 
@@ -597,11 +1014,8 @@ const formatLastLogin = (dateStr) => {
 @media (max-width: 480px) {
   .kpi-card { padding: 0.75rem; }
   .kpi-value { font-size: 1.25rem; }
-  .kpi-icon { width: 36px; height: 36px; border-radius: 8px; }
+  .kpi-icon-circ { width: 36px; height: 36px; border-radius: 50%; }
   .donut-chart { width: 80px; height: 80px; }
-  .bar-chart { height: 90px; }
-  .bar-track { height: 55px; }
-  .bar-value { font-size: 0.6rem; }
   .user-avatar { width: 28px; height: 28px; font-size: 0.7rem; }
   .pag-btn { width: 28px; height: 28px; font-size: 0.75rem; }
 }

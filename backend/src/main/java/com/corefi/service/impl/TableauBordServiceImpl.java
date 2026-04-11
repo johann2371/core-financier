@@ -5,6 +5,7 @@ import com.corefi.dto.response.tableaubord.TableauBordResponse;
 import com.corefi.entity.CompteFinancier;
 import com.corefi.entity.Facture;
 import com.corefi.entity.Decaissement;
+import com.corefi.entity.Encaissement;
 import com.corefi.entity.JournalAudit;
 import com.corefi.enums.StatutFacture;
 import com.corefi.enums.StatutDecaissement;
@@ -36,9 +37,9 @@ import com.corefi.repository.ParametrageRepository;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
 import java.util.*;
+import com.corefi.repository.UtilisateurRepository;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class TableauBordServiceImpl implements ITableauBordService {
 
@@ -48,31 +49,52 @@ public class TableauBordServiceImpl implements ITableauBordService {
     private final FactureRepository factureRepository;
     private final JournalAuditRepository journalAuditRepository;
     private final ParametrageRepository parametrageRepository;
-    private final com.corefi.repository.UtilisateurRepository utilisateurRepository;
-    private final IJournalAuditService journalAuditService;
-    private final INotificationService notificationService;
+    private final UtilisateurRepository utilisateurRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private IJournalAuditService journalAuditService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private INotificationService notificationService;
+
+    public TableauBordServiceImpl(
+            CompteFinancierRepository compteFinancierRepository,
+            DecaissementRepository decaissementRepository,
+            EncaissementRepository encaissementRepository,
+            FactureRepository factureRepository,
+            JournalAuditRepository journalAuditRepository,
+            ParametrageRepository parametrageRepository,
+            UtilisateurRepository utilisateurRepository) {
+        this.compteFinancierRepository = compteFinancierRepository;
+        this.decaissementRepository = decaissementRepository;
+        this.encaissementRepository = encaissementRepository;
+        this.factureRepository = factureRepository;
+        this.journalAuditRepository = journalAuditRepository;
+        this.parametrageRepository = parametrageRepository;
+        this.utilisateurRepository = utilisateurRepository;
+    }
 
     @Override
     @Transactional(readOnly = true)
     public TableauBordResponse getKpis() {
         TableauBordResponse kpis = new TableauBordResponse();
 
-        // 1. Solde total des caisses
+        // 1. Solde total
         List<CompteFinancier> comptes = compteFinancierRepository.findAll();
         BigDecimal soldeCaisses = comptes.stream()
                 .filter(c -> c.getType() == TypeCompte.CAISSE && c.isActif())
                 .map(CompteFinancier::getSolde)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        kpis.setSoldeTotalCaisses(soldeCaisses);
-
-        // 2. Solde total des banques
         BigDecimal soldeBanques = comptes.stream()
                 .filter(c -> c.getType() == TypeCompte.BANQUE && c.isActif())
                 .map(CompteFinancier::getSolde)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        kpis.setSoldeTotalBanques(soldeBanques);
 
-        // 3. Nombre de décaissements en attente (Pipeline)
+        kpis.setSoldeTotalCaisses(soldeCaisses);
+        kpis.setSoldeTotalBanques(soldeBanques);
+        kpis.setSoldeTresorerieTotal(soldeCaisses.add(soldeBanques));
+
+        // 2. Nombre de décaissements en attente (Pipeline)
         List<Decaissement> allDecaissements = decaissementRepository.findAll();
         long enAttenteRF = allDecaissements.stream()
                 .filter(d -> d.getStatut() == StatutDecaissement.EN_ATTENTE)
@@ -85,18 +107,27 @@ public class TableauBordServiceImpl implements ITableauBordService {
         kpis.setDecaissementsEnAttenteRF(enAttenteRF);
         kpis.setDecaissementsEnAttentePDG(enAttentePDG);
 
-        // 3b. Répartition par catégorie (sur les décaissements validés ou exécutés)
-        java.util.Map<String, BigDecimal> repartition = allDecaissements.stream()
-                .filter(d -> d.getStatut() != StatutDecaissement.BROUILLON && d.getStatut() != StatutDecaissement.REJETEE_RF && d.getStatut() != StatutDecaissement.REJETEE_PDG && d.getStatut() != StatutDecaissement.ANNULEE)
-                .collect(java.util.stream.Collectors.groupingBy(
-                        d -> d.getCategorie() != null ? d.getCategorie().name() : "AUTRE",
-                        java.util.stream.Collectors.reducing(BigDecimal.ZERO, Decaissement::getMontant, BigDecimal::add)
-                ));
-        kpis.setRepartitionDecaissementsParCategorie(repartition);
+        // 3. Utilisateurs
+        List<Utilisateur> users = utilisateurRepository.findAll();
+        kpis.setUtilisateursActifs(users.stream().filter(Utilisateur::isActif).count());
+        kpis.setUtilisateursBloques(users.stream().filter(u -> !u.isActif()).count());
 
-        // 4. Créances Clients (Factures de VENTE impayées)
-        // 4. Créances Clients (Factures de VENTE impayées)
+        // 4. Factures Impayées & Retard (> 30j)
         List<Facture> factures = factureRepository.findAll();
+        java.time.LocalDate limitDate = java.time.LocalDate.now().minusDays(30);
+        
+        long countImpayees = factures.stream()
+                .filter(f -> f.getStatut() == StatutFacture.EN_ATTENTE_PAIEMENT || f.getStatut() == StatutFacture.PARTIELLEMENT_PAYEE)
+                .count();
+        long countRetard = factures.stream()
+                .filter(f -> f.getStatut() == StatutFacture.EN_ATTENTE_PAIEMENT || f.getStatut() == StatutFacture.PARTIELLEMENT_PAYEE)
+                .filter(f -> f.getDateEcheance() != null && f.getDateEcheance().isBefore(limitDate))
+                .count();
+        
+        kpis.setFacturesImpayeesCount(countImpayees);
+        kpis.setFacturesEnRetardCount(countRetard);
+
+        // 5. Créances & Dettes (Montants)
         BigDecimal totalCreances = factures.stream()
                 .filter(f -> "VENTE".equals(f.getType()))
                 .filter(f -> f.getStatut() == StatutFacture.EN_ATTENTE_PAIEMENT || f.getStatut() == StatutFacture.PARTIELLEMENT_PAYEE || f.getStatut() == StatutFacture.VALIDEE)
@@ -104,7 +135,6 @@ public class TableauBordServiceImpl implements ITableauBordService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         kpis.setTotalCreancesClients(totalCreances);
 
-        // 5. Dettes Fournisseurs (Factures d'ACHAT impayées)
         BigDecimal totalDettes = factures.stream()
                 .filter(f -> "ACHAT".equals(f.getType()))
                 .filter(f -> f.getStatut() == StatutFacture.EN_ATTENTE_PAIEMENT || f.getStatut() == StatutFacture.PARTIELLEMENT_PAYEE || f.getStatut() == StatutFacture.VALIDEE)
@@ -112,7 +142,13 @@ public class TableauBordServiceImpl implements ITableauBordService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         kpis.setTotalDettesFournisseurs(totalDettes);
 
-        // 5. Activités récentes (Audit)
+        // 6. Statistiques Mensuelles & Progression
+        calculerProgressions(kpis);
+
+        // 6b. Calcul des derniers mouvements (Tendance)
+        calculerDerniersMouvements(kpis);
+
+        // 7. Activités récentes (Audit)
         kpis.setActivitesRecentes(
             journalAuditRepository.findAllByOrderByDateActionDesc(PageRequest.of(0, 10))
                 .getContent().stream()
@@ -120,22 +156,52 @@ public class TableauBordServiceImpl implements ITableauBordService {
                 .collect(Collectors.toList())
         );
 
-        // 6. Calcul des derniers mouvements (Tendance)
-        calculerDerniersMouvements(kpis);
-
-        // 7. Métriques Stratégiques PDG
+        // 8. Métriques Stratégiques & Opérationnelles
         kpis.setEvolutionMensuelle(calculerEvolutionMensuelle());
         kpis.setTopFournisseurs(calculerTopFournisseurs());
         kpis.setBurnRateMensuel(calculerBurnRate());
         kpis.setSeuilApprobationActuel(recupererSeuil("SEUIL_APPROBATION_PDG", new BigDecimal("500000")));
-
-        // 8. Métriques Opérationnelles Caissier
         calculerMetriquesCaissier(kpis, allDecaissements);
 
-        log.info("Dashboard KPIs: Caisses={}, Banques={}, Creances={}, Dettes={}, Activites={}", 
-                soldeCaisses, soldeBanques, totalCreances, totalDettes, kpis.getActivitesRecentes().size());
-        
         return kpis;
+    }
+
+    private void calculerProgressions(TableauBordResponse kpis) {
+        YearMonth currentMonth = YearMonth.now();
+        YearMonth lastMonth = currentMonth.minusMonths(1);
+
+        // Encaissements
+        BigDecimal encMoisActuel = encaissementRepository.findAll().stream()
+                .filter(e -> e.getDateEncaissement() != null && YearMonth.from(e.getDateEncaissement()).equals(currentMonth))
+                .map(Encaissement::getMontant)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal encMoisDernier = encaissementRepository.findAll().stream()
+                .filter(e -> e.getDateEncaissement() != null && YearMonth.from(e.getDateEncaissement()).equals(lastMonth))
+                .map(Encaissement::getMontant)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        kpis.setEncaissementsMoisActuel(encMoisActuel);
+        kpis.setProgressionEncaissements(calculerPourcentage(encMoisActuel, encMoisDernier));
+
+        // Décaissements
+        BigDecimal decMoisActuel = decaissementRepository.findAll().stream()
+                .filter(d -> d.getStatut() == StatutDecaissement.EXECUTEE && d.getDateExecution() != null && YearMonth.from(d.getDateExecution()).equals(currentMonth))
+                .map(Decaissement::getMontant)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal decMoisDernier = decaissementRepository.findAll().stream()
+                .filter(d -> d.getStatut() == StatutDecaissement.EXECUTEE && d.getDateExecution() != null && YearMonth.from(d.getDateExecution()).equals(lastMonth))
+                .map(Decaissement::getMontant)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        kpis.setDecaissementsMoisActuel(decMoisActuel);
+        kpis.setProgressionDecaissements(calculerPourcentage(decMoisActuel, decMoisDernier));
+    }
+
+    private double calculerPourcentage(BigDecimal actuel, BigDecimal dernier) {
+        if (dernier == null || dernier.compareTo(BigDecimal.ZERO) == 0) return 100.0;
+        return (actuel.subtract(dernier)).divide(dernier, 4, java.math.RoundingMode.HALF_UP).multiply(new BigDecimal(100)).doubleValue();
     }
 
     private void calculerMetriquesCaissier(TableauBordResponse kpis, List<Decaissement> allDecaissements) {
@@ -165,6 +231,8 @@ public class TableauBordServiceImpl implements ITableauBordService {
         long nbEncDuJour = encaissementRepository.findAll().stream()
                 .filter(e -> e.getDateEncaissement() != null && e.getDateEncaissement().equals(today))
                 .count();
+        kpis.setEncaissementsDuJourCount(nbEncDuJour);
+        kpis.setDecaissementsDuJourCount((long) execDuJour.size());
         kpis.setOperationsDuJour(nbEncDuJour + execDuJour.size());
     }
 
@@ -351,12 +419,50 @@ public class TableauBordServiceImpl implements ITableauBordService {
         else if ("Tiers".equals(audit.getEntite())) type = "TIERS";
         else if ("Utilisateur".equals(audit.getEntite())) type = "AUTH";
 
+        String fullName = audit.getUtilisateur() != null ? audit.getUtilisateur().getPrenom() + " " + audit.getUtilisateur().getNom() : "Système";
+        String rawMessage = audit.getNouvellesValeurs() != null ? audit.getNouvellesValeurs() : "";
+        String finalMessage = rawMessage;
+
+        // Transformation narrative selon l'entité et l'action
+        if ("Encaissement".equals(audit.getEntite()) && "CREATE".equals(audit.getAction())) {
+            finalMessage = fullName + " a enregistré un encaissement — " + extractMontant(rawMessage);
+        } else if ("Decaissement".equals(audit.getEntite())) {
+            if ("CREATE".equals(audit.getAction())) {
+                finalMessage = fullName + " a soumis une demande de décaissement — " + extractMontant(rawMessage);
+            } else if ("UPDATE".equals(audit.getAction())) {
+                if (rawMessage.contains("EXECUTEE")) {
+                    finalMessage = fullName + " a exécuté le paiement " + extractNumero(rawMessage) + " — " + extractMontant(rawMessage);
+                } else if (rawMessage.contains("VALIDEE")) {
+                    finalMessage = fullName + " a validé le décaissement " + extractNumero(rawMessage);
+                }
+            }
+        } else if ("Facture".equals(audit.getEntite()) && "CREATE".equals(audit.getAction())) {
+            finalMessage = fullName + " a créé la facture " + extractNumero(rawMessage) + " — " + extractMontant(rawMessage);
+        } else if ("Utilisateur".equals(audit.getEntite()) && rawMessage.contains("échouée")) {
+            finalMessage = rawMessage; // On garde tel quel pour l'auth (ex: "3 tentatives de connexion échouées — ...")
+        }
+
         return ActiviteResponse.builder()
             .type(type)
             .action(audit.getAction())
-            .message(audit.getNouvellesValeurs()) // On utilise le champ nouvellesValeurs qui contient souvent le message
+            .message(finalMessage)
             .date(audit.getDateAction())
-            .utilisateur(audit.getUtilisateur() != null ? audit.getUtilisateur().getPrenom() + " " + audit.getUtilisateur().getNom() : "Système")
+            .utilisateur(fullName)
             .build();
+    }
+
+    private String extractMontant(String message) {
+        if (message == null) return "0 FCFA";
+        // Cherche un montant suivi de XAF ou FCFA
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+[\\s\\d.]*)").matcher(message);
+        if (m.find()) return m.group(1).trim() + " FCFA";
+        return "0 FCFA";
+    }
+
+    private String extractNumero(String message) {
+        if (message == null) return "";
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(DEC-\\S+|FAC-\\S+|ENC-\\S+)").matcher(message);
+        if (m.find()) return "#" + m.group(1);
+        return "";
     }
 }

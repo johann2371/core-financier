@@ -29,27 +29,24 @@ public class GlobalSearchServiceImpl implements IGlobalSearchService {
             return results;
         }
 
-        String lowerQuery = query.toLowerCase();
+        String searchTrimmed = query.trim();
 
-        // 1. Recherche Utilisateurs
-        results.addAll(utilisateurRepository.findAll().stream()
-                .filter(u -> u.getNom().toLowerCase().contains(lowerQuery) || 
-                             u.getPrenom().toLowerCase().contains(lowerQuery) || 
-                             u.getEmail().toLowerCase().contains(lowerQuery))
+        // 1. Recherche Utilisateurs (Optimisée)
+        results.addAll(utilisateurRepository.findByNomContainingIgnoreCaseOrPrenomContainingIgnoreCaseOrEmailContainingIgnoreCase(searchTrimmed, searchTrimmed, searchTrimmed)
+                .stream()
                 .limit(5)
                 .map(u -> SearchResultDTO.builder()
                         .id(u.getId().toString())
                         .title(u.getPrenom() + " " + u.getNom())
                         .subtitle(u.getEmail() + " | " + u.getRole())
                         .type("USER")
-                        .url("/admin") // Redirige vers manage users
+                        .url("/admin")
                         .build())
                 .collect(Collectors.toList()));
 
-        // 2. Recherche Tiers
-        results.addAll(tiersRepository.findAll().stream()
-                .filter(t -> (t.getRaisonSociale() != null && t.getRaisonSociale().toLowerCase().contains(lowerQuery)) || 
-                             (t.getCode() != null && t.getCode().toLowerCase().contains(lowerQuery)))
+        // 2. Recherche Tiers (Optimisée)
+        results.addAll(tiersRepository.findByRaisonSocialeContainingIgnoreCaseOrCodeContainingIgnoreCase(searchTrimmed, searchTrimmed)
+                .stream()
                 .limit(5)
                 .map(t -> SearchResultDTO.builder()
                         .id(t.getId().toString())
@@ -60,9 +57,9 @@ public class GlobalSearchServiceImpl implements IGlobalSearchService {
                         .build())
                 .collect(Collectors.toList()));
 
-        // 3. Recherche Factures
-        results.addAll(factureRepository.findAll().stream()
-                .filter(f -> f.getNumero().toLowerCase().contains(lowerQuery))
+        // 3. Recherche Factures (Optimisée)
+        results.addAll(factureRepository.findByNumeroContainingIgnoreCase(searchTrimmed)
+                .stream()
                 .limit(5)
                 .map(f -> SearchResultDTO.builder()
                         .id(f.getId().toString())
@@ -73,15 +70,13 @@ public class GlobalSearchServiceImpl implements IGlobalSearchService {
                         .build())
                 .collect(Collectors.toList()));
 
-        // 4. Recherche Audit
-        results.addAll(journalAuditRepository.findAll().stream()
-                .filter(a -> a.getAction().toLowerCase().contains(lowerQuery) || 
-                             (a.getEntite() != null && a.getEntite().toLowerCase().contains(lowerQuery)))
-                .limit(5)
+        // 4. Recherche Audit (Optimisée via existante)
+        results.addAll(journalAuditRepository.searchAudit(searchTrimmed, null, org.springframework.data.domain.PageRequest.of(0, 5))
+                .getContent().stream()
                 .map(a -> SearchResultDTO.builder()
                         .id(a.getId().toString())
-                        .title(a.getAction() + " - " + a.getEntite())
-                        .subtitle(a.getDateAction().toString() + " | IP: " + a.getAdresseIp())
+                        .title(a.getAction() + " - " + (a.getEntite() != null ? a.getEntite() : "Système"))
+                        .subtitle(a.getDateAction().toString().split("T")[0] + " | IP: " + a.getAdresseIp())
                         .type("AUDIT")
                         .url("/audit")
                         .build())

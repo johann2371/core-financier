@@ -110,7 +110,7 @@ public class FactureServiceImpl implements IFactureService {
         // 7. Notification
         notificationService.creerEtEnvoyer(
                 "Nouvelle facture créée",
-                "La facture " + saved.getNumero() + " pour " + tiers.getRaisonSociale() + " (Montant: " + saved.getMontantTtc() + " XAF) a été enregistrée.",
+                creePar.getPrenom() + " " + creePar.getNom() + " a créé la facture " + saved.getNumero() + " pour " + tiers.getRaisonSociale() + " — " + saved.getMontantTtc() + " XAF.",
                 "RESPONSABLE_FINANCIER");
 
         return factureMapper.toResponse(saved, saved.getMontantTtc());

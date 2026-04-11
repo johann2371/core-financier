@@ -15,4 +15,8 @@ public class FactureResponse {
     private BigDecimal montantTtc;
     private BigDecimal resteAPayer;
     private String statut;
+    
+    // Traçabilité
+    private String creeParNom;
+    private String valideParNom;
 }

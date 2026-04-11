@@ -262,6 +262,7 @@ const getStatusClass = (statut) => {
               <th>Client</th>
               <th>Moyen</th>
               <th class="text-right">Montant (XAF)</th>
+              <th>Opérateur</th>
               <th class="text-center">Statut</th>
               <th class="text-center">Action</th>
             </tr>
@@ -286,6 +287,12 @@ const getStatusClass = (statut) => {
               <td class="font-semibold text-dark">{{ e.nomClient }}</td>
               <td>{{ e.moyenPaiement }}</td>
               <td class="text-right font-semibold">{{ e.montant?.toLocaleString() }}</td>
+              <td>
+                <div class="cell-stack text-xs">
+                  <span v-if="e.saisiParNom" class="text-muted" title="Saisi par">S: {{ e.saisiParNom }}</span>
+                  <span v-if="e.valideParNom" class="text-blue-600" title="Validé par">V: {{ e.valideParNom }}</span>
+                </div>
+              </td>
               <td class="text-center">
                 <span class="badge" :class="getStatusClass(e.statut)">
                   {{ e.statut }}

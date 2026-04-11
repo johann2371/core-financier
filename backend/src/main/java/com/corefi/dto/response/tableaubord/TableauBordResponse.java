@@ -35,6 +35,19 @@ public class TableauBordResponse {
     private BigDecimal decaissementsExecutesDuJour;
     private long operationsDuJour;
 
+    // --- Nouveaux KPIs Admin ---
+    private BigDecimal soldeTresorerieTotal;
+    private long utilisateursActifs;
+    private long utilisateursBloques;
+    private long facturesImpayeesCount;
+    private long facturesEnRetardCount; // > 30 jours
+    private BigDecimal encaissementsMoisActuel;
+    private double progressionEncaissements; // % vs mois dernier
+    private BigDecimal decaissementsMoisActuel;
+    private double progressionDecaissements; // % vs mois dernier
+    private long encaissementsDuJourCount;
+    private long decaissementsDuJourCount;
+
     @Data
     @lombok.AllArgsConstructor
     @lombok.NoArgsConstructor

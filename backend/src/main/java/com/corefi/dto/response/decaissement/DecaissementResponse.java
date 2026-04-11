@@ -23,6 +23,12 @@ public class DecaissementResponse {
     private String moyenPaiement;
     private int nbJustificatifs;
     private List<JustificatifInfo> justificatifs;
+    
+    // Traçabilité
+    private String saisiParNom;
+    private String valideParNom;
+    private String approuveParPdgNom;
+    private String executeParNom;
 
     @Data
     public static class JustificatifInfo {

@@ -8,6 +8,7 @@ import com.corefi.entity.CompteFinancier;
 import com.corefi.entity.Devise;
 import com.corefi.enums.MoyenPaiement;
 import com.corefi.enums.StatutEncaissement;
+import com.corefi.entity.Utilisateur;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -43,6 +44,16 @@ public class EncaissementMapper {
         r.setMoyenPaiement(e.getMoyenPaiement().name());
         r.setStatut(e.getStatut().name());
         r.setReference(e.getReference());
+
+        // Traçabilité
+        r.setSaisiParNom(formatFullUser(e.getSaisiPar()));
+        r.setValideParNom(formatFullUser(e.getValidePar()));
+
         return r;
+    }
+
+    private String formatFullUser(Utilisateur u) {
+        if (u == null) return null;
+        return (u.getPrenom() != null ? u.getPrenom() : "") + " " + (u.getNom() != null ? u.getNom() : "");
     }
 }

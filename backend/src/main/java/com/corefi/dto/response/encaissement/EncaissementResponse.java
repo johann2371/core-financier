@@ -15,4 +15,8 @@ public class EncaissementResponse {
     private String reference;
     private String moyenPaiement;
     private String statut;
+    
+    // Traçabilité
+    private String saisiParNom;
+    private String valideParNom;
 }

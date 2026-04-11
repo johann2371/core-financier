@@ -15,6 +15,8 @@ public interface FactureRepository extends JpaRepository<Facture, Long> {
 
     List<Facture> findByTiersId(Long tiersId);
 
+    List<Facture> findByNumeroContainingIgnoreCase(String numero);
+
     /** Charge la facture avec ses lignes, tiers et devise en une seule requête (pour PDF) */
     @Query("SELECT f FROM Facture f LEFT JOIN FETCH f.lignes LEFT JOIN FETCH f.tiers LEFT JOIN FETCH f.devise WHERE f.id = :id")
     Optional<Facture> findByIdWithDetails(@Param("id") Long id);

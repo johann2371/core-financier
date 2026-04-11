@@ -492,6 +492,8 @@ const selectedCompteBalance = computed(() => {
               <th>Date</th>
               <th>Bénéficiaire & Motif</th>
               <th class="text-right">Montant (XAF)</th>
+              <th>Saisi par</th>
+              <th>Validation</th>
               <th>Statut</th>
               <th class="text-center">Contrôle</th>
             </tr>
@@ -515,6 +517,15 @@ const selectedCompteBalance = computed(() => {
                 </div>
               </td>
               <td class="text-right font-semibold text-dark">{{ item.montant?.toLocaleString() }} XAF</td>
+              <td class="text-sm text-muted">{{ item.saisiParNom || '-' }}</td>
+              <td>
+                <div class="cell-stack text-xs">
+                  <span v-if="item.valideParNom" class="text-green-600" title="Validé par RF">RF: {{ item.valideParNom }}</span>
+                  <span v-if="item.approuveParPdgNom" class="text-blue-600" title="Approuvé par PDG">PDG: {{ item.approuveParPdgNom }}</span>
+                  <span v-if="item.executeParNom" class="text-orange-600" title="Exécuté par Caisse">EXE: {{ item.executeParNom }}</span>
+                  <span v-if="!item.valideParNom && !item.approuveParPdgNom" class="italic opacity-50">Aucune validation</span>
+                </div>
+              </td>
               <td>
                 <span class="badge" :class="getStatusClass(item.statut)">
                   {{ item.statut }}
