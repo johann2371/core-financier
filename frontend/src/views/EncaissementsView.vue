@@ -6,7 +6,10 @@ import Pagination from '../components/Pagination.vue'
 import { useEncaissementStore } from '../stores/encaissement.store'
 import { useTierStore } from '../stores/tier.store'
 import { useCompteStore } from '../stores/compte.store'
+import { useRoute, useRouter } from 'vue-router'
 
+const route = useRoute()
+const router = useRouter()
 const store = useEncaissementStore()
 const tierStore = useTierStore()
 const compteStore = useCompteStore()
@@ -98,7 +101,9 @@ const form = ref({
   banqueEmettrice: '',
   numeroOperation: '',
   dateOperation: '',
-  telephone: ''
+  telephone: '',
+  fraisTransaction: 0,
+  datePrevisionnelleCompensation: ''
 })
 
 const selectedClientObj = computed(() => {
@@ -110,6 +115,19 @@ onMounted(async () => {
   await store.fetchEncaissements()
   await tierStore.fetchTiers()
   await compteStore.fetchComptes()
+
+  // Gestion du pré-remplissage depuis Factures
+  if (route.query.invoiceId) {
+    form.value.clientId = parseInt(route.query.clientId)
+    form.value.montant = parseFloat(route.query.amount)
+    form.value.numeroFacture = route.query.numero
+    form.value.motif = `Paiement facture ${route.query.numero}`
+    
+    showModal.value = true
+    
+    // Nettoyer l'URL
+    router.replace({ path: '/encaissements' })
+  }
 })
 
 const availableComptes = computed(() => {
@@ -157,7 +175,9 @@ const submitForm = async () => {
       banqueEmettrice: form.value.banqueEmettrice || null,
       numeroOperation: form.value.numeroOperation || null,
       dateOperation: form.value.dateOperation || null,
-      telephone: form.value.telephone || null
+      telephone: form.value.telephone || null,
+      fraisTransaction: form.value.fraisTransaction || 0,
+      datePrevisionnelleCompensation: form.value.datePrevisionnelleCompensation || null
     }
 
     // Gestion de l'affectation automatique par numéro de facture
@@ -170,7 +190,7 @@ const submitForm = async () => {
 
     const newlyCreated = await store.createEncaissement(dataToSend)
     showModal.value = false
-    form.value = { motif: '', montant: '', numeroFacture: '', clientId: '', moyenPaiement: 'VIREMENT', compteFinancierId: 1, banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '' }
+    form.value = { motif: '', montant: '', numeroFacture: '', clientId: '', moyenPaiement: 'VIREMENT', compteFinancierId: 1, banqueEmettrice: '', numeroOperation: '', dateOperation: '', telephone: '', fraisTransaction: 0, datePrevisionnelleCompensation: '' }
     
     // Auto-téléchargement du reçu pour marquer l'acte
     if (newlyCreated && newlyCreated.id) {
@@ -285,7 +305,12 @@ const getStatusClass = (statut) => {
               </td>
               <td>{{ new Date(e.dateEncaissement).toLocaleDateString() }}</td>
               <td class="font-semibold text-dark">{{ e.nomClient }}</td>
-              <td>{{ e.moyenPaiement }}</td>
+              <td>
+                <div class="motif-cell">
+                  <span>{{ e.moyenPaiement }}</span>
+                  <span v-if="e.fraisTransaction > 0" class="text-xs text-orange-500">Frais: {{ e.fraisTransaction }}</span>
+                </div>
+              </td>
               <td class="text-right font-semibold">{{ e.montant?.toLocaleString() }}</td>
               <td>
                 <div class="cell-stack text-xs">
@@ -398,7 +423,12 @@ const getStatusClass = (statut) => {
                 <label class="mode-card" :class="{ active: selectedMode === 'ORANGE_MONEY' }">
                   <input type="radio" v-model="selectedMode" value="ORANGE_MONEY" class="hidden-radio"/>
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-                  <span>Or. Money</span>
+                  <span>OM</span>
+                </label>
+                <label class="mode-card" :class="{ active: selectedMode === 'CARTE_BANCAIRE' }">
+                  <input type="radio" v-model="selectedMode" value="CARTE_BANCAIRE" class="hidden-radio"/>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                  <span>Carte</span>
                 </label>
               </div>
             </div>
@@ -421,15 +451,28 @@ const getStatusClass = (statut) => {
                 <input v-model="form.dateOperation" type="date" class="input-large" required />
               </div>
 
-              <div v-if="selectedMode === 'ORANGE_MONEY'" class="form-row mt-2">
-                <div class="form-group half">
+              <div v-if="selectedMode === 'ORANGE_MONEY' || selectedMode === 'CARTE_BANCAIRE'" class="form-row mt-2">
+                <div class="form-group half" v-if="selectedMode === 'ORANGE_MONEY'">
                   <label>Téléphone <span class="req">*</span></label>
                   <input v-model="form.telephone" type="text" class="input-large" placeholder="Ex: 6XX XX XX XX" required />
                 </div>
                 <div class="form-group half">
                   <label>ID Transaction <span class="req">*</span></label>
-                  <input v-model="form.numeroOperation" type="text" class="input-large" placeholder="ID OM..." required />
+                  <input v-model="form.numeroOperation" type="text" class="input-large" placeholder="Référence..." required />
                 </div>
+              </div>
+
+              <div v-if="selectedMode === 'ORANGE_MONEY' || selectedMode === 'CARTE_BANCAIRE'" class="form-group mt-2">
+                <label>Frais de transaction (XAF)</label>
+                <input v-model="form.fraisTransaction" type="number" class="input-large" placeholder="0" />
+                <span class="text-xs text-muted" v-if="form.montant > 0">
+                  Montant Net: <strong>{{ (form.montant - (form.fraisTransaction || 0)).toLocaleString() }} XAF</strong>
+                </span>
+              </div>
+
+              <div v-if="selectedMode === 'CHEQUE'" class="form-group mt-2">
+                <label>Date prévisionnelle de compensation</label>
+                <input v-model="form.datePrevisionnelleCompensation" type="date" class="input-large" />
               </div>
             </div>
 

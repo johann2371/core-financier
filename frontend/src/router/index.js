@@ -63,6 +63,12 @@ const router = createRouter({
       name: 'admin',
       component: () => import('../views/DashboardAdminView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/journal-caisse',
+      name: 'journal-caisse',
+      component: () => import('../views/JournalCaisseView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })

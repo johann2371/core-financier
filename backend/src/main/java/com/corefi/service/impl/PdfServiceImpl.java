@@ -12,17 +12,23 @@ import com.corefi.repository.EncaissementRepository;
 import com.corefi.repository.DecaissementRepository;
 import com.corefi.repository.FactureRepository;
 import com.corefi.repository.ParametrageRepository;
+import com.corefi.repository.SessionCaisseRepository;
+import com.corefi.entity.SessionCaisse;
+import com.corefi.enums.MoyenPaiement;
 import com.corefi.service.interfaces.IPdfService;
 import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
+import com.itextpdf.text.pdf.draw.LineSeparator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +38,7 @@ public class PdfServiceImpl implements IPdfService {
     private final EncaissementRepository encaissementRepository;
     private final DecaissementRepository decaissementRepository;
     private final ParametrageRepository parametrageRepository;
+    private final SessionCaisseRepository sessionCaisseRepository;
 
     private String getNomSociete() {
         return parametrageRepository.findByCle("INFO_SOCIETE_NOM")
@@ -351,5 +358,189 @@ public class PdfServiceImpl implements IPdfService {
         } catch (DocumentException e) {
             throw new WorkflowException("Erreur lors de la génération du bon PDF : " + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] genererRapportCloturePdf(Long sessionId) {
+        SessionCaisse session = sessionCaisseRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session de caisse introuvable"));
+
+        List<Encaissement> encaissements = encaissementRepository.findBySessionCaisseId(sessionId).stream()
+                .filter(e -> e.getMoyenPaiement() == MoyenPaiement.ESPECES)
+                .toList();
+
+        List<Decaissement> decaissements = decaissementRepository.findBySessionCaisseId(sessionId).stream()
+                .filter(d -> d.getMoyenPaiement() == MoyenPaiement.ESPECES)
+                .toList();
+
+        try {
+            Document document = new Document();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfWriter.getInstance(document, baos);
+
+            document.open();
+
+            // Header
+            Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
+            Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
+            titreApp.setAlignment(Element.ALIGN_CENTER);
+            document.add(titreApp);
+
+            document.add(new Paragraph(" "));
+
+            Font fontType = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
+            Paragraph titreRapport = new Paragraph("RAPPORT DE CLÔTURE DE CAISSE", fontType);
+            titreRapport.setAlignment(Element.ALIGN_CENTER);
+            document.add(titreRapport);
+
+            document.add(new Paragraph(" "));
+
+            // Session Info
+            Font fontBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11);
+            Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 11);
+            
+            document.add(new Paragraph("Caisse: " + session.getCaisse().getLibelle(), fontNormal));
+            document.add(new Paragraph("Caissier: " + session.getCaissier().getNom() + " " + session.getCaissier().getPrenom(), fontNormal));
+            document.add(new Paragraph("Date Ouverture: " + session.getDateOuverture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")), fontNormal));
+            if (session.getDateFermeture() != null) {
+                document.add(new Paragraph("Date Fermeture: " + session.getDateFermeture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")), fontNormal));
+            }
+            
+            document.add(new Paragraph(" "));
+
+            // Table Encaissements
+            document.add(new Paragraph("DÉTAIL DES ENCAISSEMENTS (RECETTES)", fontBold));
+            document.add(new Paragraph(" "));
+            PdfPTable tableEnc = new PdfPTable(3);
+            tableEnc.setWidthPercentage(100);
+            tableEnc.setWidths(new float[]{2f, 5f, 3f});
+            ajouterCelluleEnTete(tableEnc, "N°", fontBold);
+            ajouterCelluleEnTete(tableEnc, "Motif / Client", fontBold);
+            ajouterCelluleEnTete(tableEnc, "Montant (XAF)", fontBold);
+
+            for (Encaissement e : encaissements) {
+                tableEnc.addCell(new Phrase(e.getNumero(), fontNormal));
+                tableEnc.addCell(new Phrase((e.getClient() != null ? e.getClient().getRaisonSociale() + " - " : "") + e.getReference(), fontNormal));
+                tableEnc.addCell(new Phrase(String.format("%,.0f", e.getMontant()), fontNormal));
+            }
+            if (encaissements.isEmpty()) {
+                PdfPCell empty = new PdfPCell(new Phrase("Aucun mouvement", fontNormal));
+                empty.setColspan(3);
+                tableEnc.addCell(empty);
+            }
+            document.add(tableEnc);
+
+            document.add(new Paragraph(" "));
+
+            // Table Décaissements
+            document.add(new Paragraph("DÉTAIL DES DÉCAISSEMENTS (DÉPENSES)", fontBold));
+            document.add(new Paragraph(" "));
+            PdfPTable tableDec = new PdfPTable(3);
+            tableDec.setWidthPercentage(100);
+            tableDec.setWidths(new float[]{2f, 5f, 3f});
+            ajouterCelluleEnTete(tableDec, "N°", fontBold);
+            ajouterCelluleEnTete(tableDec, "Motif", fontBold);
+            ajouterCelluleEnTete(tableDec, "Montant (XAF)", fontBold);
+
+            for (Decaissement d : decaissements) {
+                tableDec.addCell(new Phrase(d.getNumero(), fontNormal));
+                tableDec.addCell(new Phrase(d.getMotif(), fontNormal));
+                tableDec.addCell(new Phrase(String.format("%,.0f", d.getMontant()), fontNormal));
+            }
+            if (decaissements.isEmpty()) {
+                PdfPCell empty = new PdfPCell(new Phrase("Aucun mouvement", fontNormal));
+                empty.setColspan(3);
+                tableDec.addCell(empty);
+            }
+            document.add(tableDec);
+
+            document.add(new Paragraph(" "));
+            document.add(new LineSeparator());
+            document.add(new Paragraph(" "));
+
+            // Récapitulatif Final
+            PdfPTable tableRecap = new PdfPTable(2);
+            tableRecap.setWidthPercentage(60);
+            tableRecap.setHorizontalAlignment(Element.ALIGN_RIGHT);
+
+            ajouterRecapRow(tableRecap, "Solde Initial (A):", session.getSoldeInitial());
+            ajouterRecapRow(tableRecap, "Total Recettes (+):", encaissements.stream().map(Encaissement::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add));
+            ajouterRecapRow(tableRecap, "Total Dépenses (-):", decaissements.stream().map(Decaissement::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add));
+            document.add(tableRecap);
+            
+            document.add(new Paragraph(" "));
+            
+            PdfPTable tableTotal = new PdfPTable(2);
+            tableTotal.setWidthPercentage(60);
+            tableTotal.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            
+            ajouterRecapRowBold(tableTotal, "Solde Théorique (B):", session.getSoldeFinalTheorique());
+            ajouterRecapRowBold(tableTotal, "Solde Réel compté (C):", session.getSoldeFinalReel());
+            
+            BaseColor ecartColor = session.getEcart().compareTo(BigDecimal.ZERO) == 0 ? BaseColor.BLACK : BaseColor.RED;
+            ajouterRecapRowColored(tableTotal, "ÉCART (C - B):", session.getEcart(), ecartColor);
+            
+            document.add(tableTotal);
+
+            if (session.getMotifEcart() != null && !session.getMotifEcart().isEmpty()) {
+                document.add(new Paragraph(" "));
+                document.add(new Paragraph("Justification de l'écart:", fontBold));
+                document.add(new Paragraph(session.getMotifEcart(), fontNormal));
+            }
+
+            // Signatures
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph(" "));
+            PdfPTable tableSign = new PdfPTable(2);
+            tableSign.setWidthPercentage(100);
+            PdfPCell signC = new PdfPCell(new Phrase("Visa Caissier", fontBold));
+            signC.setBorder(Rectangle.NO_BORDER);
+            signC.setHorizontalAlignment(Element.ALIGN_CENTER);
+            PdfPCell signR = new PdfPCell(new Phrase("Visa Responsable Financier / PDG", fontBold));
+            signR.setBorder(Rectangle.NO_BORDER);
+            signR.setHorizontalAlignment(Element.ALIGN_CENTER);
+            tableSign.addCell(signC);
+            tableSign.addCell(signR);
+            document.add(tableSign);
+
+            document.close();
+            return baos.toByteArray();
+
+        } catch (Exception e) {
+            throw new WorkflowException("Erreur lors de la génération du rapport PDF : " + e.getMessage());
+        }
+    }
+
+    private void ajouterRecapRow(PdfPTable table, String label, java.math.BigDecimal montant) {
+        PdfPCell c1 = new PdfPCell(new Phrase(label));
+        c1.setBorder(Rectangle.NO_BORDER);
+        PdfPCell c2 = new PdfPCell(new Phrase(String.format("%,.0f XAF", montant)));
+        c2.setBorder(Rectangle.NO_BORDER);
+        c2.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        table.addCell(c1);
+        table.addCell(c2);
+    }
+
+    private void ajouterRecapRowBold(PdfPTable table, String label, java.math.BigDecimal montant) {
+        Font font = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
+        PdfPCell c1 = new PdfPCell(new Phrase(label, font));
+        c1.setBorder(Rectangle.NO_BORDER);
+        PdfPCell c2 = new PdfPCell(new Phrase(String.format("%,.0f XAF", montant), font));
+        c2.setBorder(Rectangle.NO_BORDER);
+        c2.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        table.addCell(c1);
+        table.addCell(c2);
+    }
+
+    private void ajouterRecapRowColored(PdfPTable table, String label, java.math.BigDecimal montant, BaseColor color) {
+        Font font = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, color);
+        PdfPCell c1 = new PdfPCell(new Phrase(label, font));
+        c1.setBorder(Rectangle.NO_BORDER);
+        PdfPCell c2 = new PdfPCell(new Phrase(String.format("%,.0f XAF", montant), font));
+        c2.setBorder(Rectangle.NO_BORDER);
+        c2.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        table.addCell(c1);
+        table.addCell(c2);
     }
 }

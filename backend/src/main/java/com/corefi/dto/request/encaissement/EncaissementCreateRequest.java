@@ -31,5 +31,8 @@ public class EncaissementCreateRequest {
     private LocalDate dateOperation;
     private String telephone;
 
+    private BigDecimal fraisTransaction;
+    private LocalDate datePrevisionnelleCompensation;
+
     private List<AffectationRequest> affectations;
 }

@@ -41,7 +41,7 @@ public class DecaissementController {
         byte[] pdfBytes = pdfService.genererRecuDecaissementPdf(id);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
-        headers.setContentDisposition(ContentDisposition.inline().build());
+        headers.setContentDisposition(ContentDisposition.inline().filename("bon_decaissement_" + id + ".pdf").build());
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 

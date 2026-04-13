@@ -38,6 +38,7 @@ public class DecaissementServiceImpl implements IDecaissementService {
     private final IJournalAuditService journalAuditService;
     private final com.corefi.service.interfaces.INotificationService notificationService;
     private final ParametrageRepository parametrageRepository;
+    private final SessionCaisseRepository sessionCaisseRepository;
 
     private BigDecimal getSeuilPdg() {
         return parametrageRepository.findByCle("SEUIL_APPROBATION_PDG")
@@ -337,10 +338,23 @@ public class DecaissementServiceImpl implements IDecaissementService {
         }
 
         // Valider le moyen de paiement
+        MoyenPaiement moyen;
         try {
-            MoyenPaiement.valueOf(request.getMoyenPaiement().toUpperCase());
+            moyen = MoyenPaiement.valueOf(request.getMoyenPaiement().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new WorkflowException("Moyen de paiement invalide : " + request.getMoyenPaiement());
+        }
+
+        // Logic spécifique Session Caisse pour les Espèces
+        if (moyen == MoyenPaiement.ESPECES) {
+            Utilisateur executePar = getUtilisateurConnecte();
+            SessionCaisse session = sessionCaisseRepository.findCurrentActiveSession(executePar.getId())
+                    .orElseThrow(() -> new WorkflowException("Vous devez ouvrir une session de caisse pour effectuer un paiement en espèces."));
+            
+            if (!session.getCaisse().getId().equals(compte.getId())) {
+                throw new WorkflowException("Le compte sélectionné ne correspond pas à la caisse de votre session active.");
+            }
+            d.setSessionCaisse(session);
         }
 
         // Débiter le compte (simulation)
@@ -349,27 +363,20 @@ public class DecaissementServiceImpl implements IDecaissementService {
 
         // Soustraire du solde fournisseur (on a payé notre dette)
         Tiers fournisseur = d.getFournisseur();
-        if (fournisseur.getSolde() == null) fournisseur.setSolde(java.math.BigDecimal.ZERO);
-        BigDecimal ancienSolde = fournisseur.getSolde();
-
-        // Validation : ne pas payer plus que le montant dû
-        if (d.getMontant().compareTo(ancienSolde) > 0) {
-            throw new RuntimeException("Le montant du décaissement (" + d.getMontant() + ") ne peut pas dépasser le solde dû (" + ancienSolde + ")");
+        if (fournisseur != null) {
+            if (fournisseur.getSolde() == null) fournisseur.setSolde(BigDecimal.ZERO);
+            fournisseur.setSolde(fournisseur.getSolde().subtract(d.getMontant()));
+            tiersRepository.save(fournisseur);
         }
-
-        BigDecimal nouveauSolde = ancienSolde.subtract(d.getMontant());
-        if (nouveauSolde.compareTo(BigDecimal.ZERO) < 0) nouveauSolde = BigDecimal.ZERO;
-
-        fournisseur.setSolde(nouveauSolde);
-        tiersRepository.save(fournisseur);
 
         // Mettre à jour le décaissement
         d.setStatut(StatutDecaissement.EXECUTEE);
-        d.setMoyenPaiement(MoyenPaiement.valueOf(request.getMoyenPaiement().toUpperCase()));
+        d.setMoyenPaiement(moyen);
         d.setCompteFinancier(compte);
         d.setReferenceExecution(request.getReferenceExecution());
         d.setExecutePar(getUtilisateurConnecte());
         d.setDateExecution(LocalDateTime.now());
+
 
         Decaissement saved = decaissementRepository.save(d);
 

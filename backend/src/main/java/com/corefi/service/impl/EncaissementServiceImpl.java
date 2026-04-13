@@ -9,6 +9,7 @@ import com.corefi.enums.StatutFacture;
 import com.corefi.enums.TypeTiers;
 import com.corefi.exception.ResourceNotFoundException;
 import com.corefi.exception.WorkflowException;
+import com.corefi.enums.StatutEncaissement;
 import com.corefi.mapper.EncaissementMapper;
 import com.corefi.repository.*;
 import com.corefi.service.interfaces.IEncaissementService;
@@ -36,97 +37,97 @@ public class EncaissementServiceImpl implements IEncaissementService {
     private final DeviseRepository deviseRepository;
     private final FactureRepository factureRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final SessionCaisseRepository sessionCaisseRepository;
     private final AffectationPaiementRepository affectationPaiementRepository;
     private final EncaissementMapper encaissementMapper;
     private final IJournalAuditService journalAuditService;
     private final com.corefi.service.interfaces.INotificationService notificationService;
 
     // ────────────────────────────────────────────────────────────────────────
-    // CRÉER UN ENCAISSEMENT (simulation de paiement reçu)
+    // CRÉER UN ENCAISSEMENT
     // ────────────────────────────────────────────────────────────────────────
     @Override
     @Transactional
     public EncaissementResponse creer(EncaissementCreateRequest request) {
-        // 1. Vérifier le client
+        // 1. Charger les entités de base
         Tiers client = tiersRepository.findById(request.getClientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Client introuvable avec ID : " + request.getClientId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Client introuvable"));
 
         if (client.getType() != TypeTiers.CLIENT) {
-            throw new WorkflowException("Un encaissement doit être associé à un CLIENT, pas un FOURNISSEUR.");
+            throw new WorkflowException("Seuls les clients peuvent faire l'objet d'un encaissement.");
         }
 
-        // 2. Vérifier le compte financier
         CompteFinancier compte = compteFinancierRepository.findById(request.getCompteFinancierId())
-                .orElseThrow(() -> new ResourceNotFoundException("Compte financier introuvable avec ID : " + request.getCompteFinancierId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Compte financier introuvable"));
 
-        // 3. Vérifier la devise (XAF par défaut)
-        Devise devise = null;
-        if (request.getDeviseId() != null) {
-            devise = deviseRepository.findById(request.getDeviseId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Devise introuvable avec ID : " + request.getDeviseId()));
-        } else {
-            devise = deviseRepository.findByCode("XAF")
-                    .orElseThrow(() -> new ResourceNotFoundException("Devise XAF non trouvée."));
-        }
+        Devise devise = request.getDeviseId() != null 
+                ? deviseRepository.findById(request.getDeviseId()).orElseThrow(() -> new ResourceNotFoundException("Devise introuvable"))
+                : deviseRepository.findByCode("XAF").orElseThrow(() -> new ResourceNotFoundException("Devise XAF non configurée"));
 
-        // 4. Valider le moyen de paiement
+        // 2. Valider le moyen de paiement
+        MoyenPaiement moyen;
         try {
-            MoyenPaiement.valueOf(request.getMoyenPaiement().toUpperCase());
+            moyen = MoyenPaiement.valueOf(request.getMoyenPaiement().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new WorkflowException("Moyen de paiement invalide : " + request.getMoyenPaiement()
-                    + ". Valeurs : ESPECES, CHEQUE, VIREMENT, CARTE_BANCAIRE, ORANGE_MONEY");
+            throw new WorkflowException("Moyen de paiement invalide : " + request.getMoyenPaiement());
         }
 
-        // 5. Créer l'encaissement
+        // 3. Mapper l'entité
         Encaissement encaissement = encaissementMapper.toEntity(request, client, compte, devise);
         encaissement.setNumero(genererNumero("ENC"));
         encaissement.setDateEncaissement(LocalDate.now());
 
-        // Récupérer l'utilisateur connecté
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        Utilisateur saisiPar = utilisateurRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur connecté introuvable."));
+        Utilisateur saisiPar = getUtilisateurConnecte();
         encaissement.setSaisiPar(saisiPar);
 
-        // 6. Créditer le compte financier (simulation)
-        compte.setSolde(compte.getSolde().add(request.getMontant()));
-        compteFinancierRepository.save(compte);
-
-        // 7. Mettre à jour le solde du tiers (diminue la dette globale dès l'encaissement)
-        if (client.getSolde() == null) client.setSolde(BigDecimal.ZERO);
-        BigDecimal ancienSolde = client.getSolde();
-
-        // Validation : ne pas payer plus que le montant dû
-        if (request.getMontant().compareTo(ancienSolde) > 0) {
-             throw new RuntimeException("Le montant de l'encaissement (" + request.getMontant() + ") ne peut pas dépasser le solde dû (" + ancienSolde + ")");
+        // 4. Logique conditionnelle selon le type de paiement
+        if (moyen == MoyenPaiement.ESPECES) {
+            SessionCaisse session = sessionCaisseRepository.findCurrentActiveSession(saisiPar.getId())
+                    .orElseThrow(() -> new WorkflowException("Aucune session de caisse ouverte pour enregistrer des espèces."));
+            
+            if (!session.getCaisse().getId().equals(compte.getId())) {
+                 throw new WorkflowException("Le compte choisi ne correspond pas à la caisse de votre session.");
+            }
+            
+            encaissement.setSessionCaisse(session);
+            encaissement.setStatut(StatutEncaissement.VALIDEE);
+            
+            // Impact immédiat sur le solde
+            compte.setSolde(compte.getSolde().add(request.getMontant()));
+            compteFinancierRepository.save(compte);
+        } 
+        else if (moyen == MoyenPaiement.CHEQUE) {
+            encaissement.setStatut(StatutEncaissement.ATTENTE_COMPENSATION);
+        } 
+        else if (moyen == MoyenPaiement.VIREMENT) {
+            encaissement.setStatut(StatutEncaissement.A_CONFIRMER);
+        } 
+        else {
+            // Mobile Money ou Carte (Impact Net)
+            encaissement.setStatut(StatutEncaissement.VALIDEE);
+            compte.setSolde(compte.getSolde().add(encaissement.getMontantNet()));
+            compteFinancierRepository.save(compte);
         }
 
-        BigDecimal nouveauSolde = ancienSolde.subtract(request.getMontant());
-        if (nouveauSolde.compareTo(BigDecimal.ZERO) < 0) nouveauSolde = BigDecimal.ZERO;
-        
-        client.setSolde(nouveauSolde);
+        // 5. Mettre à jour le solde du tiers (baisse de sa créance)
+        if (client.getSolde() == null) client.setSolde(BigDecimal.ZERO);
+        client.setSolde(client.getSolde().subtract(request.getMontant()));
         tiersRepository.save(client);
 
-        // 8. Sauvegarder l'encaissement
+        // 6. Sauvegarder
         Encaissement saved = encaissementRepository.save(encaissement);
 
-        // 9. Si des affectations de factures sont fournies, les traiter
+        // 7. Traiter les affectations si présentes
         if (request.getAffectations() != null && !request.getAffectations().isEmpty()) {
             affecter(saved.getId(), request.getAffectations());
         }
 
-        // 9. Audit
-        journalAuditService.enregistrer(
-                "CREATE", "Encaissement", saved.getId(),
-                null,
-                "Encaissement " + saved.getNumero() + " de " + saved.getMontant() + " XAF via " + saved.getMoyenPaiement(),
-                null);
+        // 8. Audit & Notification
+        journalAuditService.enregistrer("CREATE", "Encaissement", saved.getId(), null, 
+                "Encaissement " + saved.getNumero() + " (" + saved.getMontant() + " XAF)", null);
 
-        // 10. Notification
-        notificationService.creerEtEnvoyer(
-                "Nouvel encaissement reçu",
-                saisiPar.getPrenom() + " " + saisiPar.getNom() + " a enregistré un encaissement — " + saved.getMontant() + " FCFA pour le client " + client.getRaisonSociale() + ".",
-                "RESPONSABLE_FINANCIER");
+        notificationService.creerEtEnvoyer("Nouvel encaissement", 
+                "Un encaissement de " + saved.getMontant() + " a été saisi par " + saisiPar.getNom(), "RESPONSABLE_FINANCIER");
 
         return encaissementMapper.toResponse(saved);
     }

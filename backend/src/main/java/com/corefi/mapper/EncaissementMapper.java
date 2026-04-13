@@ -7,8 +7,8 @@ import com.corefi.entity.Tiers;
 import com.corefi.entity.CompteFinancier;
 import com.corefi.entity.Devise;
 import com.corefi.enums.MoyenPaiement;
-import com.corefi.enums.StatutEncaissement;
 import com.corefi.entity.Utilisateur;
+import java.math.BigDecimal;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -28,7 +28,17 @@ public class EncaissementMapper {
         e.setNumeroOperation(request.getNumeroOperation());
         e.setDateOperation(request.getDateOperation());
         e.setTelephone(request.getTelephone());
-        e.setStatut(StatutEncaissement.VALIDEE); // Par défaut : VALIDEE
+        
+        // Nouveaux champs
+        e.setFraisTransaction(request.getFraisTransaction());
+        e.setDatePrevisionnelleCompensation(request.getDatePrevisionnelleCompensation());
+        
+        BigDecimal net = request.getMontant();
+        if (request.getFraisTransaction() != null) {
+            net = net.subtract(request.getFraisTransaction());
+        }
+        e.setMontantNet(net);
+
         return e;
     }
 
@@ -48,6 +58,12 @@ public class EncaissementMapper {
         // Traçabilité
         r.setSaisiParNom(formatFullUser(e.getSaisiPar()));
         r.setValideParNom(formatFullUser(e.getValidePar()));
+
+        // Frais & Compensation
+        r.setFraisTransaction(e.getFraisTransaction());
+        r.setMontantNet(e.getMontantNet());
+        r.setDatePrevisionnelleCompensation(e.getDatePrevisionnelleCompensation());
+        r.setSessionId(e.getSessionCaisse() != null ? e.getSessionCaisse().getId() : null);
 
         return r;
     }

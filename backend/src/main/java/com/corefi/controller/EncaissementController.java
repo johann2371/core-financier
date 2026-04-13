@@ -25,7 +25,7 @@ public class EncaissementController {
         byte[] pdfBytes = pdfService.genererRecuEncaissementPdf(id);
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
-        headers.setContentDisposition(org.springframework.http.ContentDisposition.inline().build());
+        headers.setContentDisposition(org.springframework.http.ContentDisposition.inline().filename("recu_encaissement_" + id + ".pdf").build());
         return new ResponseEntity<>(pdfBytes, headers, org.springframework.http.HttpStatus.OK);
     }
 

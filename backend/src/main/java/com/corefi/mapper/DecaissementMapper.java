@@ -74,6 +74,7 @@ public class DecaissementMapper {
         r.setValideParNom(formatFullUser(d.getValidePar()));
         r.setApprouveParPdgNom(formatFullUser(d.getApprouveParPdg()));
         r.setExecuteParNom(formatFullUser(d.getExecutePar()));
+        r.setSessionId(d.getSessionCaisse() != null ? d.getSessionCaisse().getId() : null);
 
         return r;
     }

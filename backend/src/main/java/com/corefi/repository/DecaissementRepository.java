@@ -14,4 +14,6 @@ public interface DecaissementRepository extends JpaRepository<Decaissement, Long
     List<Decaissement> findByStatut(StatutDecaissement statut);
 
     List<Decaissement> findByFournisseurId(Long fournisseurId);
+
+    List<Decaissement> findBySessionCaisseId(Long sessionCaisseId);
 }

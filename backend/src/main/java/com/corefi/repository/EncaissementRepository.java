@@ -10,4 +10,6 @@ public interface EncaissementRepository extends JpaRepository<Encaissement, Long
     boolean existsByNumero(String numero);
 
     java.util.List<com.corefi.entity.Encaissement> findByClientId(Long clientId);
+    
+    java.util.List<com.corefi.entity.Encaissement> findBySessionCaisseId(Long sessionCaisseId);
 }

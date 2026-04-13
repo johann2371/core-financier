@@ -29,6 +29,7 @@ public class DecaissementResponse {
     private String valideParNom;
     private String approuveParPdgNom;
     private String executeParNom;
+    private Long sessionId;
 
     @Data
     public static class JustificatifInfo {

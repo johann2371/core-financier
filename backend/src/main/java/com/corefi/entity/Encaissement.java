@@ -61,6 +61,19 @@ public class Encaissement {
     @Column(nullable = false, length = 50)
     private StatutEncaissement statut = StatutEncaissement.VALIDEE;
 
+    // --- Frais et Compensation ---
+    @Column(precision = 18, scale = 2)
+    private BigDecimal fraisTransaction;
+
+    @Column(precision = 18, scale = 2)
+    private BigDecimal montantNet;
+
+    private LocalDate datePrevisionnelleCompensation;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_caisse_id")
+    private SessionCaisse sessionCaisse;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "saisi_par")
     private Utilisateur saisiPar;

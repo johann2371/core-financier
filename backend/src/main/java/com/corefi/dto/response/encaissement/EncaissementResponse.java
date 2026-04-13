@@ -19,4 +19,10 @@ public class EncaissementResponse {
     // Traçabilité
     private String saisiParNom;
     private String valideParNom;
+
+    // Frais & Compensation
+    private BigDecimal fraisTransaction;
+    private BigDecimal montantNet;
+    private LocalDate datePrevisionnelleCompensation;
+    private Long sessionId;
 }

@@ -337,7 +337,16 @@ const openExecute = (item) => {
   executeForm.value = {
     compteFinancierId: list.length > 0 ? list[0].id : null,
     moyenPaiement: item.moyenPaiement || 'VIREMENT',
-    referenceExecution: ''
+    referenceExecution: '',
+    hasActiveSession: false
+  }
+  // Vérifier la session active si Espèces
+  if (executeForm.value.moyenPaiement === 'ESPECES') {
+    api.get('/sessions-caisse/active').then(res => {
+      executeForm.value.hasActiveSession = true;
+    }).catch(err => {
+      executeForm.value.hasActiveSession = false;
+    });
   }
   showExecuteModal.value = true
 }
@@ -885,6 +894,15 @@ const selectedCompteBalance = computed(() => {
             </select>
             <div v-if="availableComptes.length === 0" class="alert-box alert-error">
                Aucun compte compatible trouvé.
+            </div>
+          </div>
+
+          <div v-if="executeForm.moyenPaiement === 'ESPECES'" class="alert-box mb-4" :class="executeForm.hasActiveSession ? 'alert-success' : 'alert-error'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <div>
+              <strong>Session de Caisse</strong>
+              <span v-if="executeForm.hasActiveSession">Votre session est ouverte. Prêt pour décaissement espèces.</span>
+              <span v-else>⚠️ Vous devez ouvrir une session dans <strong>Journal de Caisse</strong> avant de décaisser des espèces.</span>
             </div>
           </div>
 

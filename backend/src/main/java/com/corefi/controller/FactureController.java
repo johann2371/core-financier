@@ -28,18 +28,18 @@ public class FactureController {
         byte[] pdfBytes = pdfService.genererFacturePdf(id);
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
-        headers.setContentDisposition(org.springframework.http.ContentDisposition.inline().build());
+        headers.setContentDisposition(org.springframework.http.ContentDisposition.inline().filename("facture_" + id + ".pdf").build());
         return new ResponseEntity<>(pdfBytes, headers, org.springframework.http.HttpStatus.OK);
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG','CAISSIER')")
     public ResponseEntity<List<FactureResponse>> findAll() {
         return ResponseEntity.ok(factureService.findAll());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG','CAISSIER')")
     public ResponseEntity<FactureResponse> findById(@PathVariable Long id) {
         return ResponseEntity.ok(factureService.findById(id));
     }

@@ -109,4 +109,8 @@ public class Decaissement {
 
     private LocalDateTime dateExecution;
     private String referenceExecution;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_caisse_id")
+    private SessionCaisse sessionCaisse;
 }

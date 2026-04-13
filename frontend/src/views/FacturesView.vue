@@ -5,10 +5,12 @@ import Pagination from '../components/Pagination.vue'
 import { useFactureStore } from '../stores/facture.store'
 import { useTierStore } from '../stores/tier.store'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth.store'
 import api from '../services/api'
 
 const store = useFactureStore()
 const tierStore = useTierStore()
+const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -145,6 +147,12 @@ const totalTTC = computed(() => {
 
 const filteredFactures = computed(() => {
   let list = store.factures
+  
+  // Restriction Caissier : Uniquement les ventes
+  if (authStore.userRole === 'CAISSIER') {
+    list = list.filter(f => f.type === 'VENTE')
+  }
+
   if (activeTab.value !== 'TOUS') {
     list = list.filter(f => f.type === activeTab.value)
   }
@@ -240,7 +248,7 @@ const submitForm = async () => {
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
         </svg>
       </button>
-      <button @click="showModal = true" class="btn-primary hide-on-mobile">
+      <button v-if="authStore.userRole !== 'CAISSIER'" @click="showModal = true" class="btn-primary hide-on-mobile">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
         Nouvelle Facture
       </button>
@@ -254,7 +262,7 @@ const submitForm = async () => {
     </div>
 
     <!-- Navigation par Onglets -->
-    <div class="tabs-nav" :class="{ 'mobile-collapsed': !showMobileFilters }">
+    <div v-if="authStore.userRole !== 'CAISSIER'" class="tabs-nav" :class="{ 'mobile-collapsed': !showMobileFilters }">
       <button class="tab-btn" :class="{ active: activeTab === 'TOUS' }" @click="setTab('TOUS')">Toutes ({{ store.factures.length }})</button>
       <button class="tab-btn" :class="{ active: activeTab === 'VENTE' }" @click="setTab('VENTE')">Ventes ({{ store.ventes.length }})</button>
       <button class="tab-btn" :class="{ active: activeTab === 'ACHAT' }" @click="setTab('ACHAT')">Achats ({{ store.achats.length }})</button>
@@ -356,6 +364,9 @@ const submitForm = async () => {
               <td class="text-right font-semibold text-dark">{{ item.montantTtc?.toLocaleString() || '0' }}</td>
               <td class="text-center">
                  <div class="actions-cell">
+                   <button v-if="item.statut !== 'SOLDEE' && item.type === 'VENTE'" class="icon-btn" @click="router.push({ path: '/encaissements', query: { invoiceId: item.id, clientId: item.tiersId, amount: item.resteAPayer || item.montantTtc, numero: item.numero } })" title="Enregistrer le paiement" style="color: #16a34a; background: #dcfce7;">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                   </button>
                    <button class="icon-btn preview-btn" @click="openPreview(item.id)" title="Aperçu">
                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                    </button>
