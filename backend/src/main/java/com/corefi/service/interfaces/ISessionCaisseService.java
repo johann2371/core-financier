@@ -13,5 +13,6 @@ public interface ISessionCaisseService {
     Optional<SessionCaisseResponse> getSessionActiveCurrentCaissier();
     List<SessionCaisseResponse> getHistoriqueSessionsCaissier(Long caissierId);
     List<SessionCaisseResponse> getHistoriqueSessionsCurrentCaissier();
+    List<SessionCaisseResponse> getAllHistoriqueSessions();
     SessionCaisseResponse getById(Long id);
 }

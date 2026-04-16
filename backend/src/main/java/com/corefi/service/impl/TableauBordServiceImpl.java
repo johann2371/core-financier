@@ -76,7 +76,7 @@ public class TableauBordServiceImpl implements ITableauBordService {
 
     @Override
     @Transactional(readOnly = true)
-    public TableauBordResponse getKpis() {
+    public TableauBordResponse getKpis(int forecastDays) {
         TableauBordResponse kpis = new TableauBordResponse();
 
         // 1. Solde total
@@ -162,6 +162,11 @@ public class TableauBordServiceImpl implements ITableauBordService {
         kpis.setBurnRateMensuel(calculerBurnRate());
         kpis.setSeuilApprobationActuel(recupererSeuil("SEUIL_APPROBATION_PDG", new BigDecimal("500000")));
         calculerMetriquesCaissier(kpis, allDecaissements);
+
+        // 9. KPIs Stratégiques (DSO, DPO, Prévision)
+        calculerDsoDpo(kpis, factures);
+        calculerPrevisionTresorerie(kpis, factures, soldeCaisses.add(soldeBanques), forecastDays);
+        calculerRepartitionDepenses(kpis, allDecaissements);
 
         return kpis;
     }
@@ -464,5 +469,118 @@ public class TableauBordServiceImpl implements ITableauBordService {
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("(DEC-\\S+|FAC-\\S+|ENC-\\S+)").matcher(message);
         if (m.find()) return "#" + m.group(1);
         return "";
+    }
+
+    // ==================== KPIS STRATEGIQUES ====================
+
+    /**
+     * Calcule le DSO (Days Sales Outstanding) et DPO (Days Payables Outstanding).
+     * DSO = délai moyen de paiement des clients (factures de vente payées).
+     * DPO = délai moyen de règlement aux fournisseurs (factures d'achat payées).
+     */
+    private void calculerDsoDpo(TableauBordResponse kpis, List<Facture> factures) {
+        // DSO: Approximation basée sur les factures VENTE payées
+        // Délai moyen = différence entre dateEchéance et dateFacture pour les factures payées
+        double totalDsoJours = 0;
+        int countDso = 0;
+
+        for (Facture f : factures) {
+            if ("VENTE".equals(f.getType()) && f.getStatut() == StatutFacture.SOLDEE
+                    && f.getDateFacture() != null && f.getDateEcheance() != null) {
+                long jours = java.time.temporal.ChronoUnit.DAYS.between(f.getDateFacture(), f.getDateEcheance());
+                if (jours >= 0) {
+                    totalDsoJours += jours;
+                    countDso++;
+                }
+            }
+        }
+        kpis.setDso(countDso > 0 ? Math.round(totalDsoJours / countDso * 10.0) / 10.0 : 0);
+
+        // DPO: Factures ACHAT payées -> différence entre date facture et date décaissement
+        List<Decaissement> allDec = decaissementRepository.findAll();
+        double totalDpoJours = 0;
+        int countDpo = 0;
+
+        for (Decaissement d : allDec) {
+            if (d.getStatut() == StatutDecaissement.EXECUTEE && d.getDateExecution() != null && d.getDateSaisie() != null) {
+                long jours = java.time.temporal.ChronoUnit.DAYS.between(d.getDateSaisie().toLocalDate(), d.getDateExecution().toLocalDate());
+                if (jours >= 0) {
+                    totalDpoJours += jours;
+                    countDpo++;
+                }
+            }
+        }
+        kpis.setDpo(countDpo > 0 ? Math.round(totalDpoJours / countDpo * 10.0) / 10.0 : 0);
+    }
+
+    /**
+     * Calcule la prévision de trésorerie sur X jours.
+     * Logique : Solde actuel + Factures Vente échéance < Xj - Factures Achat échéance < Xj
+     */
+    private void calculerPrevisionTresorerie(TableauBordResponse kpis, List<Facture> factures, BigDecimal soldeActuel, int forecastDays) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate limit = today.plusDays(forecastDays);
+
+        // Factures impayées avec échéance dans les X prochains jours
+        List<Facture> ventesAttendues = factures.stream()
+                .filter(f -> "VENTE".equals(f.getType()))
+                .filter(f -> f.getStatut() == StatutFacture.EN_ATTENTE_PAIEMENT || f.getStatut() == StatutFacture.PARTIELLEMENT_PAYEE || f.getStatut() == StatutFacture.VALIDEE)
+                .filter(f -> f.getDateEcheance() != null && !f.getDateEcheance().isBefore(today) && !f.getDateEcheance().isAfter(limit))
+                .collect(Collectors.toList());
+
+        List<Facture> achatsAttendus = factures.stream()
+                .filter(f -> "ACHAT".equals(f.getType()))
+                .filter(f -> f.getStatut() == StatutFacture.EN_ATTENTE_PAIEMENT || f.getStatut() == StatutFacture.PARTIELLEMENT_PAYEE || f.getStatut() == StatutFacture.VALIDEE)
+                .filter(f -> f.getDateEcheance() != null && !f.getDateEcheance().isBefore(today) && !f.getDateEcheance().isAfter(limit))
+                .collect(Collectors.toList());
+
+        // Générer les points de projection dynamiquement
+        List<TableauBordResponse.PointPrevision> points = new ArrayList<>();
+        List<Integer> checkpoints = new ArrayList<>();
+        checkpoints.add(0);
+        int step = forecastDays <= 30 ? 7 : (forecastDays <= 60 ? 15 : 30);
+        for (int i = step; i < forecastDays; i += step) {
+            checkpoints.add(i);
+        }
+        checkpoints.add(forecastDays);
+
+        for (int jour : checkpoints) {
+            java.time.LocalDate datePoint = today.plusDays(jour);
+
+            BigDecimal entreesCumul = ventesAttendues.stream()
+                    .filter(f -> !f.getDateEcheance().isAfter(datePoint))
+                    .map(Facture::getMontantTtc)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal sortiesCumul = achatsAttendus.stream()
+                    .filter(f -> !f.getDateEcheance().isAfter(datePoint))
+                    .map(Facture::getMontantTtc)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal soldePrevu = soldeActuel.add(entreesCumul).subtract(sortiesCumul);
+            String label = jour == 0 ? "Aujourd'hui" : "J+" + jour;
+            points.add(new TableauBordResponse.PointPrevision(label, soldePrevu));
+        }
+
+        kpis.setPointsPrevisionnels(points);
+        kpis.setSoldePrevisionnel30j(points.get(points.size() - 1).getSolde());
+    }
+
+    /**
+     * Répartition des dépenses par catégorie (basé sur le champ "categorie" du décaissement).
+     */
+    private void calculerRepartitionDepenses(TableauBordResponse kpis, List<Decaissement> allDecaissements) {
+        YearMonth currentMonth = YearMonth.now();
+        Map<String, BigDecimal> repartition = new LinkedHashMap<>();
+
+        allDecaissements.stream()
+                .filter(d -> d.getStatut() == StatutDecaissement.EXECUTEE)
+                .filter(d -> d.getDateExecution() != null && YearMonth.from(d.getDateExecution()).equals(currentMonth))
+                .forEach(d -> {
+                    String cat = d.getCategorie() != null ? d.getCategorie().name() : "Autre";
+                    repartition.put(cat, repartition.getOrDefault(cat, BigDecimal.ZERO).add(d.getMontant()));
+                });
+
+        kpis.setRepartitionDepensesParCategorie(repartition);
     }
 }

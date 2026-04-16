@@ -17,7 +17,7 @@ const handleLogin = async () => {
   await authStore.login(email.value, password.value)
   if (!authStore.error) {
     if (authStore.userRole === 'ADMINISTRATEUR') {
-      router.push('/audit')
+      router.push('/admin')
     } else {
       router.push('/')
     }

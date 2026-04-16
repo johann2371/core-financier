@@ -17,8 +17,8 @@ public class TableauBordController {
 
     @GetMapping("/kpis")
     @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'RESPONSABLE_FINANCIER', 'PDG', 'COMPTABLE', 'CAISSIER')")
-    public ResponseEntity<TableauBordResponse> getKpis() {
-        return ResponseEntity.ok(tableauBordService.getKpis());
+    public ResponseEntity<TableauBordResponse> getKpis(@RequestParam(defaultValue = "30") int forecastDays) {
+        return ResponseEntity.ok(tableauBordService.getKpis(forecastDays));
     }
 
     @PutMapping("/seuil")

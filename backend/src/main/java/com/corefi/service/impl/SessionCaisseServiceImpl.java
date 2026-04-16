@@ -136,6 +136,14 @@ public class SessionCaisseServiceImpl implements ISessionCaisseService {
     }
 
     @Override
+    public List<SessionCaisseResponse> getAllHistoriqueSessions() {
+        return sessionCaisseRepository.findAll().stream()
+                .sorted((a, b) -> b.getDateOuverture().compareTo(a.getDateOuverture()))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public SessionCaisseResponse getById(Long id) {
         return sessionCaisseRepository.findById(id)
                 .map(this::mapToResponse)

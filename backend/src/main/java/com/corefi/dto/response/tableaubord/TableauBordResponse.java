@@ -48,6 +48,13 @@ public class TableauBordResponse {
     private long encaissementsDuJourCount;
     private long decaissementsDuJourCount;
 
+    // --- KPIs Stratégiques ---
+    private double dso; // Days Sales Outstanding (délai moyen de paiement clients)
+    private double dpo; // Days Payables Outstanding (délai moyen de paiement fournisseurs)
+    private BigDecimal soldePrevisionnel30j; // Prévision trésorerie à 30 jours
+    private List<PointPrevision> pointsPrevisionnels; // Points pour le graphique de prévision
+    private java.util.Map<String, BigDecimal> repartitionDepensesParCategorie; // Pour bilan mensuel
+
     @Data
     @lombok.AllArgsConstructor
     @lombok.NoArgsConstructor
@@ -63,5 +70,13 @@ public class TableauBordResponse {
     public static class TopFournisseur {
         private String nom;
         private BigDecimal total;
+    }
+
+    @Data
+    @lombok.AllArgsConstructor
+    @lombok.NoArgsConstructor
+    public static class PointPrevision {
+        private String date;
+        private BigDecimal solde;
     }
 }

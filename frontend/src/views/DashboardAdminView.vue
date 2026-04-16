@@ -297,6 +297,112 @@ const getActivityIconClass = (type) => {
     default: return 'bg-gray'
   }
 }
+
+// === PRÉVISION TRÉSORERIE 30j ===
+const forecastTrend = computed(() => {
+  const prev = kpis.value.soldePrevisionnel30j
+  const actuel = kpis.value.soldeTresorerieTotal
+  if (!prev || !actuel) return 0
+  return prev - actuel
+})
+
+const forecastChartData = computed(() => {
+  const pts = kpis.value.pointsPrevisionnels || []
+  return {
+    labels: pts.map(p => p.date),
+    datasets: [{
+      label: 'Solde prévisionnel',
+      data: pts.map(p => p.solde),
+      borderColor: '#6366f1',
+      backgroundColor: (context) => {
+        const chart = context.chart
+        const { ctx, chartArea } = chart
+        if (!chartArea) return null
+        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.2)')
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0)')
+        return gradient
+      },
+      fill: true,
+      tension: 0.4,
+      pointBackgroundColor: '#6366f1',
+      pointBorderColor: '#fff',
+      pointHoverRadius: 7,
+      pointRadius: 5,
+      borderWidth: 3
+    }]
+  }
+})
+
+const forecastChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: 'rgba(30, 41, 59, 0.9)',
+      titleColor: '#fff',
+      bodyColor: '#fff',
+      padding: 12,
+      cornerRadius: 8,
+      callbacks: {
+        label: function(context) {
+          return new Intl.NumberFormat('fr-FR').format(context.parsed.y) + ' FCFA'
+        }
+      }
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: false,
+      grid: { color: 'rgba(226, 232, 240, 0.5)', drawBorder: false },
+      ticks: {
+        color: '#94a3b8',
+        font: { size: 11 },
+        callback: function(value) {
+          if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'
+          if (value >= 1000) return (value / 1000).toFixed(0) + 'k'
+          return value
+        }
+      }
+    },
+    x: {
+      grid: { display: false },
+      ticks: { color: '#94a3b8', font: { size: 11, weight: '600' } }
+    }
+  }
+}
+
+// === DSO / DPO ===
+const dsoClass = computed(() => {
+  const v = kpis.value.dso || 0
+  if (v <= 30) return 'good'
+  if (v <= 60) return 'warn'
+  return 'danger'
+})
+
+const dsoMessage = computed(() => {
+  const v = kpis.value.dso || 0
+  if (v <= 30) return 'Excellent ! Vos clients paient rapidement.'
+  if (v <= 60) return 'Attention, les délais de paiement s\'allongent.'
+  return 'Délai critique ! Relancez vos clients.'
+})
+
+const dpoMessage = computed(() => {
+  const v = kpis.value.dpo || 0
+  if (v <= 15) return 'Vous payez très rapidement vos fournisseurs.'
+  if (v <= 45) return 'Délai de paiement raisonnable.'
+  return 'Délai élevé. Attention aux pénalités.'
+})
+
+// === RÉPARTITION DÉPENSES ===
+const depPercent = (val) => {
+  const rep = kpis.value.repartitionDepensesParCategorie || {}
+  const vals = Object.values(rep)
+  if (!vals.length) return 0
+  const max = Math.max(...vals.map(v => Number(v)))
+  return max > 0 ? (Number(val) / max * 100) : 0
+}
 </script>
 
 <template>
@@ -486,6 +592,71 @@ const getActivityIconClass = (type) => {
           </div>
           <div class="chart-body" style="height: 220px; position: relative;">
             <Line :data="evolutionChartData" :options="evolutionChartOptions" />
+          </div>
+        </div>
+      </div>
+
+      <!-- STRATEGIC KPIs ROW: DSO/DPO + Prévision 30j -->
+      <div class="charts-row">
+        <!-- Prévision de Trésorerie -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Prévision de Trésorerie — 30 jours</div>
+            <div class="forecast-badge">
+              <span :class="forecastTrend >= 0 ? 'text-green' : 'text-red'">
+                {{ forecastTrend >= 0 ? '↑' : '↓' }} {{ formatCurrency(kpis.soldePrevisionnel30j) }} FCFA à J+30
+              </span>
+            </div>
+          </div>
+          <div class="chart-body" style="height: 220px; position: relative;">
+            <Line :data="forecastChartData" :options="forecastChartOptions" />
+          </div>
+        </div>
+
+        <!-- DSO / DPO Cards -->
+        <div class="dso-dpo-container">
+          <div class="dso-card">
+            <div class="dso-header">
+              <span class="dso-label">DSO</span>
+              <span class="dso-sublabel">Délai moyen encaissement clients</span>
+            </div>
+            <div class="dso-value">
+              <span class="dso-number">{{ kpis.dso || 0 }}</span>
+              <span class="dso-unit">jours</span>
+            </div>
+            <div class="dso-bar">
+              <div class="dso-fill" :class="dsoClass" :style="{ width: Math.min(kpis.dso || 0, 90) / 90 * 100 + '%' }"></div>
+            </div>
+            <div class="dso-hint">{{ dsoMessage }}</div>
+          </div>
+
+          <div class="dso-card">
+            <div class="dso-header">
+              <span class="dso-label">DPO</span>
+              <span class="dso-sublabel">Délai moyen paiement fournisseurs</span>
+            </div>
+            <div class="dso-value">
+              <span class="dso-number">{{ kpis.dpo || 0 }}</span>
+              <span class="dso-unit">jours</span>
+            </div>
+            <div class="dso-bar">
+              <div class="dso-fill dpo" :style="{ width: Math.min(kpis.dpo || 0, 90) / 90 * 100 + '%' }"></div>
+            </div>
+            <div class="dso-hint">{{ dpoMessage }}</div>
+          </div>
+
+          <!-- Répartition Dépenses -->
+          <div class="depenses-card" v-if="Object.keys(kpis.repartitionDepensesParCategorie || {}).length > 0">
+            <div class="chart-title" style="margin-bottom: 0.75rem;">Dépenses du mois par catégorie</div>
+            <div class="dep-bars">
+              <div v-for="(val, cat) in kpis.repartitionDepensesParCategorie" :key="cat" class="dep-row">
+                <span class="dep-cat">{{ cat }}</span>
+                <div class="dep-track">
+                  <div class="dep-fill" :style="{ width: depPercent(val) + '%' }"></div>
+                </div>
+                <span class="dep-amount">{{ formatCurrency(val) }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -967,6 +1138,41 @@ const getActivityIconClass = (type) => {
 .um-btn-submit { background: #3b82f6; color: white; border: none; padding: 0.6rem 1.5rem; border-radius: 8px; font-weight: 600; font-size: 0.875rem; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(59,130,246,0.3); transition: all 0.15s; }
 .um-btn-submit:hover { background: #2563eb; box-shadow: 0 6px 12px -2px rgba(59,130,246,0.4); }
 .um-btn-submit:disabled { background: #94a3b8; box-shadow: none; cursor: not-allowed; }
+
+/* ========== DSO/DPO & FORECAST ========== */
+.forecast-badge { font-size: 0.8rem; font-weight: 700; }
+
+.dso-dpo-container { display: flex; flex-direction: column; gap: 1rem; }
+
+.dso-card {
+  background: white; border-radius: 14px; border: 1px solid #f1f5f9;
+  padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.dso-header { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.5rem; }
+.dso-label { font-size: 0.85rem; font-weight: 800; color: #1e293b; letter-spacing: 0.02em; }
+.dso-sublabel { font-size: 0.7rem; color: #94a3b8; font-weight: 500; }
+.dso-value { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.75rem; }
+.dso-number { font-size: 2rem; font-weight: 800; color: #1e293b; }
+.dso-unit { font-size: 0.85rem; color: #64748b; font-weight: 600; }
+.dso-bar { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem; }
+.dso-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease; }
+.dso-fill.good { background: linear-gradient(90deg, #10b981, #34d399); }
+.dso-fill.warn { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.dso-fill.danger { background: linear-gradient(90deg, #ef4444, #f87171); }
+.dso-fill.dpo { background: linear-gradient(90deg, #6366f1, #818cf8); }
+.dso-hint { font-size: 0.75rem; color: #94a3b8; font-style: italic; }
+
+/* Dépenses par catégorie */
+.depenses-card {
+  background: white; border-radius: 14px; border: 1px solid #f1f5f9;
+  padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.dep-bars { display: flex; flex-direction: column; gap: 0.5rem; }
+.dep-row { display: flex; align-items: center; gap: 0.75rem; }
+.dep-cat { width: 100px; font-size: 0.75rem; font-weight: 600; color: #475569; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; flex-shrink: 0; }
+.dep-track { flex: 1; height: 10px; background: #f1f5f9; border-radius: 5px; overflow: hidden; }
+.dep-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); border-radius: 5px; transition: width 0.6s ease; min-width: 4px; }
+.dep-amount { font-size: 0.75rem; font-weight: 700; color: #1e293b; width: 90px; text-align: right; flex-shrink: 0; }
 
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1200px) {

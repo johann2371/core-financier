@@ -81,4 +81,7 @@ public class Encaissement {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "valide_par")
     private Utilisateur validePar;
+
+    private boolean rapproche = false;
+    private LocalDate dateRapprochement;
 }

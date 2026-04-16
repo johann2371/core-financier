@@ -4,6 +4,6 @@ import com.corefi.dto.response.tableaubord.TableauBordResponse;
 import java.math.BigDecimal;
 
 public interface ITableauBordService {
-    TableauBordResponse getKpis();
+    TableauBordResponse getKpis(int forecastDays);
     void updateSeuil(BigDecimal nouveauSeuil);
 }

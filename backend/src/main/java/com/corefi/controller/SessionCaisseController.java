@@ -46,6 +46,12 @@ public class SessionCaisseController {
         return ResponseEntity.ok(sessionCaisseService.getHistoriqueSessionsCaissier(caissierId));
     }
 
+    @GetMapping("/historique-global")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'RESPONSABLE_FINANCIER', 'PDG')")
+    public ResponseEntity<List<SessionCaisseResponse>> getHistoriqueGlobal() {
+        return ResponseEntity.ok(sessionCaisseService.getAllHistoriqueSessions());
+    }
+
     @GetMapping("/mon-historique")
     @PreAuthorize("hasAuthority('CAISSIER')")
     public ResponseEntity<List<SessionCaisseResponse>> getMonHistorique() {

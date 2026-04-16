@@ -113,4 +113,7 @@ public class Decaissement {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_caisse_id")
     private SessionCaisse sessionCaisse;
+
+    private boolean rapproche = false;
+    private LocalDate dateRapprochement;
 }

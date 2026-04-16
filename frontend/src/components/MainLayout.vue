@@ -181,6 +181,11 @@ onMounted(() => {
           Journal de Caisse
         </router-link>
 
+        <router-link v-if="['COMPTABLE', 'ADMINISTRATEUR', 'RESPONSABLE_FINANCIER'].includes(authStore.userRole)" to="/rapprochement" class="nav-item" :class="{ active: isActive('/rapprochement') }">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          Rapprochement
+        </router-link>
+
         <router-link v-if="['COMPTABLE', 'ADMINISTRATEUR', 'CAISSIER'].includes(authStore.userRole)" to="/factures" class="nav-item" :class="{ active: isActive('/factures') }">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
           Factures
@@ -189,6 +194,11 @@ onMounted(() => {
         <router-link v-if="['COMPTABLE', 'RESPONSABLE_FINANCIER', 'PDG', 'ADMINISTRATEUR', 'CAISSIER'].includes(authStore.userRole)" to="/tiers" class="nav-item" :class="{ active: isActive('/tiers') }">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
           Annuaire Tiers
+        </router-link>
+
+        <router-link v-if="['ADMINISTRATEUR', 'PDG', 'RESPONSABLE_FINANCIER', 'COMPTABLE'].includes(authStore.userRole)" to="/rapports" class="nav-item" :class="{ active: isActive('/rapports') }">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+          Rapports
         </router-link>
 
         <div class="nav-section-title">SYSTÈME</div>

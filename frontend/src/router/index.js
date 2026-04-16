@@ -69,6 +69,18 @@ const router = createRouter({
       name: 'journal-caisse',
       component: () => import('../views/JournalCaisseView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/rapprochement',
+      name: 'rapprochement',
+      component: () => import('../views/RapprochementView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/rapports',
+      name: 'rapports',
+      component: () => import('../views/RapportsView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })

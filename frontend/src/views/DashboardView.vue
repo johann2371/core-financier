@@ -34,12 +34,13 @@ const kpis = ref({
   operationsDuJour: 0
 })
 const loading = ref(true)
+const forecastPeriod = ref(30)
 
 const fetchKpis = async () => {
   loading.value = true
   const start = Date.now()
   try {
-    const response = await api.get('/tableau-bord/kpis')
+    const response = await api.get(`/tableau-bord/kpis?forecastDays=${forecastPeriod.value}`)
     kpis.value = response.data
   } catch (error) {
     console.error('Erreur lors de la récupération des KPIs:', error)
@@ -148,6 +149,45 @@ const totalBudget = computed(() => {
 const totalTresorerie = computed(() => {
   return (kpis.value.soldeTotalCaisses || 0) + (kpis.value.soldeTotalBanques || 0)
 })
+
+// === PRÉVISION TRÉSORERIE 30j ===
+const forecastTrend = computed(() => {
+  const prev = kpis.value.soldePrevisionnel30j
+  const actuel = totalTresorerie.value
+  if (!prev || !actuel) return 0
+  return prev - actuel
+})
+
+// === DSO / DPO ===
+const dsoClass = computed(() => {
+  const v = kpis.value.dso || 0
+  if (v <= 30) return 'good'
+  if (v <= 60) return 'warn'
+  return 'danger'
+})
+
+const dsoMessage = computed(() => {
+  const v = kpis.value.dso || 0
+  if (v <= 30) return 'Excellent ! Vos clients paient rapidement.'
+  if (v <= 60) return 'Attention, les délais s\'allongent.'
+  return 'Délai critique ! Relancez vos clients.'
+})
+
+const dpoMessage = computed(() => {
+  const v = kpis.value.dpo || 0
+  if (v <= 15) return 'Vous payez très rapidement.'
+  if (v <= 45) return 'Délai de paiement raisonnable.'
+  return 'Délai élevé. Attention aux pénalités.'
+})
+
+// === RÉPARTITION DÉPENSES ===
+const depPercent = (val) => {
+  const rep = kpis.value.repartitionDepensesParCategorie || {}
+  const vals = Object.values(rep)
+  if (!vals.length) return 0
+  const max = Math.max(...vals.map(v => Number(v)))
+  return max > 0 ? (Number(val) / max * 100) : 0
+}
 </script>
 
 <template>
@@ -409,6 +449,82 @@ const totalTresorerie = computed(() => {
               </div>
               <div class="budget-progress-bg">
                 <div class="budget-progress-fill" :style="{ width: (cat.value / totalBudget * 100) + '%' }"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- INDICATEURS STRATÉGIQUES (PDG + RF) -->
+        <div class="dashboard-section" v-if="isPDG || isRF">
+          <h3 class="section-title">INDICATEURS STRATÉGIQUES</h3>
+          <div class="strategic-indicators-grid">
+            <!-- Prévision Trésorerie 30j -->
+            <div class="strategic-ind-card forecast-card">
+              <div class="ind-header" style="align-items: flex-start; flex-direction: column; gap: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; width: 100%;">
+                  <h4>Prévision Trésorerie</h4>
+                  <div class="period-selector">
+                    <select v-model="forecastPeriod" @change="fetchKpis" class="forecast-select">
+                      <option :value="30">30 jours</option>
+                      <option :value="60">60 jours</option>
+                      <option :value="90">90 jours</option>
+                    </select>
+                  </div>
+                </div>
+                <span class="ind-badge" :class="forecastTrend >= 0 ? 'badge-green' : 'badge-red'">
+                  {{ forecastTrend >= 0 ? '↑' : '↓' }} {{ Math.abs(forecastTrend)?.toLocaleString() }} XAF
+                </span>
+              </div>
+              <div class="forecast-points">
+                <div v-for="pt in (kpis.pointsPrevisionnels || [])" :key="pt.date" class="forecast-point">
+                  <span class="fp-date">{{ pt.date }}</span>
+                  <span class="fp-value">{{ pt.solde?.toLocaleString() }} XAF</span>
+                </div>
+                <div v-if="!kpis.pointsPrevisionnels?.length" class="empty-mini">Aucune projection disponible</div>
+              </div>
+              <div class="forecast-summary" v-if="kpis.soldePrevisionnel30j">
+                <strong>Solde estimé à J+{{ forecastPeriod }} :</strong> {{ kpis.soldePrevisionnel30j?.toLocaleString() }} XAF
+              </div>
+            </div>
+
+            <!-- DSO / DPO -->
+            <div class="strategic-ind-card" title="DSO (Days Sales Outstanding) : Délai moyen que mettent vos clients à vous payer. DPO (Days Payables Outstanding) : Délai moyen que vous mettez pour acquitter une facture fournisseur une fois la demande de décaissement initiée.">
+              <div class="dso-dpo-pair">
+                <div class="dso-block">
+                  <div class="dso-head">
+                    <span class="dso-title" title="DSO = (Délai d'encaissement moyen des clients)">DSO</span>
+                    <span class="dso-sub">Délai clients</span>
+                  </div>
+                  <div class="dso-big">{{ kpis.dso || 0 }} <span>jours</span></div>
+                  <div class="dso-bar-mini">
+                    <div class="dso-fill-mini" :class="dsoClass" :style="{ width: Math.min(kpis.dso || 0, 90) / 90 * 100 + '%' }"></div>
+                  </div>
+                  <div class="dso-msg">{{ dsoMessage }}</div>
+                </div>
+                <div class="dso-divider"></div>
+                <div class="dso-block">
+                  <div class="dso-head">
+                    <span class="dso-title" title="DPO = (Délai d'exécution moyen des fournisseurs)">DPO</span>
+                    <span class="dso-sub">Délai fournisseurs</span>
+                  </div>
+                  <div class="dso-big">{{ kpis.dpo || 0 }} <span>jours</span></div>
+                  <div class="dso-bar-mini">
+                    <div class="dso-fill-mini dpo-color" :style="{ width: Math.min(kpis.dpo || 0, 90) / 90 * 100 + '%' }"></div>
+                  </div>
+                  <div class="dso-msg">{{ dpoMessage }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Répartition dépenses du mois -->
+            <div class="strategic-ind-card" v-if="Object.keys(kpis.repartitionDepensesParCategorie || {}).length > 0">
+              <h4 style="margin-bottom: 1rem;">Dépenses du mois par catégorie</h4>
+              <div v-for="(val, cat) in kpis.repartitionDepensesParCategorie" :key="cat" class="dep-row-db">
+                <span class="dep-cat-db">{{ cat }}</span>
+                <div class="dep-track-db">
+                  <div class="dep-fill-db" :style="{ width: depPercent(val) + '%' }"></div>
+                </div>
+                <span class="dep-val-db">{{ val?.toLocaleString() }} XAF</span>
               </div>
             </div>
           </div>
@@ -1326,5 +1442,79 @@ const totalTresorerie = computed(() => {
   .budget-chart-container {
     padding: 1rem;
   }
+}
+
+/* ========== INDICATEURS STRATÉGIQUES (PDG + RF) ========== */
+.strategic-indicators-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.strategic-ind-card {
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #f1f5f9;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.strategic-ind-card h4 {
+  font-size: 0.9rem; font-weight: 700; color: #1e293b; margin: 0;
+}
+
+.ind-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.ind-badge { font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+.badge-green { background: #d1fae5; color: #065f46; }
+.badge-red { background: #fee2e2; color: #991b1b; }
+
+.forecast-points { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.forecast-point { display: flex; justify-content: space-between; padding: 0.5rem 0.75rem; background: #f8fafc; border-radius: 8px; }
+.fp-date { font-size: 0.8rem; font-weight: 600; color: #64748b; }
+.fp-value { font-size: 0.85rem; font-weight: 700; color: #1e293b; }
+.forecast-summary { font-size: 0.85rem; color: #475569; padding: 0.75rem; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe; }
+
+.forecast-select {
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+  background-color: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  outline: none;
+}
+.forecast-select:hover {
+  border-color: #cbd5e1;
+}
+
+/* DSO/DPO pair */
+.dso-dpo-pair { display: flex; gap: 1.5rem; }
+.dso-block { flex: 1; }
+.dso-divider { width: 1px; background: #f1f5f9; }
+.dso-head { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem; }
+.dso-title { font-size: 0.85rem; font-weight: 800; color: #1e293b; }
+.dso-sub { font-size: 0.7rem; color: #94a3b8; }
+.dso-big { font-size: 1.75rem; font-weight: 800; color: #1e293b; margin-bottom: 0.75rem; }
+.dso-big span { font-size: 0.8rem; font-weight: 600; color: #64748b; }
+.dso-bar-mini { height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-bottom: 0.5rem; }
+.dso-fill-mini { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+.dso-fill-mini.good { background: linear-gradient(90deg, #10b981, #34d399); }
+.dso-fill-mini.warn { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.dso-fill-mini.danger { background: linear-gradient(90deg, #ef4444, #f87171); }
+.dso-fill-mini.dpo-color { background: linear-gradient(90deg, #6366f1, #818cf8); }
+.dso-msg { font-size: 0.7rem; color: #94a3b8; font-style: italic; }
+
+/* Dépenses par catégorie (Dashboard) */
+.dep-row-db { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.dep-cat-db { width: 120px; font-size: 0.8rem; font-weight: 600; color: #475569; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dep-track-db { flex: 1; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+.dep-fill-db { height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); border-radius: 4px; transition: width 0.6s ease; min-width: 4px; }
+.dep-val-db { font-size: 0.75rem; font-weight: 700; color: #1e293b; width: 100px; text-align: right; flex-shrink: 0; }
+
+@media (max-width: 768px) {
+  .strategic-indicators-grid { grid-template-columns: 1fr; }
+  .dso-dpo-pair { flex-direction: column; }
+  .dso-divider { width: 100%; height: 1px; }
 }
 </style>

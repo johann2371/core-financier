@@ -1,6 +1,7 @@
 <template>
-  <div class="journal-caisse-container">
-    <!-- Header with Stats -->
+  <MainLayout>
+    <div class="journal-caisse-container">
+      <!-- Header with Stats -->
     <header class="header-section">
       <div class="title-group">
         <h1>Journal de Caisse</h1>
@@ -34,7 +35,7 @@
     <main class="main-content">
       
       <!-- Scenario 1: No active session -->
-      <div v-if="!activeSession && !loading" class="empty-state-container">
+      <div v-if="!isAdmin && !activeSession && !loading" class="empty-state-container">
         <div class="opening-form card-premium fade-in">
           <div class="card-header">
             <div class="icon-circle">
@@ -68,7 +69,7 @@
       </div>
 
       <!-- Scenario 2: Active Session -->
-      <div v-else-if="activeSession" class="session-layout grid">
+      <div v-else-if="!isAdmin && activeSession" class="session-layout grid">
         
         <!-- Left Column: Movements -->
         <div class="col-8">
@@ -170,18 +171,19 @@
       </div>
  
       <!-- SECTION HISTORIQUE DES SESSIONS -->
-      <section v-if="history.length > 0" class="history-section mt-5 fade-in">
+      <section v-if="history.length > 0 || isAdmin" class="history-section mt-5 fade-in">
         <div class="section-header">
           <div class="header-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
           </div>
-          <h2 class="text-xl font-bold">Historique de mes sessions</h2>
+          <h2 class="text-xl font-bold">Historique des sessions</h2>
         </div>
 
         <div class="table-container shadow-sm mt-3">
           <table class="modern-table">
             <thead>
               <tr>
+                <th v-if="isAdmin">Caissier</th>
                 <th>Date Ouverture</th>
                 <th>Date Fermeture</th>
                 <th>Solde Initial</th>
@@ -193,6 +195,7 @@
             </thead>
             <tbody>
               <tr v-for="sess in history" :key="sess.id">
+                <td v-if="isAdmin"><strong>{{ sess.caissierNom }}</strong></td>
                 <td>{{ formatDate(sess.dateOuverture) }}</td>
                 <td>{{ sess.dateFermeture ? formatDate(sess.dateFermeture) : 'Session en cours' }}</td>
                 <td class="font-mono">{{ formatXAF(sess.soldeInitial) }}</td>
@@ -216,18 +219,25 @@
       </section>
 
     </main>
-  </div>
+    </div>
+  </MainLayout>
 </template>
 
 <script>
 import { ref, onMounted, computed, reactive } from 'vue';
 import { useCompteStore } from '@/stores/compte.store';
+import { useAuthStore } from '@/stores/auth.store';
+import MainLayout from '@/components/MainLayout.vue';
 import { sessionCaisseService } from '@/services/sessionCaisseService';
 import api from '@/services/api';
 
 export default {
+  components: { MainLayout },
   setup() {
     const compteStore = useCompteStore();
+    const authStore = useAuthStore();
+    const isAdmin = computed(() => ['ADMINISTRATEUR', 'RESPONSABLE_FINANCIER', 'PDG'].includes(authStore.userRole));
+
     const feedback = reactive({ message: '', type: 'success' });
     const loading = ref(true);
     const submitting = ref(false);
@@ -249,20 +259,24 @@ export default {
     const loadContext = async () => {
       loading.value = true;
       try {
-        // 1. Charger la session active si elle existe
-        const res = await sessionCaisseService.getActive();
-        if (res.status === 200) {
-          activeSession.value = res.data;
-          await loadMovements(res.data.id);
+        if (isAdmin.value) {
+          // L'Admin ne voit que l'historique global
+          await loadHistory();
+        } else {
+          // 1. Charger la session active si elle existe (Caissier)
+          const res = await sessionCaisseService.getActive();
+          if (res.status === 200 && res.data) {
+            activeSession.value = res.data;
+            await loadMovements(res.data.id);
+          }
+          
+          // 2. Charger l'historique personnel
+          await loadHistory();
+
+          // 3. Charger les caisses via le store
+          await compteStore.fetchComptes();
+          if (compteStore.caisses.length > 0) openingData.value.caisseId = compteStore.caisses[0].id;
         }
-        
-        // 2. Charger l'historique
-        await loadHistory();
-
-        // 3. Charger les caisses via le store
-        await compteStore.fetchComptes();
-        if (compteStore.caisses.length > 0) openingData.value.caisseId = compteStore.caisses[0].id;
-
       } catch (err) {
         console.error(err);
       } finally {
@@ -272,7 +286,9 @@ export default {
 
     const loadHistory = async () => {
       try {
-        const res = await sessionCaisseService.getMonHistorique();
+        const res = isAdmin.value 
+            ? await sessionCaisseService.getHistoriqueGlobal()
+            : await sessionCaisseService.getMonHistorique();
         history.value = res.data;
       } catch (err) {
         console.error("Erreur historique", err);
@@ -372,6 +388,7 @@ export default {
     onMounted(loadContext);
 
     return {
+      isAdmin,
       activeSession, caisses: computed(() => compteStore.caisses), history, loading, submitting, openingData, closingData, feedback,
       movements, filterType, filteredMovements, totalEntrees, totalSorties, soldeTheorique, ecartVal,
       ouvrirCaisse, fermerCaisse, downloadReport, formatXAF, formatDate, formatTime

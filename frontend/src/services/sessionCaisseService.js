@@ -19,6 +19,9 @@ export const sessionCaisseService = {
   getMonHistorique() {
     return api.get('/sessions-caisse/mon-historique');
   },
+  getHistoriqueGlobal() {
+    return api.get('/sessions-caisse/historique-global');
+  },
   async downloadReport(id) {
       const response = await api.get(`/sessions-caisse/${id}/rapport-pdf`, { responseType: 'blob' });
       const blob = new Blob([response.data], { type: 'application/pdf' });
