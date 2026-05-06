@@ -2,9 +2,64 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
+import { useParametrageStore } from '../stores/parametrage.store'
+import { useLangStore } from '../stores/lang.store'
 import MainLayout from '../components/MainLayout.vue'
-import FluxChart from '../components/FluxChart.vue'
+import { Line } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  Filler
+} from 'chart.js'
+import {
+  BanknotesIcon,
+  ArrowDownTrayIcon,
+  CheckCircleIcon,
+  DocumentPlusIcon,
+  PlusIcon,
+  UsersIcon,
+  ClockIcon,
+  ArrowPathIcon,
+  CheckIcon,
+  WalletIcon,
+  ChevronRightIcon
+} from '@heroicons/vue/24/outline'
+
+ChartJS.register(Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement, Filler)
 import api from '../services/api'
+
+const authStore = useAuthStore()
+const parametrageStore = useParametrageStore()
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
+
+const selectedCurrency = computed(() => {
+  const param = parametrageStore.parametres?.find(p => p.cle === 'DEVISE_BASE_CODE')
+  return param ? param.valeur : 'XAF'
+})
+const usdRate = 600
+
+const formatCurrency = (val) => {
+  if (val === undefined || val === null) return '0'
+  if (selectedCurrency.value === 'USD') {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val / usdRate)
+  }
+  return new Intl.NumberFormat('fr-FR').format(val) + ' XAF'
+}
+
+const formatCurrencyPlain = (val) => {
+  if (val === undefined || val === null) return '0'
+  if (selectedCurrency.value === 'USD') {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val / usdRate)
+  }
+  return new Intl.NumberFormat('fr-FR').format(val)
+}
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -19,8 +74,8 @@ const kpis = ref({
   totalDettesFournisseurs: 0,
   repartitionDecaissementsParCategorie: {},
   activitesRecentes: [],
-  dernierMouvementCaisse: 0,
-  dernierMouvementBanque: 0,
+  dernierMouvement{{ t("dashboard.caisse") }}: 0,
+  dernierMouvement{{ t("dashboard.banque") }}: 0,
   derniereCreanceClient: 0,
   derniereDetteFournisseur: 0,
   evolutionMensuelle: [],
@@ -57,6 +112,7 @@ const fetchKpis = async () => {
 let refreshInterval = null
 
 onMounted(() => {
+  parametrageStore.fetchParametres()
   fetchKpis()
   // Refresh every 30 seconds
   refreshInterval = setInterval(fetchKpis, 30000)
@@ -67,29 +123,7 @@ onUnmounted(() => {
   if (refreshInterval) clearInterval(refreshInterval)
 })
 
-const showSeuilModal = ref(false)
-const newSeuil = ref(0)
-const updatingSeuil = ref(false)
 
-const openSeuilModal = () => {
-  newSeuil.value = kpis.value.seuilApprobationActuel
-  showSeuilModal.value = true
-}
-
-const updateSeuil = async () => {
-  if (newSeuil.value < 0) return
-  updatingSeuil.value = true
-  try {
-    await api.put(`/tableau-bord/seuil?montant=${newSeuil.value}`)
-    kpis.value.seuilApprobationActuel = newSeuil.value
-    showSeuilModal.value = false
-    // Pas besoin de fetchKpis complet, on a mis à jour localement
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour du seuil:', error)
-  } finally {
-    updatingSeuil.value = false
-  }
-}
 
 const formatTime = (dateStr) => {
   if (!dateStr) return ''
@@ -158,6 +192,118 @@ const forecastTrend = computed(() => {
   return prev - actuel
 })
 
+const runwayMois = computed(() => {
+  if (!kpis.value.burnRateMensuel || kpis.value.burnRateMensuel <= 0) return '∞'
+  return (totalTresorerie.value / kpis.value.burnRateMensuel).toFixed(1)
+})
+
+// === GRAPHIQUE ÉVOLUTION TRÉSORERIE ===
+const evolutionChartData = computed(() => {
+  const data = [...(kpis.value.evolutionMensuelle || [])].reverse() // On affiche chronologiquement
+  return {
+    labels: data.map(d => d.mois),
+    datasets: [
+      {
+        label: 'Encaissements',
+        data: data.map(d => d.encaissements),
+        borderColor: '#10b981',
+        backgroundColor: (context) => {
+          const chart = context.chart
+          const { ctx, chartArea } = chart
+          if (!chartArea) return null
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+          gradient.addColorStop(0, 'rgba(16, 185, 129, 0.2)')
+          gradient.addColorStop(1, 'rgba(16, 185, 129, 0)')
+          return gradient
+        },
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#10b981',
+        pointBorderColor: '#fff',
+        pointHoverRadius: 6,
+        pointRadius: 4
+      },
+      {
+        label: 'Décaissements',
+        data: data.map(d => d.decaissements),
+        borderColor: '#f59e0b',
+        backgroundColor: (context) => {
+          const chart = context.chart
+          const { ctx, chartArea } = chart
+          if (!chartArea) return null
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+          gradient.addColorStop(0, 'rgba(245, 158, 11, 0.2)')
+          gradient.addColorStop(1, 'rgba(245, 158, 11, 0)')
+          return gradient
+        },
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#f59e0b',
+        pointBorderColor: '#fff',
+        pointHoverRadius: 6,
+        pointRadius: 4
+      }
+    ]
+  }
+})
+
+const evolutionChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: false
+    },
+    tooltip: {
+      mode: 'index',
+      intersect: false,
+      backgroundColor: 'rgba(30, 41, 59, 0.9)',
+      titleColor: '#fff',
+      bodyColor: '#fff',
+      padding: 12,
+      cornerRadius: 8,
+      callbacks: {
+        label: function(context) {
+          let label = context.dataset.label || '';
+          if (label) label += ': ';
+          if (context.parsed.y !== null) {
+            const val = selectedCurrency.value === 'USD' ? context.parsed.y / usdRate : context.parsed.y;
+          label += selectedCurrency.value === 'USD' ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val) : new Intl.NumberFormat('fr-FR').format(val) + ' FCFA';
+          }
+          return label;
+        }
+      }
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: 'rgba(226, 232, 240, 0.5)',
+        drawBorder: false
+      },
+      ticks: {
+        color: '#94a3b8',
+        font: { size: 11 },
+        callback: function(value) {
+          if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'
+          if (value >= 1000) return (value / 1000).toFixed(0) + 'k'
+          return value
+        }
+      }
+    },
+    x: {
+      grid: {
+        display: false
+      },
+      ticks: {
+        color: '#94a3b8',
+        font: { size: 11, weight: '600' }
+      }
+    }
+  }
+}
+
 // === DSO / DPO ===
 const dsoClass = computed(() => {
   const v = kpis.value.dso || 0
@@ -168,16 +314,16 @@ const dsoClass = computed(() => {
 
 const dsoMessage = computed(() => {
   const v = kpis.value.dso || 0
-  if (v <= 30) return 'Excellent ! Vos clients paient rapidement.'
-  if (v <= 60) return 'Attention, les délais s\'allongent.'
-  return 'Délai critique ! Relancez vos clients.'
+  if (v <= 30) return t('dashboard.dsoExcellent')
+  if (v <= 60) return t('dashboard.dsoAttention')
+  return t('dashboard.dsoCritique')
 })
 
 const dpoMessage = computed(() => {
   const v = kpis.value.dpo || 0
-  if (v <= 15) return 'Vous payez très rapidement.'
-  if (v <= 45) return 'Délai de paiement raisonnable.'
-  return 'Délai élevé. Attention aux pénalités.'
+  if (v <= 15) return t('dashboard.dpoRapide')
+  if (v <= 45) return t('dashboard.dpoRaisonnable')
+  return t('dashboard.dpoEleve')
 })
 
 // === RÉPARTITION DÉPENSES ===
@@ -194,48 +340,48 @@ const depPercent = (val) => {
   <MainLayout>
     <!-- ACTIONS RAPIDES -->
     <div class="dashboard-section">
-      <h3 class="section-title">ACTIONS RAPIDES</h3>
+      <h3 class="section-title">{{ t("dashboard.actionsRapides") }}</h3>
       <div class="quick-actions-grid">
         <router-link v-if="isAdmin || isComptable || authStore.userRole === 'CAISSIER'" to="/encaissements" class="action-card">
           <div class="action-icon light-blue">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <BanknotesIcon class="w-5 h-5" />
           </div>
-          <h4>Nouvel<br/>Encaissement</h4>
+          <h4>{{ t("dashboard.nouvelEncaissement") }}</h4>
         </router-link>
 
         <router-link v-if="isCaissier" to="/decaissements" class="action-card highlight">
           <div class="action-icon light-orange">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <CheckCircleIcon class="w-5 h-5" />
           </div>
-          <h4>Exécuter un<br/>Paiement</h4>
+          <h4>{{ t("dashboard.executerPaiement") }}</h4>
         </router-link>
 
         <router-link v-if="isAdmin || isRF || isPDG" to="/decaissements" class="action-card highlight" :class="{ 'pdg-primary': isPDG }">
           <div class="action-icon light-orange">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <CheckCircleIcon class="w-5 h-5" />
           </div>
-          <h4>{{ isPDG ? 'Signer les\nDécaissements' : 'Valider les\nDemandes' }}</h4>
+          <h4>{{ isPDG ? t('dashboard.signerDecaissements') : t('dashboard.validerDemandes') }}</h4>
         </router-link>
         
         <router-link v-if="isAdmin || isComptable" to="/factures?create=VENTE" class="action-card">
           <div class="action-icon light-indigo">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
+            <DocumentPlusIcon class="w-5 h-5" />
           </div>
-          <h4>Nouvelle<br/>Facture</h4>
+          <h4>{{ t("dashboard.nouvelleFacture") }}</h4>
         </router-link>
 
         <router-link v-if="isAdmin || isComptable" to="/decaissements" class="action-card">
           <div class="action-icon light-blue">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <PlusIcon class="w-5 h-5" />
           </div>
-          <h4>Saisir un<br/>Décaissement</h4>
+          <h4>{{ t("dashboard.saisirDecaissement") }}</h4>
         </router-link>
 
         <router-link to="/tiers" class="action-card">
           <div class="action-icon light-indigo">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+            <UsersIcon class="w-5 h-5" />
           </div>
-          <h4>Consulter<br/>les Tiers</h4>
+          <h4>{{ t("dashboard.consulterTiers") }}</h4>
         </router-link>
       </div>
     </div>
@@ -246,44 +392,44 @@ const depPercent = (val) => {
       <div class="left-col">
         <!-- POSTE DE CAISSE (CAISSIER UNIQUEMENT) -->
         <div class="dashboard-section" v-if="isCaissier">
-          <h3 class="section-title">POSTE DE CAISSE</h3>
+          <h3 class="section-title">{{ t("dashboard.posteCaisse") }}</h3>
           <div class="kpi-grid">
             <div class="kpi-card tresorerie-globale-card">
-              <span class="kpi-label">Solde de Caisse</span>
+              <span class="kpi-label">{{ t("dashboard.soldeDeCaisse") }}</span>
               <div class="kpi-body">
-                <span class="kpi-value tresorerie-value">{{ kpis.soldeTotalCaisses?.toLocaleString() }}<span class="currency light">XAF</span></span>
+                <span class="kpi-value tresorerie-value">{{ formatCurrencyPlain(kpis.soldeTotalCaisses?) }}<span class="currency light">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
               </div>
             </div>
 
             <div class="kpi-card caissier-highlight">
-              <span class="kpi-label">Paiements à Exécuter</span>
+              <span class="kpi-label">{{ t("dashboard.paiementsAExecuter") }}</span>
               <div class="kpi-body">
                 <span class="kpi-value" :class="{ 'urgent-gold': kpis.decaissementsAExecuter > 0 }">{{ kpis.decaissementsAExecuter }}</span>
-                <span class="kpi-trend attention" v-if="kpis.decaissementsAExecuter > 0">{{ kpis.montantTotalAExecuter?.toLocaleString() }} XAF</span>
-                <span class="kpi-trend" v-else>Aucun dossier en attente</span>
+                <span class="kpi-trend attention" v-if="kpis.decaissementsAExecuter > 0">{{ formatCurrency(kpis.montantTotalAExecuter?) }}</span>
+                <span class="kpi-trend" v-else>{{ t("dashboard.aucunDossier") }}</span>
               </div>
               <router-link to="/decaissements" class="kpi-action-link" v-if="kpis.decaissementsAExecuter > 0">Traiter maintenant</router-link>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">Encaissé Aujourd'hui</span>
+              <span class="kpi-label">{{ t("dashboard.encaisseAujourdhui") }}</span>
               <div class="kpi-body">
-                <span class="kpi-value success">{{ kpis.encaissementsDuJour?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span class="kpi-value success">{{ formatCurrencyPlain(kpis.encaissementsDuJour?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">Décaissé Aujourd'hui</span>
+              <span class="kpi-label">{{ t("dashboard.decaisseAujourdhui") }}</span>
               <div class="kpi-body">
-                <span class="kpi-value danger">{{ kpis.decaissementsExecutesDuJour?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span class="kpi-value danger">{{ formatCurrencyPlain(kpis.decaissementsExecutesDuJour?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">Opérations du Jour</span>
+              <span class="kpi-label">{{ t("dashboard.operationsDuJour") }}</span>
               <div class="kpi-body">
                 <span class="kpi-value">{{ kpis.operationsDuJour }}</span>
-                <span class="kpi-trend">transactions traitées</span>
+                <span class="kpi-trend">{{ t("dashboard.transactionsTraitees") }}</span>
               </div>
             </div>
           </div>
@@ -291,56 +437,56 @@ const depPercent = (val) => {
 
         <!-- ÉTAT FINANCIER GLOBAL (non-CAISSIER) -->
         <div class="dashboard-section" v-if="!isCaissier">
-          <h3 class="section-title">ÉTAT FINANCIER GLOBAL</h3>
+          <h3 class="section-title">{{ t("dashboard.etatFinancier") }}</h3>
           <div class="kpi-grid">
             <!-- Widget Trésorerie Globale (PDG Uniquement) -->
             <div class="kpi-card tresorerie-globale-card" v-if="isPDG">
-              <span class="kpi-label">Trésorerie Globale Disponbile</span>
+              <span class="kpi-label">{{ t("dashboard.tresorerieGlobale") }}</span>
               <div class="kpi-body">
-                <span class="kpi-value gold">{{ totalTresorerie?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span class="kpi-value gold">{{ formatCurrencyPlain(totalTresorerie?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
                 <div class="tresorerie-split">
-                  <span class="split-item">Caisse: {{ kpis.soldeTotalCaisses?.toLocaleString() }}</span>
-                  <span class="split-item">Banque: {{ kpis.soldeTotalBanques?.toLocaleString() }}</span>
+                  <span class="split-item">{{ t("dashboard.caisse") }}: {{ kpis.soldeTotalCaisses?.toLocaleString() }}</span>
+                  <span class="split-item">{{ t("dashboard.banque") }}: {{ kpis.soldeTotalBanques?.toLocaleString() }}</span>
                 </div>
               </div>
             </div>
 
             <div class="kpi-card" v-if="!isPDG">
-              <span class="kpi-label">Solde Caisses</span>
+              <span class="kpi-label">{{ t("dashboard.soldeCaisses") }}</span>
               <div class="kpi-body">
-                <span class="kpi-value">{{ kpis.soldeTotalCaisses?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span class="kpi-value">{{ formatCurrencyPlain(kpis.soldeTotalCaisses?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
                 <span v-if="kpis.dernierMouvementCaisse" class="kpi-trend" :class="kpis.dernierMouvementCaisse >= 0 ? 'positive' : 'negative'">
-                  {{ kpis.dernierMouvementCaisse >= 0 ? '+' : '' }} {{ kpis.dernierMouvementCaisse.toLocaleString() }} XAF
+                  {{ formatCurrency(kpis.dernierMouvementCaisse >= 0 ? '+' : '' }} {{ kpis.dernierMouvementCaisse) }}
                 </span>
               </div>
             </div>
 
             <div class="kpi-card" v-if="!isPDG">
-              <span class="kpi-label">Solde Banques</span>
+              <span class="kpi-label">{{ t("dashboard.soldeBanques") }}</span>
               <div class="kpi-body">
-                <span class="kpi-value">{{ kpis.soldeTotalBanques?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span class="kpi-value">{{ formatCurrencyPlain(kpis.soldeTotalBanques?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
                 <span v-if="kpis.dernierMouvementBanque" class="kpi-trend" :class="kpis.dernierMouvementBanque >= 0 ? 'positive' : 'negative'">
-                  {{ kpis.dernierMouvementBanque >= 0 ? '+' : '' }} {{ kpis.dernierMouvementBanque.toLocaleString() }} XAF
+                  {{ formatCurrency(kpis.dernierMouvementBanque >= 0 ? '+' : '' }} {{ kpis.dernierMouvementBanque) }}
                 </span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">Créances Clients</span>
+              <span class="kpi-label">{{ t("dashboard.creancesClients") }}</span>
               <div class="kpi-body">
-                <span class="kpi-value success">{{ kpis.totalCreancesClients?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span class="kpi-value success">{{ formatCurrencyPlain(kpis.totalCreancesClients?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
                 <span v-if="kpis.derniereCreanceClient" class="kpi-trend" :class="kpis.derniereCreanceClient >= 0 ? 'positive' : 'negative'">
-                  {{ kpis.derniereCreanceClient >= 0 ? '+' : '' }} {{ kpis.derniereCreanceClient.toLocaleString() }} XAF
+                  {{ formatCurrency(kpis.derniereCreanceClient >= 0 ? '+' : '' }} {{ kpis.derniereCreanceClient) }}
                 </span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">Dettes Fournisseurs</span>
+              <span class="kpi-label">{{ t("dashboard.dettesFournisseurs") }}</span>
               <div class="kpi-body">
-                <span class="kpi-value danger">{{ kpis.totalDettesFournisseurs?.toLocaleString() }}<span class="currency">XAF</span></span>
+                <span class="kpi-value danger">{{ formatCurrencyPlain(kpis.totalDettesFournisseurs?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
                 <span v-if="kpis.derniereDetteFournisseur" class="kpi-trend" :class="kpis.derniereDetteFournisseur >= 0 ? 'negative' : 'positive'">
-                   {{ kpis.derniereDetteFournisseur > 0 ? '+' : '' }} {{ kpis.derniereDetteFournisseur.toLocaleString() }} XAF
+                   {{ formatCurrency(kpis.derniereDetteFournisseur > 0 ? '+' : '' }} {{ kpis.derniereDetteFournisseur) }}
                 </span>
               </div>
             </div>
@@ -350,33 +496,33 @@ const depPercent = (val) => {
               <div class="pipeline-display">
                 <div class="pipeline-step">
                   <span class="step-count">{{ kpis.decaissementsEnAttenteRF }}</span>
-                  <span class="step-label">Attente RF</span>
+                  <span class="step-label">{{ t("dashboard.attenteRF") }}</span>
                 </div>
                 <div class="pipeline-arrow">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  <ChevronRightIcon class="w-4 h-4" />
                 </div>
                 <div class="pipeline-step">
                   <span class="step-count">{{ kpis.decaissementsEnAttentePDG }}</span>
-                  <span class="step-label">Attente PDG</span>
+                  <span class="step-label">{{ t("dashboard.attentePDG") }}</span>
                 </div>
               </div>
               <router-link to="/decaissements" class="kpi-action-link">Gérer le flux</router-link>
             </div>
 
             <div class="kpi-card highlight-card pdg-alert-card" v-if="isPDG">
-              <span class="kpi-label">Approbation PDG Requise</span>
+              <span class="kpi-label">{{ t("dashboard.approbationPDG") }}</span>
               <div class="kpi-body">
                 <span class="kpi-value" :class="{ 'urgent-gold': kpis.decaissementsEnAttentePDG > 0 }">{{ kpis.decaissementsEnAttentePDG }}</span>
-                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttentePDG > 0">Signature attendue</span>
+                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttentePDG > 0">{{ t("dashboard.signatureAttendue") }}</span>
               </div>
               <router-link to="/decaissements" class="kpi-action-link">Ouvrir le parapheur</router-link>
             </div>
 
             <div class="kpi-card" v-if="!isRF && !isPDG">
-              <span class="kpi-label">Décaissements en attente</span>
+              <span class="kpi-label">{{ t("dashboard.decaissementsEnAttente") }}</span>
               <div class="kpi-body">
                 <span class="kpi-value" :class="{ 'warning': kpis.decaissementsEnAttente > 0 }">{{ kpis.decaissementsEnAttente }}</span>
-                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttente > 0">Action requise</span>
+                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttente > 0">{{ t("dashboard.actionRequise") }}</span>
               </div>
             </div>
           </div>
@@ -384,15 +530,29 @@ const depPercent = (val) => {
 
         <!-- PILOTAGE STRATÉGIQUE (PDG UNIQUEMENT) -->
         <div class="dashboard-section" v-if="isPDG">
-          <h3 class="section-title">PILOTAGE STRATÉGIQUE</h3>
+          <h3 class="section-title">{{ t("dashboard.pilotageStrategique") }}</h3>
           <div class="strategic-grid">
             <!-- Graphique de Flux -->
             <div class="strategic-card flux-chart-card">
               <div class="card-header">
-                <h4>Flux de Trésorerie Mensuel</h4>
-                <span class="card-subtitle">Évolution des encaissements et décaissements sur 6 mois</span>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <h4>Flux de Trésorerie Mensuel</h4>
+                    <span class="card-subtitle">Évolution des encaissements et décaissements sur 3 {{ t("dashboard.mois") }}</span>
+                  </div>
+                  <div class="chart-legend-custom" style="display: flex; gap: 1rem; font-size: 0.8rem; font-weight: 600;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="width: 10px; height: 10px; border-radius: 50%; background: #10b981;"></span> Encaissements
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="width: 10px; height: 10px; border-radius: 50%; background: #f59e0b;"></span> Décaissements
+                    </div>
+                  </div>
+                </div>
               </div>
-              <FluxChart :data="kpis.evolutionMensuelle" />
+              <div style="height: 250px; position: relative;">
+                <Line :data="evolutionChartData" :options="evolutionChartOptions" />
+              </div>
             </div>
 
             <!-- Top Fournisseurs & Burn Rate -->
@@ -403,7 +563,7 @@ const depPercent = (val) => {
                   <div v-for="sup in kpis.topFournisseurs" :key="sup.nom" class="supplier-row">
                     <div class="sup-info">
                       <span class="sup-name">{{ sup.nom }}</span>
-                      <span class="sup-amount">{{ sup.total.toLocaleString() }} XAF</span>
+                      <span class="sup-amount">{{ formatCurrency(sup.total) }}</span>
                     </div>
                     <div class="sup-progress">
                       <div class="sup-bar" :style="{ width: (sup.total / (kpis.topFournisseurs[0]?.total || 1) * 100) + '%' }"></div>
@@ -419,18 +579,15 @@ const depPercent = (val) => {
                 </div>
                 <div class="burn-body">
                   <div class="burn-item">
-                    <span class="burn-label">Burn Rate Mensuel (Moyen)</span>
-                    <span class="burn-value">{{ kpis.burnRateMensuel?.toLocaleString() }} <span class="unit">XAF / mois</span></span>
+                    <span class="burn-label">{{ t("dashboard.depensesMoyennes") }}</span>
+                    <span class="burn-value">{{ kpis.burnRateMensuel?.toLocaleString() }} <span class="unit">{{ selectedCurrency === 'XAF' ? 'XAF' : 'USD' }} / {{ t("dashboard.mois") }}</span></span>
                   </div>
                   <div class="divider"></div>
-                  <div class="threshold-item">
+                  <div class="burn-item runway-item">
                     <div class="threshold-info">
-                      <span class="burn-label">Seuil de Signature PDG</span>
-                      <span class="threshold-value">{{ kpis.seuilApprobationActuel?.toLocaleString() }} XAF</span>
+                      <span class="burn-label">{{ t("dashboard.runway") }}</span>
+                      <span class="threshold-value">{{ runwayMois }} <span class="unit">mois</span></span>
                     </div>
-                    <button @click="openSeuilModal" class="btn-setup" title="Modifier le seuil">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -440,12 +597,12 @@ const depPercent = (val) => {
 
         <!-- RÉPARTITION DU BUDGET (Uniquement pour RF/ADMIN) -->
         <div class="dashboard-section" v-if="isRF && sortedCategories.length > 0">
-          <h3 class="section-title">RÉPARTITION DU BUDGET DÉCAISSÉ</h3>
+          <h3 class="section-title">{{ t("dashboard.repartitionBudget") }}</h3>
           <div class="budget-chart-container">
             <div v-for="cat in sortedCategories" :key="cat.key" class="budget-row">
               <div class="budget-row-header">
                 <span class="cat-label">{{ cat.label }}</span>
-                <span class="cat-amount">{{ cat.value.toLocaleString() }} XAF</span>
+                <span class="cat-amount">{{ formatCurrency(cat.value) }}</span>
               </div>
               <div class="budget-progress-bg">
                 <div class="budget-progress-fill" :style="{ width: (cat.value / totalBudget * 100) + '%' }"></div>
@@ -456,7 +613,7 @@ const depPercent = (val) => {
 
         <!-- INDICATEURS STRATÉGIQUES (PDG + RF) -->
         <div class="dashboard-section" v-if="isPDG || isRF">
-          <h3 class="section-title">INDICATEURS STRATÉGIQUES</h3>
+          <h3 class="section-title">{{ t("dashboard.indicateursStrategiques") }}</h3>
           <div class="strategic-indicators-grid">
             <!-- Prévision Trésorerie 30j -->
             <div class="strategic-ind-card forecast-card">
@@ -472,18 +629,18 @@ const depPercent = (val) => {
                   </div>
                 </div>
                 <span class="ind-badge" :class="forecastTrend >= 0 ? 'badge-green' : 'badge-red'">
-                  {{ forecastTrend >= 0 ? '↑' : '↓' }} {{ Math.abs(forecastTrend)?.toLocaleString() }} XAF
+                  {{ formatCurrency(forecastTrend >= 0 ? '↑' : '↓' }} {{ Math.abs(forecastTrend)?) }}
                 </span>
               </div>
               <div class="forecast-points">
                 <div v-for="pt in (kpis.pointsPrevisionnels || [])" :key="pt.date" class="forecast-point">
                   <span class="fp-date">{{ pt.date }}</span>
-                  <span class="fp-value">{{ pt.solde?.toLocaleString() }} XAF</span>
+                  <span class="fp-value">{{ formatCurrency(pt.solde?) }}</span>
                 </div>
                 <div v-if="!kpis.pointsPrevisionnels?.length" class="empty-mini">Aucune projection disponible</div>
               </div>
               <div class="forecast-summary" v-if="kpis.soldePrevisionnel30j">
-                <strong>Solde estimé à J+{{ forecastPeriod }} :</strong> {{ kpis.soldePrevisionnel30j?.toLocaleString() }} XAF
+                <strong>{{ t("dashboard.soldeEstime") }}{{ formatCurrency(forecastPeriod }} :</strong> {{ kpis.soldePrevisionnel30j?) }}
               </div>
             </div>
 
@@ -493,7 +650,7 @@ const depPercent = (val) => {
                 <div class="dso-block">
                   <div class="dso-head">
                     <span class="dso-title" title="DSO = (Délai d'encaissement moyen des clients)">DSO</span>
-                    <span class="dso-sub">Délai clients</span>
+                    <span class="dso-sub">{{ t("dashboard.delaiClients") }}</span>
                   </div>
                   <div class="dso-big">{{ kpis.dso || 0 }} <span>jours</span></div>
                   <div class="dso-bar-mini">
@@ -505,7 +662,7 @@ const depPercent = (val) => {
                 <div class="dso-block">
                   <div class="dso-head">
                     <span class="dso-title" title="DPO = (Délai d'exécution moyen des fournisseurs)">DPO</span>
-                    <span class="dso-sub">Délai fournisseurs</span>
+                    <span class="dso-sub">{{ t("dashboard.delaiFournisseurs") }}</span>
                   </div>
                   <div class="dso-big">{{ kpis.dpo || 0 }} <span>jours</span></div>
                   <div class="dso-bar-mini">
@@ -524,7 +681,7 @@ const depPercent = (val) => {
                 <div class="dep-track-db">
                   <div class="dep-fill-db" :style="{ width: depPercent(val) + '%' }"></div>
                 </div>
-                <span class="dep-val-db">{{ val?.toLocaleString() }} XAF</span>
+                <span class="dep-val-db">{{ formatCurrency(val?) }}</span>
               </div>
             </div>
           </div>
@@ -533,23 +690,23 @@ const depPercent = (val) => {
         <!-- A FAIRE AUJOURD'HUI -->
         <div class="dashboard-section">
           <div class="section-header-row">
-            <h3 class="section-title">À FAIRE AUJOURD'HUI</h3>
-            <a href="#" class="view-all-link">Voir toutes les tâches</a>
+            <h3 class="section-title">{{ t("dashboard.aFaireAujourdhui") }}</h3>
+            <a href="#" class="view-all-link">{{ t("dashboard.voirTaches") }}</a>
           </div>
           
           <div class="table-container">
             <table class="tasks-table">
               <thead>
                 <tr>
-                  <th>PRIORITÉ</th>
-                  <th>ÉLÉMENT</th>
-                  <th>MONTANT</th>
-                  <th>ACTION</th>
+                  <th>{{ t("dashboard.priorite") }}</th>
+                  <th>{{ t("dashboard.element") }}</th>
+                  <th>{{ t("dashboard.montant") }}</th>
+                  <th>{{ t("dashboard.action") }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="kpis.decaissementsEnAttenteRF > 0 && isRF">
-                  <td><span class="badge badge-urgent">Critique</span></td>
+                  <td><span class="badge badge-urgent">{{ t("dashboard.critique") }}</span></td>
                   <td>
                     <div class="task-info">
                       <strong>{{ kpis.decaissementsEnAttenteRF }} dossiers à VOTRE validation</strong>
@@ -557,10 +714,10 @@ const depPercent = (val) => {
                     </div>
                   </td>
                   <td class="task-amount">--</td>
-                  <td><router-link to="/decaissements" class="task-action highlight">Valider</router-link></td>
+                  <td><router-link to="/decaissements" class="task-action highlight">{{ t("dashboard.valider") }}</router-link></td>
                 </tr>
                 <tr v-if="kpis.decaissementsEnAttentePDG > 0 && isPDG">
-                  <td><span class="badge badge-urgent">Direction</span></td>
+                  <td><span class="badge badge-urgent">{{ t("dashboard.direction") }}</span></td>
                   <td>
                     <div class="task-info">
                       <strong>{{ kpis.decaissementsEnAttentePDG }} dossier(s) en attente de signature</strong>
@@ -568,10 +725,10 @@ const depPercent = (val) => {
                     </div>
                   </td>
                   <td class="task-amount">--</td>
-                  <td><router-link to="/decaissements" class="task-action highlight gold-btn">Signer</router-link></td>
+                  <td><router-link to="/decaissements" class="task-action highlight gold-btn">{{ t("dashboard.signer") }}</router-link></td>
                 </tr>
                 <tr v-if="kpis.decaissementsEnAttente > 0 && !isRF && !isPDG">
-                  <td><span class="badge badge-urgent">Urgent</span></td>
+                  <td><span class="badge badge-urgent">{{ t("dashboard.urgent") }}</span></td>
                   <td>
                     <div class="task-info">
                       <strong>{{ kpis.decaissementsEnAttente }} décaissement(s) en attente</strong>
@@ -579,10 +736,10 @@ const depPercent = (val) => {
                     </div>
                   </td>
                   <td class="task-amount">--</td>
-                  <td><router-link to="/decaissements" class="task-action">Voir</router-link></td>
+                  <td><router-link to="/decaissements" class="task-action">{{ t("dashboard.voir") }}</router-link></td>
                 </tr>
                 <tr>
-                  <td><span class="badge badge-normal">Normale</span></td>
+                  <td><span class="badge badge-normal">{{ t("dashboard.normale") }}</span></td>
                   <td>
                     <div class="task-info">
                       <strong>Rapprochement bancaire</strong>
@@ -603,18 +760,18 @@ const depPercent = (val) => {
         <!-- ACTIVITÉ RÉCENTE -->
         <div class="dashboard-section right-panel">
           <div class="section-header-row">
-            <h3 class="section-title">ACTIVITÉ RÉCENTE</h3>
+            <h3 class="section-title">{{ t("dashboard.activiteRecente") }}</h3>
             <button @click="fetchKpis" class="refresh-btn" :class="{ 'spinning': loading }" title="Rafraîchir">
-               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.63 4.36A9 9 0 0 0 20.49 15"/></svg>
+               <ArrowPathIcon class="w-4 h-4" />
             </button>
           </div>
           
           <div class="timeline" v-if="kpis.activitesRecentes?.length > 0">
             <div class="timeline-item" v-for="(act, idx) in kpis.activitesRecentes" :key="idx">
               <div class="timeline-icon" :class="getActivityIconClass(act.type)">
-                <svg v-if="act.type === 'FACTURE'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <svg v-else-if="act.type === 'ENCAISSEMENT'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <CheckIcon v-if="act.type === 'FACTURE'" class="w-3 h-3" />
+                <WalletIcon v-else-if="act.type === 'ENCAISSEMENT'" class="w-3 h-3" />
+                <ClockIcon v-else class="w-3 h-3" />
               </div>
               <div class="timeline-content">
                 <h4>{{ act.action === 'CREATE' ? 'Création' : act.action }} {{ act.type.toLowerCase() }}</h4>
@@ -627,15 +784,15 @@ const depPercent = (val) => {
             </div>
           </div>
           <div class="empty-activity" v-else>
-            <p>Aucune activité récente enregistrée.</p>
+            <p>{{ t("dashboard.aucuneActivite") }}</p>
           </div>
         </div>
 
         <!-- SCORE D'EFFICACITE -->
         <div class="dashboard-section right-panel score-panel">
-          <h3 class="section-title">SCORE D'EFFICACITÉ</h3>
+          <h3 class="section-title">{{ t("dashboard.scoreEfficacite") }}</h3>
           <div class="score-header">
-            <span class="score-label">Vitesse de Traitement</span>
+            <span class="score-label">{{ t("dashboard.vitesseTraitement") }}</span>
             <span class="score-percent">94%</span>
           </div>
           <div class="progress-bar-bg">
@@ -648,7 +805,7 @@ const depPercent = (val) => {
             </div>
             <div class="stat-col">
               <strong>0.02%</strong>
-              <span>TAUX D'ERREUR</span>
+              <span>{{ t("dashboard.tauxErreur") }}</span>
             </div>
           </div>
         </div>
@@ -672,7 +829,7 @@ const depPercent = (val) => {
           </div>
         </div>
         <div class="modal-footer">
-          <button @click="showSeuilModal = false" class="btn-secondary">Annuler</button>
+          <button @click="showSeuilModal = false" class="btn-secondary">{{ t("common.annuler") }}</button>
           <button @click="updateSeuil" class="btn-primary gold-btn" :disabled="updatingSeuil">
             {{ updatingSeuil ? 'Confirmer' : 'Enregistrer' }}
           </button>

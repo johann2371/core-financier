@@ -259,7 +259,7 @@ public class TableauBordServiceImpl implements ITableauBordService {
         List<TableauBordResponse.EvolutionMois> result = new ArrayList<>();
         YearMonth current = YearMonth.now();
         
-        for (int i = 5; i >= 0; i--) {
+        for (int i = 2; i >= 0; i--) {
             YearMonth ym = current.minusMonths(i);
             String label = ym.getMonth().getDisplayName(TextStyle.SHORT, Locale.FRENCH);
             

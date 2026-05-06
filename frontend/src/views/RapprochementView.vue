@@ -2,8 +2,21 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useCompteStore } from '../stores/compte.store'
 import { useRapprochementStore } from '../stores/rapprochement.store'
+import { useLangStore } from '../stores/lang.store'
 import MainLayout from '../components/MainLayout.vue'
 import api from '../services/api'
+import { 
+  BuildingLibraryIcon, 
+  SparklesIcon, 
+  CheckCircleIcon, 
+  ArrowUpOnSquareIcon, 
+  ArrowPathIcon, 
+  LinkIcon, 
+  ChevronRightIcon,
+  XMarkIcon,
+  DocumentTextIcon,
+  InformationCircleIcon
+} from '@heroicons/vue/24/outline'
 
 const compteStore = useCompteStore()
 const rapprochementStore = useRapprochementStore()
@@ -119,11 +132,14 @@ const handleValidate = async () => {
 
 const formatAmount = (val) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF' }).format(val)
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR')
+
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 </script>
 
 <template>
   <MainLayout>
-    <template #title>Rapprochement Bancaire</template>
+    <template #title>{{ t("rapprochement.titre") }}</template>
     <template #subtitle>Assurer la concordance entre vos comptes et la banque</template>
 
     <div class="rapprochement-container">
@@ -135,7 +151,9 @@ const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR')
           <div v-for="bank in banques" :key="bank.id" 
                class="bank-card" :class="{ active: selectedCompteId === bank.id }"
                @click="selectCompte(bank.id)">
-            <div class="bank-icon">🏛️</div>
+            <div class="bank-icon">
+              <BuildingLibraryIcon class="w-6 h-6 text-slate-400" />
+            </div>
             <div class="bank-info">
               <span class="bank-name">{{ bank.libelle }}</span>
               <span class="bank-number">{{ bank.numero }}</span>
@@ -181,7 +199,9 @@ const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR')
             
             <div class="drop-zone" @click="triggerFileInput">
               <input type="file" ref="fileInput" class="hidden" @change="onFileSelected" accept=".csv">
-              <div class="drop-icon">📁</div>
+              <div class="drop-icon">
+                <ArrowUpOnSquareIcon class="w-12 h-12 text-slate-300" />
+              </div>
               <span v-if="!selectedFile">Cliquez pour choisir un fichier</span>
               <span v-else class="file-name">{{ selectedFile.name }}</span>
             </div>
@@ -208,8 +228,14 @@ const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR')
               <span><strong>Solde relevé :</strong> {{ formatAmount(soldeCalculé) }}</span>
             </div>
             <div class="toolbar-actions">
-              <button @click="handleAutoMatch" class="btn-magic">Magic Auto-Match ✨</button>
-              <button @click="handleValidate" class="btn-success">Finaliser & Valider</button>
+              <button @click="handleAutoMatch" class="btn-magic">
+                <SparklesIcon class="w-4 h-4 mr-2" />
+                Magic Auto-Match
+              </button>
+              <button @click="handleValidate" class="btn-success">
+                <CheckCircleIcon class="w-4 h-4 mr-2" />
+                Finaliser & Valider
+              </button>
             </div>
           </div>
 
@@ -228,7 +254,9 @@ const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR')
                   <div class="item-amount" :class="{ debit: ligne.debit > 0 }">
                     {{ ligne.debit > 0 ? '-' + formatAmount(ligne.debit) : '+' + formatAmount(ligne.credit) }}
                   </div>
-                  <div v-if="ligne.matched" class="match-check">✅</div>
+                  <div v-if="ligne.matched" class="match-check">
+                    <CheckCircleIcon class="w-5 h-5 text-green-500" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -237,9 +265,15 @@ const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR')
             <div class="match-bridge" v-if="selectedLigne">
               <div v-if="selectedSystemTx" class="match-preview bounce-in">
                 <span>Appairer ?</span>
-                <button class="btn-primary" @click="confirmMatch">Vailder le lien 🔗</button>
+                <button class="btn-primary" @click="confirmMatch">
+                  <LinkIcon class="w-4 h-4 mr-2" />
+                  Vailder le lien
+                </button>
               </div>
-              <div v-else class="match-hint">Sélectionnez une écriture système à droite</div>
+              <div v-else class="match-hint">
+                <ChevronRightIcon class="w-6 h-6 mx-auto mb-2 opacity-20" />
+                Sélectionnez une écriture système à droite
+              </div>
             </div>
 
             <!-- Colonne 2: Système CoreFi -->
@@ -268,7 +302,9 @@ const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR')
       </main>
 
       <div v-else class="no-compte-selected">
-        <div class="illustration">🏛️</div>
+        <div class="illustration">
+          <BuildingLibraryIcon class="w-16 h-16" />
+        </div>
         <h3>Sélectionnez un compte bancaire</h3>
         <p>Pour commencer ou consulter un rapprochement, choisissez un compte dans la liste de gauche.</p>
       </div>
@@ -280,7 +316,7 @@ const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR')
       <div class="modal-content">
         <div class="modal-header">
           <h3>Nouvelle session de rapprochement</h3>
-          <button @click="showCreateModal = false" class="close-btn">&times;</button>
+          <button @click="showCreateModal = false" class="close-btn"><XMarkIcon class="w-6 h-6" /></button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -297,7 +333,7 @@ const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR')
           </div>
         </div>
         <div class="modal-footer">
-          <button @click="showCreateModal = false" class="btn-text">Annuler</button>
+          <button @click="showCreateModal = false" class="btn-text">{{ t("common.annuler") }}</button>
           <button @click="handleCreateSession" class="btn-primary">Créer la session</button>
         </div>
       </div>

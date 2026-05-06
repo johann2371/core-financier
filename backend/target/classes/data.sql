@@ -4,18 +4,19 @@
 -- ============================================================
 
 -- 1. Devise de base (XAF, EUR, USD)
-INSERT IGNORE INTO devise (code, libelle, symbole, devise_base, actif)
+INSERT INTO devise (code, libelle, symbole, devise_base, actif)
 VALUES
     ('XAF', 'Franc CFA BEAC', 'FCFA', true, true),
     ('EUR', 'Euro',            '€',    false, true),
-    ('USD', 'Dollar US',       '$',    false, true);
+    ('USD', 'Dollar US',       '$',    false, true)
+ON DUPLICATE KEY UPDATE libelle = VALUES(libelle), symbole = VALUES(symbole);
 
 -- NOTE : L'utilisateur admin est créé par DataInitializer.java au démarrage
 --        pour garantir que le mot de passe est correctement encodé (BCrypt coût 12).
 
 
 -- 3. Parametrage initial (seuil PDG + autres configs)
-INSERT IGNORE INTO parametrage (cle, valeur, description)
+INSERT INTO parametrage (cle, valeur, description)
 VALUES
     ('SEUIL_APPROBATION_PDG',       '500000', 'Montant en XAF au-dela duquel le PDG doit approuver'),
     ('DEVISE_BASE_CODE',            'XAF',    'Devise de reference pour les operations'),
@@ -30,7 +31,9 @@ VALUES
     ('INVOICE_LOGO_URL',            '',       'URL du logo utilise sur les factures PDF'),
     ('SEUIL_SOLDE_CRITIQUE',        '100000', 'Solde minimum avant alerte de tresorerie (XAF)'),
     ('NOTIF_EMAIL_ALERTE',          'true',   'Activer les notifications par email pour les alertes'),
-    ('APP_VERSION',                 '1.0.0',  'Version actuelle du systeme');
+    ('APP_VERSION',                 '1.0.0',  'Version actuelle du systeme')
+ON DUPLICATE KEY UPDATE description = VALUES(description);
+
 
 -- 4. Comptes financiers par défaut pour les tests
 INSERT IGNORE INTO compte_financier (id, type, numero, libelle, solde, devise_id, actif)

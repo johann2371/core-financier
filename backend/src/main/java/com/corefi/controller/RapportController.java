@@ -25,7 +25,7 @@ public class RapportController {
         return ResponseEntity.ok(rapportService.genererBilanMensuel(mois, annee));
     }
 
-    @GetMapping("/bilan-mensuel/pdf")
+    @GetMapping(value = "/bilan-mensuel/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR', 'PDG', 'RESPONSABLE_FINANCIER', 'COMPTABLE')")
     public ResponseEntity<byte[]> getBilanMensuelPdf(
             @RequestParam int mois, @RequestParam int annee) {

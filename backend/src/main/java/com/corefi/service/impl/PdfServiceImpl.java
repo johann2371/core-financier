@@ -39,6 +39,7 @@ public class PdfServiceImpl implements IPdfService {
     private final DecaissementRepository decaissementRepository;
     private final ParametrageRepository parametrageRepository;
     private final SessionCaisseRepository sessionCaisseRepository;
+    private final com.corefi.repository.TiersRepository tiersRepository;
 
     private String getNomSociete() {
         return parametrageRepository.findByCle("INFO_SOCIETE_NOM")
@@ -543,4 +544,126 @@ public class PdfServiceImpl implements IPdfService {
         table.addCell(c1);
         table.addCell(c2);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // RELEVÉ DE COMPTE TIERS (PDF)
+    // ════════════════════════════════════════════════════════════════════════
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] genererReleveCompteTiersPdf(Long tiersId) {
+        com.corefi.entity.Tiers tiers = tiersRepository.findById(tiersId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tiers introuvable ID: " + tiersId));
+
+        List<Facture> factures = factureRepository.findByTiersId(tiersId);
+        List<Encaissement> encaissements = encaissementRepository.findAll().stream()
+                .filter(e -> e.getClient() != null && e.getClient().getId().equals(tiersId))
+                .toList();
+
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            Document document = new Document(PageSize.A4, 40, 40, 50, 40);
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            // En-tête
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, new BaseColor(30, 41, 59));
+            Font subtitleFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.GRAY);
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, BaseColor.WHITE);
+            Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 9, BaseColor.DARK_GRAY);
+            Font sectionFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, new BaseColor(37, 99, 235));
+
+            document.add(new Paragraph(getNomSociete(), titleFont));
+            document.add(new Paragraph("RELEVÉ DE COMPTE", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, new BaseColor(37, 99, 235))));
+            document.add(Chunk.NEWLINE);
+
+            // Infos tiers
+            document.add(new Paragraph("Client / Fournisseur : " + tiers.getRaisonSociale(), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11)));
+            document.add(new Paragraph("Code : " + tiers.getCode() + "  |  Email : " + (tiers.getEmail() != null ? tiers.getEmail() : "—"), subtitleFont));
+            document.add(new Paragraph("Solde actuel : " + String.format("%,.0f XAF", tiers.getSolde()), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11, new BaseColor(220, 38, 38))));
+            document.add(new Paragraph("Date d'édition : " + java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), subtitleFont));
+            document.add(Chunk.NEWLINE);
+            document.add(new LineSeparator());
+            document.add(Chunk.NEWLINE);
+
+            // Section Factures
+            document.add(new Paragraph("FACTURES", sectionFont));
+            document.add(Chunk.NEWLINE);
+
+            if (factures.isEmpty()) {
+                document.add(new Paragraph("Aucune facture enregistrée.", cellFont));
+            } else {
+                PdfPTable table = new PdfPTable(new float[]{2, 1.5f, 1.5f, 1.5f, 1.5f});
+                table.setWidthPercentage(100);
+
+                BaseColor headerBg = new BaseColor(37, 99, 235);
+                for (String h : new String[]{"N° Facture", "Date", "Échéance", "Montant TTC", "Statut"}) {
+                    PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
+                    cell.setBackgroundColor(headerBg);
+                    cell.setPadding(6);
+                    table.addCell(cell);
+                }
+
+                BigDecimal totalFactures = BigDecimal.ZERO;
+                for (Facture f : factures) {
+                    table.addCell(new PdfPCell(new Phrase(f.getNumero(), cellFont)));
+                    table.addCell(new PdfPCell(new Phrase(f.getDateFacture() != null ? f.getDateFacture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "—", cellFont)));
+                    table.addCell(new PdfPCell(new Phrase(f.getDateEcheance() != null ? f.getDateEcheance().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "—", cellFont)));
+                    PdfPCell mCell = new PdfPCell(new Phrase(String.format("%,.0f", f.getMontantTtc()), cellFont));
+                    mCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                    table.addCell(mCell);
+                    table.addCell(new PdfPCell(new Phrase(f.getStatut().name(), cellFont)));
+                    totalFactures = totalFactures.add(f.getMontantTtc());
+                }
+                document.add(table);
+                document.add(new Paragraph("Total factures : " + String.format("%,.0f XAF", totalFactures),
+                        FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
+            }
+
+            document.add(Chunk.NEWLINE);
+            document.add(new LineSeparator());
+            document.add(Chunk.NEWLINE);
+
+            // Section Encaissements / Paiements
+            document.add(new Paragraph("PAIEMENTS REÇUS", sectionFont));
+            document.add(Chunk.NEWLINE);
+
+            if (encaissements.isEmpty()) {
+                document.add(new Paragraph("Aucun paiement enregistré.", cellFont));
+            } else {
+                PdfPTable table2 = new PdfPTable(new float[]{2, 1.5f, 1.5f, 1.5f});
+                table2.setWidthPercentage(100);
+
+                BaseColor headerBg2 = new BaseColor(16, 185, 129);
+                for (String h : new String[]{"N° Reçu", "Date", "Montant", "Moyen"}) {
+                    PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
+                    cell.setBackgroundColor(headerBg2);
+                    cell.setPadding(6);
+                    table2.addCell(cell);
+                }
+
+                BigDecimal totalPaye = BigDecimal.ZERO;
+                for (Encaissement e : encaissements) {
+                    table2.addCell(new PdfPCell(new Phrase(e.getNumero(), cellFont)));
+                    table2.addCell(new PdfPCell(new Phrase(e.getDateEncaissement() != null ? e.getDateEncaissement().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "—", cellFont)));
+                    PdfPCell mCell = new PdfPCell(new Phrase(String.format("%,.0f", e.getMontant()), cellFont));
+                    mCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                    table2.addCell(mCell);
+                    table2.addCell(new PdfPCell(new Phrase(e.getMoyenPaiement() != null ? e.getMoyenPaiement().name() : "—", cellFont)));
+                    totalPaye = totalPaye.add(e.getMontant());
+                }
+                document.add(table2);
+                document.add(new Paragraph("Total payé : " + String.format("%,.0f XAF", totalPaye),
+                        FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, new BaseColor(16, 185, 129))));
+            }
+
+            document.add(Chunk.NEWLINE);
+            document.add(new Paragraph("— Fin du relevé —", subtitleFont));
+            document.close();
+            return baos.toByteArray();
+        } catch (DocumentException e) {
+            throw new WorkflowException("Erreur lors de la génération du relevé PDF : " + e.getMessage());
+        }
+    }
+
 }
+

@@ -80,4 +80,20 @@ public class TiersController {
         tiersService.desactiver(id);
         return ResponseEntity.noContent().build();
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // RELEVÉ DE COMPTE TIERS (PDF)
+    // ═══════════════════════════════════════════════════════════
+    private final com.corefi.service.interfaces.IPdfService pdfService;
+
+    @GetMapping("/{id}/releve-pdf")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATEUR','COMPTABLE','RESPONSABLE_FINANCIER','PDG')")
+    public ResponseEntity<byte[]> telechargerReleve(@PathVariable Long id) {
+        byte[] pdfBytes = pdfService.genererReleveCompteTiersPdf(id);
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(org.springframework.http.ContentDisposition.inline().filename("releve_tiers_" + id + ".pdf").build());
+        return new ResponseEntity<>(pdfBytes, headers, org.springframework.http.HttpStatus.OK);
+    }
 }
+

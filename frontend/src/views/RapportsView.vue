@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useLangStore } from '../stores/lang.store'
 import MainLayout from '../components/MainLayout.vue'
 import api from '../services/api'
 import { useCompteStore } from '../stores/compte.store'
@@ -37,7 +38,7 @@ const fetchBilan = async () => {
   loading.value = true
   error.value = null
   try {
-    const res = await api.get('/api/rapports/bilan-mensuel', {
+    const res = await api.get('/rapports/bilan-mensuel', {
       params: { mois: selectedMonth.value, annee: selectedYear.value }
     })
     bilanData.value = res.data
@@ -51,7 +52,7 @@ const fetchBilan = async () => {
 
 const downloadPdf = async () => {
   try {
-    const res = await api.get('/api/rapports/bilan-mensuel/pdf', {
+    const res = await api.get('/rapports/bilan-mensuel/pdf', {
       params: { mois: selectedMonth.value, annee: selectedYear.value },
       responseType: 'blob'
     })
@@ -63,6 +64,7 @@ const downloadPdf = async () => {
     link.click()
     link.remove()
   } catch (err) {
+    console.error("Erreur PDF:", err)
     error.value = 'Erreur lors de la génération du PDF.'
   }
 }
@@ -78,11 +80,14 @@ const resultatNet = computed(() => {
 })
 
 const resultatClass = computed(() => resultatNet.value >= 0 ? 'positive' : 'negative')
+
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 </script>
 
 <template>
   <MainLayout>
-    <template #title>Rapports Financiers</template>
+    <template #title>{{ t("rapports.titre") }}</template>
     <template #subtitle>Génération de bilans périodiques et analyses financières</template>
 
     <div class="rapports-container">
@@ -129,17 +134,14 @@ const resultatClass = computed(() => resultatNet.value >= 0 ? 'positive' : 'nega
           <div class="bilan-kpi ca">
             <div class="bk-label">Chiffre d'Affaires</div>
             <div class="bk-value">{{ formatCurrency(bilanData.totalCA) }} <span>FCFA</span></div>
-            <div class="bk-icon">📈</div>
           </div>
           <div class="bilan-kpi depenses">
             <div class="bk-label">Total Dépenses</div>
             <div class="bk-value">{{ formatCurrency(bilanData.totalDepenses) }} <span>FCFA</span></div>
-            <div class="bk-icon">📉</div>
           </div>
           <div class="bilan-kpi resultat" :class="resultatClass">
             <div class="bk-label">Résultat Net</div>
             <div class="bk-value">{{ resultatNet >= 0 ? '+' : '' }}{{ formatCurrency(resultatNet) }} <span>FCFA</span></div>
-            <div class="bk-icon">{{ resultatNet >= 0 ? '✅' : '⚠️' }}</div>
           </div>
           <div class="bilan-kpi operations">
             <div class="bk-label">Opérations</div>
@@ -201,6 +203,9 @@ export default {
     }
   }
 }
+
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 </script>
 
 <style scoped>
@@ -264,7 +269,7 @@ export default {
 .bk-label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
 .bk-value { font-size: 1.5rem; font-weight: 800; color: #1e293b; }
 .bk-value span { font-size: 0.85rem; font-weight: 600; color: #94a3b8; }
-.bk-icon { position: absolute; top: 1rem; right: 1rem; font-size: 1.5rem; opacity: 0.6; }
+
 .bk-detail { font-size: 0.8rem; color: #94a3b8; margin-top: 0.25rem; }
 
 .resultat.positive .bk-value { color: #059669; }

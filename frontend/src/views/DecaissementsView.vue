@@ -5,12 +5,35 @@ import MainLayout from '../components/MainLayout.vue'
 import Pagination from '../components/Pagination.vue'
 import { useDecaissementStore } from '../stores/decaissement.store'
 import { useTierStore } from '../stores/tier.store'
+import { useLangStore } from '../stores/lang.store'
 import { useAuthStore } from '../stores/auth.store'
 import { useCompteStore } from '../stores/compte.store'
+import { 
+  PlusIcon, 
+  FunnelIcon, 
+  MagnifyingGlassIcon, 
+  CheckCircleIcon, 
+  XMarkIcon, 
+  CheckIcon, 
+  EyeIcon, 
+  ArrowDownTrayIcon,
+  WalletIcon,
+  ShieldCheckIcon,
+  InformationCircleIcon,
+  ExclamationTriangleIcon,
+  ArrowUpTrayIcon,
+  DocumentIcon,
+  ArrowsRightLeftIcon,
+  BanknotesIcon,
+  CurrencyDollarIcon,
+  UsersIcon
+} from '@heroicons/vue/24/outline'
 
 const store = useDecaissementStore()
 const tierStore = useTierStore()
 const authStore = useAuthStore()
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 const compteStore = useCompteStore()
 
 // Modals State
@@ -419,19 +442,17 @@ const selectedCompteBalance = computed(() => {
 
     <template #actions>
       <button class="icon-btn show-on-mobile" @click="showMobileFilters = !showMobileFilters" title="Filtrer">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-        </svg>
+        <FunnelIcon class="w-5 h-5" />
       </button>
       <button @click="showCreateModal = true" class="btn-primary hide-on-mobile">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <PlusIcon class="w-4 h-4" />
         Nouvel Décaissement
       </button>
     </template>
 
     <div class="show-on-mobile w-100" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
       <button @click="showCreateModal = true" class="btn-primary w-100" style="justify-content: center; padding: 0.75rem;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <PlusIcon class="w-5 h-5" />
         Nouvel Décaissement
       </button>
     </div>
@@ -440,14 +461,14 @@ const selectedCompteBalance = computed(() => {
     <div class="filter-bar" :class="{ 'mobile-collapsed': !showMobileFilters }">
       <div class="filter-group group-search">
         <div class="input-with-icon-left">
-          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <MagnifyingGlassIcon class="icon w-4 h-4" />
           <input v-model="filters.search" type="text" placeholder="Motif ou Bénéficiaire..." class="filter-input-std" />
         </div>
       </div>
 
       <div class="filter-group" v-if="isRF || isPDG">
         <button @click="showMyTasksOnly = !showMyTasksOnly" class="btn-toggle-tasks" :class="{ active: showMyTasksOnly }">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          <CheckCircleIcon class="w-4 h-4" />
           {{ isPDG ? 'Mes signatures en attente' : 'Mes dossiers à valider' }}
         </button>
       </div>
@@ -479,7 +500,7 @@ const selectedCompteBalance = computed(() => {
       </div>
 
       <button @click="resetFilters" class="btn-clear-filters" title="Réinitialiser">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        <XMarkIcon class="w-5 h-5" />
       </button>
     </div>
 
@@ -511,7 +532,7 @@ const selectedCompteBalance = computed(() => {
             <tr v-if="filteredDecaissements.length === 0" class="empty-row text-center">
               <td colspan="6">
                 <div class="empty-state">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <ExclamationTriangleIcon class="w-12 h-12 text-slate-300 mx-auto" />
                   <p>Aucune demande de décaissement trouvée.</p>
                 </div>
               </td>
@@ -544,33 +565,33 @@ const selectedCompteBalance = computed(() => {
                 <div class="actions-cell">
                   <template v-if="(item.statut === 'SOUMIS' || item.statut === 'EN_ATTENTE') && (isRF || isAdmin)">
                     <button class="btn-icon text-green" @click="openApprove(item)" title="Valider (RF)">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      <CheckIcon class="w-5 h-5" />
                     </button>
                     <button class="btn-icon text-red" @click="openReject(item)" title="Rejeter">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                      <XMarkIcon class="w-5 h-5" />
                     </button>
                   </template>
 
                   <template v-if="(item.statut === 'VALIDEE_RF' || item.statut === 'EN_ATTENTE_PDG') && (isPDG || isAdmin)">
                     <button class="btn-icon text-green" @click="openApprove(item)" title="Approuver (PDG)">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      <CheckIcon class="w-5 h-5" />
                     </button>
                     <button class="btn-icon text-red" @click="openReject(item)" title="Rejeter">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                      <XMarkIcon class="w-5 h-5" />
                     </button>
                   </template>
 
                   <button v-if="(item.statut === 'VALIDEE_PDG' || (item.statut === 'VALIDEE_RF' && item.montant < 500000)) && (authStore.userRole === 'CAISSIER' || authStore.userRole === 'ADMINISTRATEUR')" @click="openExecute(item)" class="icon-btn text-blue" title="Exécuter Paiement">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-3-3.87"></path><path d="M1 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 7l-7 7-3-3"></path></svg>
+                    <WalletIcon class="w-5 h-5" />
                   </button>
                   
                   <!-- Preview Button -->
                   <button @click="openPreview(item.id)" class="icon-btn preview-btn" title="Aperçu">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <EyeIcon class="w-5 h-5" />
                   </button>
 
                   <button @click="store.downloadReceipt(item.id)" class="icon-btn download-btn" title="Télécharger">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <ArrowDownTrayIcon class="w-5 h-5" />
                   </button>
                 </div>
               </td>
@@ -600,7 +621,7 @@ const selectedCompteBalance = computed(() => {
       <div class="modal modal-lg">
         <div class="modal-header">
           <h3>Nouveau Décaissement</h3>
-          <button @click="showCreateModal = false" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+          <button @click="showCreateModal = false" class="close-btn"><XMarkIcon class="w-6 h-6" /></button>
         </div>
         
         <div class="modal-split">
@@ -609,7 +630,7 @@ const selectedCompteBalance = computed(() => {
 
             <!-- Bandeau d'erreur métier -->
             <div v-if="formError" class="form-error-banner">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <ExclamationTriangleIcon class="w-5 h-5" />
               <span>{{ formError }}</span>
               <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
             </div>
@@ -635,11 +656,11 @@ const selectedCompteBalance = computed(() => {
                    {{ fou.raisonSociale }}
                  </option>
               </select>
-              <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <UsersIcon class="input-icon w-5 h-5" />
             </div>
             
             <div class="alert-box alert-error mt-2" v-if="tierStore.fournisseurs.length === 0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <ExclamationTriangleIcon class="w-5 h-5" />
                 <div>
                   <strong>Aucun fournisseur disponible</strong>
                   <span>Veuillez créer un Fournisseur dans l'annuaire des Tiers d'abord.</span>
@@ -651,22 +672,22 @@ const selectedCompteBalance = computed(() => {
               <div class="payment-modes" style="grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
                 <label class="mode-card" :class="{ active: createForm.mode === 'VIREMENT' }">
                   <input type="radio" v-model="createForm.mode" value="VIREMENT" class="hidden-radio"/>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+                  <ArrowsRightLeftIcon class="w-6 h-6" />
                   <span>Virement</span>
                 </label>
                 <label class="mode-card" :class="{ active: createForm.mode === 'CHEQUE' }">
                   <input type="radio" v-model="createForm.mode" value="CHEQUE" class="hidden-radio"/>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
+                  <DocumentIcon class="w-6 h-6" />
                   <span>Chèque</span>
                 </label>
                 <label class="mode-card" :class="{ active: createForm.mode === 'ESPECES' }">
                   <input type="radio" v-model="createForm.mode" value="ESPECES" class="hidden-radio"/>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                  <BanknotesIcon class="w-6 h-6" />
                   <span>Espèces</span>
                 </label>
                 <label class="mode-card" :class="{ active: createForm.mode === 'ORANGE_MONEY' }">
                   <input type="radio" v-model="createForm.mode" value="ORANGE_MONEY" class="hidden-radio"/>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                  <CurrencyDollarIcon class="w-6 h-6" />
                   <span>Or. Money</span>
                 </label>
               </div>
@@ -715,14 +736,14 @@ const selectedCompteBalance = computed(() => {
               <div class="upload-zone">
                 <input type="file" id="justificatif-upload" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" @change="onFilesSelected" class="upload-input" />
                 <label for="justificatif-upload" class="upload-label">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  <ArrowUpTrayIcon class="w-8 h-8 mx-auto" />
                   <span>Cliquer pour ajouter des fichiers</span>
                   <span class="upload-hint">PDF, Images, Documents (max 10 Mo)</span>
                 </label>
               </div>
               <div v-if="uploadFiles.length > 0" class="uploaded-files">
                 <div v-for="(file, index) in uploadFiles" :key="index" class="file-item">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                  <DocumentIcon class="w-4 h-4" />
                   <span class="file-name">{{ file.name }}</span>
                   <span class="file-size">{{ (file.size / 1024).toFixed(0) }} Ko</span>
                   <button type="button" @click="removeFile(index)" class="file-remove">&times;</button>
@@ -736,11 +757,11 @@ const selectedCompteBalance = computed(() => {
              <div class="right-section validation-section">
                 <div class="section-title-row">
                   <h4>VÉRIFICATION SÉCURITÉ</h4>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                  <ShieldCheckIcon class="w-5 h-5 text-blue-600" />
                 </div>
                 
                 <div class="alert-box alert-info" v-if="createForm.montant < 500000">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <InformationCircleIcon class="w-5 h-5" />
                   <div>
                     <strong>Flux Standard</strong>
                     <span>Validation DAF uniquement.</span>
@@ -748,7 +769,7 @@ const selectedCompteBalance = computed(() => {
                 </div>
 
                 <div class="alert-box alert-error" v-if="createForm.montant >= 500000">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                  <ExclamationTriangleIcon class="w-5 h-5" />
                   <div>
                     <strong>Seuil Dépassé (> 500k)</strong>
                     <span>Validation PDG obligatoire requise.</span>
@@ -756,7 +777,7 @@ const selectedCompteBalance = computed(() => {
                 </div>
 
                 <div class="alert-box alert-success" v-if="createForm.montant && (createForm.fournisseurId || createForm.beneficiaire)">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                  <CheckCircleIcon class="w-5 h-5 text-green-500" />
                   <div>
                     <strong>Formulaire complet</strong>
                     <span>Prêt pour soumission.</span>
@@ -767,7 +788,7 @@ const selectedCompteBalance = computed(() => {
         </div>
         
         <div class="modal-footer bottom-bar">
-          <button type="button" class="btn-text" @click="showCreateModal = false">Annuler</button>
+          <button type="button" class="btn-text" @click="showCreateModal = false">{{ t("common.annuler") }}</button>
           <button type="submit" form="create-decaissement-form" class="btn-primary-large">
             Soumettre Demande
           </button>
@@ -944,7 +965,7 @@ const selectedCompteBalance = computed(() => {
         </div>
 
         <div class="approve-footer">
-          <button @click="showExecuteModal = false" class="btn-outline-wide">Annuler</button>
+          <button @click="showExecuteModal = false" class="btn-outline-wide">{{ t("common.annuler") }}</button>
           <button @click="submitExecute" class="btn-confirm-execute" style="background: #2563eb;">
             Confirmer le Paiement
           </button>

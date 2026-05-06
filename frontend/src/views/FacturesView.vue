@@ -5,12 +5,28 @@ import Pagination from '../components/Pagination.vue'
 import { useFactureStore } from '../stores/facture.store'
 import { useTierStore } from '../stores/tier.store'
 import { useRoute, useRouter } from 'vue-router'
+import { useLangStore } from '../stores/lang.store'
 import { useAuthStore } from '../stores/auth.store'
 import api from '../services/api'
+import {
+  FunnelIcon,
+  PlusIcon,
+  DocumentPlusIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  BanknotesIcon,
+  EyeIcon,
+  ArrowDownTrayIcon,
+  DocumentTextIcon,
+  TrashIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/vue/24/outline'
 
 const store = useFactureStore()
 const tierStore = useTierStore()
 const authStore = useAuthStore()
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 const route = useRoute()
 const router = useRouter()
 
@@ -240,23 +256,21 @@ const submitForm = async () => {
 
 <template>
   <MainLayout>
-    <template #title>Gestion des Factures</template>
+    <template #title>{{ t("factures.titre") }}</template>
 
     <template #actions>
       <button class="icon-btn show-on-mobile" @click="showMobileFilters = !showMobileFilters" title="Filtrer">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-        </svg>
+        <FunnelIcon class="w-5 h-5" />
       </button>
       <button v-if="authStore.userRole !== 'CAISSIER'" @click="showModal = true" class="btn-primary hide-on-mobile">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
+        <DocumentPlusIcon class="w-5 h-5" />
         Nouvelle Facture
       </button>
     </template>
 
     <div class="show-on-mobile w-100" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
       <button @click="showModal = true" class="btn-primary w-100" style="justify-content: center; padding: 0.75rem;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
+        <DocumentPlusIcon class="w-5 h-5" />
         Nouvelle Facture
       </button>
     </div>
@@ -272,7 +286,7 @@ const submitForm = async () => {
     <div class="filter-bar" :class="{ 'mobile-collapsed': !showMobileFilters }">
       <div class="filter-group group-search">
         <div class="input-with-icon-left">
-          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <MagnifyingGlassIcon class="icon w-5 h-5 text-slate-400" />
           <input v-model="filters.search" type="text" placeholder="N° Facture..." class="filter-input-std" />
         </div>
       </div>
@@ -301,7 +315,7 @@ const submitForm = async () => {
       </div>
 
       <button @click="resetFilters" class="btn-clear-filters" title="Réinitialiser">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        <XMarkIcon class="w-4 h-4" />
       </button>
     </div>
 
@@ -363,17 +377,17 @@ const submitForm = async () => {
               </td>
               <td class="text-right font-semibold text-dark">{{ item.montantTtc?.toLocaleString() || '0' }}</td>
               <td class="text-center">
-                 <div class="actions-cell">
-                   <button v-if="item.statut !== 'SOLDEE' && item.type === 'VENTE'" class="icon-btn" @click="router.push({ path: '/encaissements', query: { invoiceId: item.id, clientId: item.tiersId, amount: item.resteAPayer || item.montantTtc, numero: item.numero } })" title="Enregistrer le paiement" style="color: #16a34a; background: #dcfce7;">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                   </button>
-                   <button class="icon-btn preview-btn" @click="openPreview(item.id)" title="Aperçu">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                   </button>
-                   <button class="icon-btn download-btn" @click="store.downloadPdf(item.id)" title="Télécharger PDF">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                   </button>
-                 </div>
+                  <div class="actions-cell">
+                    <button v-if="item.statut !== 'SOLDEE' && item.type === 'VENTE'" class="icon-btn" @click="router.push({ path: '/encaissements', query: { invoiceId: item.id, clientId: item.tiersId, amount: item.resteAPayer || item.montantTtc, numero: item.numero } })" title="Enregistrer le paiement" style="color: #16a34a; background: #dcfce7;">
+                      <BanknotesIcon class="w-4 h-4" />
+                    </button>
+                    <button class="icon-btn preview-btn" @click="openPreview(item.id)" title="Aperçu">
+                      <EyeIcon class="w-4 h-4" />
+                    </button>
+                    <button class="icon-btn download-btn" @click="store.downloadPdf(item.id)" title="Télécharger PDF">
+                      <ArrowDownTrayIcon class="w-4 h-4" />
+                    </button>
+                  </div>
               </td>
             </tr>
           </tbody>
@@ -400,7 +414,7 @@ const submitForm = async () => {
         <div class="preview-header">
           <h3>Prévisualisation de la Facture</h3>
           <button @click="closePreview" class="close-btn-preview">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <XMarkIcon class="w-7 h-7" />
           </button>
         </div>
         <div class="preview-body">
@@ -414,14 +428,14 @@ const submitForm = async () => {
       <div class="modal modal-large">
         <div class="modal-header">
           <h3>Nouvelle Facture</h3>
-          <button @click="showModal = false" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+          <button @click="showModal = false" class="close-btn"><XMarkIcon class="w-6 h-6" /></button>
         </div>
         
         <form @submit.prevent="submitForm" class="modal-body complex-body">
 
           <!-- Bandeau d'erreur métier -->
           <div v-if="formError" class="form-error-banner">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <ExclamationTriangleIcon class="w-5 h-5" />
             <span>{{ formError }}</span>
             <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
           </div>
@@ -467,15 +481,15 @@ const submitForm = async () => {
                <div class="line-col total-col v-center hide-on-mobile">
                  <span class="font-semibold text-dark">{{ (ligne.quantite * ligne.prixUnitaire).toLocaleString() }}</span>
                </div>
-               <div class="line-col act-col v-center">
-                 <button type="button" class="icon-btn-danger" @click="removeLigne(index)" :disabled="form.lignes.length === 1">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                 </button>
-               </div>
+                <div class="line-col act-col v-center">
+                  <button type="button" class="icon-btn-danger" @click="removeLigne(index)" :disabled="form.lignes.length === 1">
+                    <TrashIcon class="w-4 h-4" />
+                  </button>
+                </div>
             </div>
             
             <button type="button" class="btn-outline-dashed mt-2" @click="addLigne">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <PlusIcon class="w-4 h-4" />
               Ajouter une Ligne
             </button>
           </div>
@@ -490,7 +504,7 @@ const submitForm = async () => {
           <div v-if="store.error" class="form-error">{{ store.error }}</div>
 
           <div class="modal-footer pt-3 pb-0">
-             <button type="button" class="btn-text" @click="showModal = false">Annuler</button>
+             <button type="button" class="btn-text" @click="showModal = false">{{ t("common.annuler") }}</button>
              <button type="submit" class="btn-primary" :disabled="store.loading">
                {{ store.loading ? 'Création...' : 'Générer la Facture' }}
              </button>

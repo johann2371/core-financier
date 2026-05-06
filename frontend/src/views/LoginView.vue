@@ -1,12 +1,17 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useLangStore } from '../stores/lang.store'
 import { useAuthStore } from '../stores/auth.store'
+import { EyeIcon, EyeSlashIcon, ShieldCheckIcon, ArrowRightIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import logoFull from '../assets/images/logo-sodica.png'
 
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const authStore = useAuthStore()
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 const router = useRouter()
 
 const togglePassword = () => {
@@ -31,33 +36,28 @@ const handleLogin = async () => {
     <div class="login-card">
       <div class="card-header">
         <div class="login-logo-vector">
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <path d="M50 5 C25 5 5 25 5 50 C5 75 25 95 50 95 C75 95 95 75 95 50 C95 25 75 5 50 5 Z" fill="none" stroke="currentColor" stroke-width="2" opacity="0.1" />
-            <path d="M30 40 C30 25 70 25 70 40 C70 50 30 50 30 60 C30 75 70 75 70 60" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" />
-            <path d="M40 40 C40 35 60 35 60 40 C60 45 40 45 40 50 C40 55 60 55 60 50" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity="0.3" />
-          </svg>
+          <img :src="logoFull" alt="SODICA" />
         </div>
-        <h1>SODICA</h1>
-        <h2>Connexion</h2>
-        <p>Accédez à votre espace sécurisé</p>
+        <h2>{{ t("login.connexion") }}</h2>
+        <p>{{ t("login.accesSecurise") }}</p>
       </div>
 
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
-          <label for="email">Identifiant ou Email</label>
+          <label for="email">{{ t("login.identifiant") }}</label>
           <input 
             id="email"
             v-model="email" 
             type="email" 
             required 
-            placeholder="nom@exemple.fr" 
+            :placeholder="t('login.placeholder')" 
           />
         </div>
         
         <div class="input-group">
           <div class="label-row">
-            <label for="password">Mot de passe</label>
-            <a href="#" class="forgot-link">Mot de passe oublié ?</a>
+            <label for="password">{{ t("login.motDePasse") }}</label>
+            <a href="#" class="forgot-link">{{ t("login.motDePasseOublie") }}</a>
           </div>
           <div class="password-wrapper">
             <input 
@@ -68,41 +68,41 @@ const handleLogin = async () => {
               placeholder="••••••••"
             />
             <button type="button" class="eye-btn" @click="togglePassword">
-              <svg v-if="!showPassword" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-              <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+              <EyeSlashIcon v-if="!showPassword" class="w-5 h-5" />
+              <EyeIcon v-else class="w-5 h-5" />
             </button>
           </div>
         </div>
 
         <div v-if="authStore.error" class="error-msg">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <ExclamationTriangleIcon class="w-4 h-4" />
           <span>{{ authStore.error }}</span>
         </div>
 
         <button :disabled="authStore.loading" type="submit" class="btn-primary">
           <span v-if="authStore.loading" class="spinner"></span>
-          <span>{{ authStore.loading ? 'Connexion...' : 'Se connecter' }}</span>
-          <svg v-if="!authStore.loading" class="arrow-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          <span>{{ authStore.loading ? t('login.enCours') : t('login.seConnecter') }}</span>
+          <ArrowRightIcon v-if="!authStore.loading" class="w-5 h-5 ms-2" />
         </button>
       </form>
 
       <div class="secure-footer">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
-        <span>ACCÈS SÉCURISÉ PAR CRYPTAGE AES-256</span>
+        <ShieldCheckIcon class="w-4 h-4" />
+        <span>{{ t("login.securise") }}</span>
       </div>
     </div>
 
     <!-- Liens du bas -->
     <div class="page-footer">
-      <a href="#">Aide</a>
-      <a href="#">Confidentialité</a>
-      <a href="#">Conditions</a>
+      <a href="#">{{ t("login.aide") }}</a>
+      <a href="#">{{ t("login.confidentialite") }}</a>
+      <a href="#">{{ t("login.conditions") }}</a>
     </div>
 
     <!-- Statut du système en bas à droite -->
     <div class="system-status">
       <div class="status-dot"></div>
-      <span>SYSTEM STATUS: OPERATIONAL</span>
+      <span>{{ t("login.systemStatus") }}</span>
     </div>
   </div>
 </template>
@@ -128,15 +128,15 @@ const handleLogin = async () => {
 }
 
 .login-logo-vector {
-  width: 84px;
-  height: 84px;
+  width: 260px;
+  height: auto;
   margin: 0 auto 1.5rem auto;
-  color: var(--c-primary);
   filter: drop-shadow(0 4px 12px rgba(37, 99, 235, 0.2));
 }
-.login-logo-vector svg {
+.login-logo-vector img {
   width: 100%;
-  height: 100%;
+  height: auto;
+  display: block;
 }
 
 .brand-header h1 {

@@ -226,6 +226,7 @@
 <script>
 import { ref, onMounted, computed, reactive } from 'vue';
 import { useCompteStore } from '@/stores/compte.store';
+import { useLangStore } from '../stores/lang.store'
 import { useAuthStore } from '@/stores/auth.store';
 import MainLayout from '@/components/MainLayout.vue';
 import { sessionCaisseService } from '@/services/sessionCaisseService';
@@ -235,8 +236,10 @@ export default {
   components: { MainLayout },
   setup() {
     const compteStore = useCompteStore();
-    const authStore = useAuthStore();
-    const isAdmin = computed(() => ['ADMINISTRATEUR', 'RESPONSABLE_FINANCIER', 'PDG'].includes(authStore.userRole));
+    const authStore = useAuthStore()
+const langStore = useLangStore()
+const t = computed(() => langStore.t);
+    const isAdmin = computed(() => ['ADMINISTRATEUR', 'RESPONSABLE_FINANCIER', 'PDG', 'COMPTABLE'].includes(authStore.userRole));
 
     const feedback = reactive({ message: '', type: 'success' });
     const loading = ref(true);

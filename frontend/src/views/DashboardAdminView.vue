@@ -5,6 +5,8 @@ import { useUtilisateurStore } from '../stores/utilisateur.store'
 import { useAuthStore } from '../stores/auth.store'
 import { useAuditStore } from '../stores/audit.store'
 import { useDashboardStore } from '../stores/dashboard.store'
+import { useParametrageStore } from '../stores/parametrage.store'
+import { useLangStore } from '../stores/lang.store'
 import { Line } from 'vue-chartjs'
 import { 
   Chart as ChartJS, 
@@ -17,6 +19,30 @@ import {
   PointElement, 
   Filler 
 } from 'chart.js'
+import { 
+  BanknotesIcon, 
+  ClockIcon, 
+  ExclamationTriangleIcon, 
+  CreditCardIcon, 
+  UserGroupIcon, 
+  ArrowTrendingUpIcon, 
+  ArrowTrendingDownIcon,
+  CurrencyDollarIcon,
+  CheckIcon,
+  WalletIcon,
+  PencilSquareIcon,
+  UserMinusIcon,
+  UserPlusIcon,
+  ShieldCheckIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+  XMarkIcon,
+  IdentificationIcon,
+  ChartBarIcon,
+  BuildingOfficeIcon,
+  NoSymbolIcon,
+  ArrowPathIcon
+} from '@heroicons/vue/24/outline'
 
 ChartJS.register(Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement, Filler)
 
@@ -24,18 +50,37 @@ const authStore = useAuthStore()
 const utilisateurStore = useUtilisateurStore()
 const auditStore = useAuditStore()
 const dashboardStore = useDashboardStore()
+const parametrageStore = useParametrageStore()
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
+
+const forecastPeriod = ref(30)
+
+const updateForecast = async () => {
+  await dashboardStore.fetchKpis(forecastPeriod.value)
+}
 
 onMounted(async () => {
-  await dashboardStore.fetchKpis()
+  await dashboardStore.fetchKpis(forecastPeriod.value)
   await utilisateurStore.fetchUtilisateurs()
   await auditStore.fetchLogs(0, 200, '', '')
+  await parametrageStore.fetchParametres()
 })
 
 const kpis = computed(() => dashboardStore.kpis || {})
 
+const selectedCurrency = computed(() => {
+  const param = parametrageStore.parametres?.find(p => p.cle === 'DEVISE_BASE_CODE')
+  return param ? param.valeur : 'XAF'
+})
+const usdRate = 600 // 1 USD = 600 XAF
+
 const formatCurrency = (val) => {
   if (val === undefined || val === null) return '0'
-  return new Intl.NumberFormat('fr-FR').format(val)
+  if (selectedCurrency.value === 'USD') {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val / usdRate)
+  }
+  return new Intl.NumberFormat('fr-FR').format(val) + ' XAF'
 }
 
 // === GESTION UTILISATEURS ===
@@ -223,7 +268,11 @@ const evolutionChartOptions = {
           let label = context.dataset.label || '';
           if (label) label += ': ';
           if (context.parsed.y !== null) {
-            label += new Intl.NumberFormat('fr-FR').format(context.parsed.y) + ' FCFA';
+            const val = selectedCurrency.value === 'USD' ? context.parsed.y / usdRate : context.parsed.y;
+            const formatted = selectedCurrency.value === 'USD' 
+              ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val)
+              : new Intl.NumberFormat('fr-FR').format(val) + ' FCFA';
+            label += formatted;
           }
           return label;
         }
@@ -261,11 +310,11 @@ const evolutionChartOptions = {
 
 // === FORMAT DATE ET ACTIVITÉS ===
 const formatLastLogin = (dateStr) => {
-  if (!dateStr) return 'Jamais'
+  if (!dateStr) return t('adminDashboard.jamais')
   const d = new Date(dateStr)
   const now = new Date()
   const diff = Math.floor((now - d) / 1000)
-  if (diff < 60) return 'À l\'instant'
+  if (diff < 60) return t('adminDashboard.aLinstant')
   if (diff < 3600) return `Il y a ${Math.floor(diff / 60)} min`
   if (diff < 86400) return `Il y a ${Math.floor(diff / 3600)}h`
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -347,7 +396,10 @@ const forecastChartOptions = {
       cornerRadius: 8,
       callbacks: {
         label: function(context) {
-          return new Intl.NumberFormat('fr-FR').format(context.parsed.y) + ' FCFA'
+          const val = selectedCurrency.value === 'USD' ? context.parsed.y / usdRate : context.parsed.y;
+          return selectedCurrency.value === 'USD' 
+            ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val)
+            : new Intl.NumberFormat('fr-FR').format(val) + ' FCFA'
         }
       }
     }
@@ -407,8 +459,8 @@ const depPercent = (val) => {
 
 <template>
   <MainLayout>
-    <template #title>Dashboard</template>
-    <template #subtitle>Vue d'ensemble de l'administration des utilisateurs et accès.</template>
+    <template #title>{{ t("adminDashboard.titre") }}</template>
+    <template #subtitle>{{ t("adminDashboard.sousTitre") }}</template>
 
     <div class="admin-dashboard">
       <div v-if="utilisateurStore.error" class="error-banner mb-4">{{ utilisateurStore.error }}</div>
@@ -419,45 +471,45 @@ const depPercent = (val) => {
         <div class="main-kpis-wrapper">
           <div class="kpi-card premium highlight-primary">
             <div class="kpi-inner">
-              <div class="kpi-label">Solde trésorerie</div>
+              <div class="kpi-label">{{ t("adminDashboard.soldeTresorerie") }}</div>
               <div class="kpi-value text-blue">{{ formatCurrency(kpis.soldeTresorerieTotal) }}</div>
-              <div class="kpi-desc">FCFA disponibles</div>
+              <div class="kpi-desc">{{ selectedCurrency === 'XAF' ? 'FCFA' : 'USD' }} {{ t("adminDashboard.disponibles") }}</div>
             </div>
             <div class="kpi-icon-circ blue">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              <BanknotesIcon class="w-6 h-6" />
             </div>
           </div>
 
           <div class="kpi-card">
             <div class="kpi-inner">
-              <div class="kpi-label">Décaissements en attente</div>
+              <div class="kpi-label">{{ t("adminDashboard.decaissementsAttente") }}</div>
               <div class="kpi-value">{{ kpis.decaissementsEnAttente || 0 }}</div>
-              <div class="kpi-desc">dont <span class="fw-700">{{ kpis.decaissementsEnAttentePDG || 0 }}</span> en attente PDG</div>
+              <div class="kpi-desc">{{ t("adminDashboard.dontAttentePDG") }} <span class="fw-700">{{ kpis.decaissementsEnAttentePDG || 0 }}</span> {{ t("adminDashboard.enAttentePDG") }}</div>
             </div>
             <div class="kpi-icon-circ orange">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <ClockIcon class="w-6 h-6" />
             </div>
           </div>
 
           <div class="kpi-card">
             <div class="kpi-inner">
-              <div class="kpi-label">Factures impayées</div>
+              <div class="kpi-label">{{ t("adminDashboard.facturesImpayees") }}</div>
               <div class="kpi-value text-red">{{ kpis.facturesImpayeesCount || 0 }}</div>
-              <div class="kpi-desc" :class="{'text-red fw-700': kpis.facturesEnRetardCount > 0}">{{ kpis.facturesEnRetardCount || 0 }} en retard > 30 j</div>
+              <div class="kpi-desc" :class="{'text-red fw-700': kpis.facturesEnRetardCount > 0}">{{ kpis.facturesEnRetardCount || 0 }} {{ t("adminDashboard.enRetard") }}</div>
             </div>
             <div class="kpi-icon-circ red">
-               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+               <ExclamationTriangleIcon class="w-6 h-6" />
             </div>
           </div>
 
           <div class="kpi-card">
             <div class="kpi-inner">
-              <div class="kpi-label">Dettes Fournisseurs</div>
+              <div class="kpi-label">{{ t("adminDashboard.dettesFournisseurs") }}</div>
               <div class="kpi-value text-purple">{{ formatCurrency(kpis.totalDettesFournisseurs) }}</div>
-              <div class="kpi-desc">Total des factures d'achat dues</div>
+              <div class="kpi-desc">{{ t("adminDashboard.totalFacturesDues") }}</div>
             </div>
             <div class="kpi-icon-circ purple">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+              <CreditCardIcon class="w-6 h-6" />
             </div>
           </div>
         </div>
@@ -465,16 +517,16 @@ const depPercent = (val) => {
         <!-- Recent Activities Card (Style DashboardView) -->
         <div class="activities-card">
           <div class="activities-head">
-            <h3 class="activities-title">ACTIVITÉ RÉCENTE</h3>
+            <h3 class="activities-title">{{ t("dashboard.activiteRecente") }}</h3>
             <div class="activities-badge">{{ kpis.activitesRecentes?.length || 0 }}</div>
           </div>
           
           <div class="timeline" v-if="kpis.activitesRecentes?.length > 0">
             <div class="timeline-item" v-for="(act, idx) in kpis.activitesRecentes" :key="idx">
               <div class="timeline-icon" :class="getActivityIconClass(act.type)">
-                <svg v-if="act.type === 'FACTURE'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <svg v-else-if="act.type === 'ENCAISSEMENT'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <CheckIcon v-if="act.type === 'FACTURE'" class="w-3 h-3" />
+                <WalletIcon v-else-if="act.type === 'ENCAISSEMENT'" class="w-3 h-3" />
+                <ClockIcon v-else class="w-3 h-3" />
               </div>
               <div class="timeline-content">
                 <h4>{{ act.action === 'CREATE' ? 'Création' : act.action }} {{ act.type.toLowerCase() }}</h4>
@@ -487,7 +539,7 @@ const depPercent = (val) => {
             </div>
           </div>
           <div class="empty-activities" v-else>
-            <p>Aucune activité récente enregistrée.</p>
+            <p>{{ t("dashboard.aucuneActivite") }}</p>
           </div>
         </div>
       </div>
@@ -496,23 +548,23 @@ const depPercent = (val) => {
       <div class="kpi-grid secondary-kpis-row">
         <div class="kpi-card">
           <div class="kpi-inner">
-            <div class="kpi-label">Utilisateurs actifs</div>
+            <div class="kpi-label">{{ t("adminDashboard.utilisateursActifs") }}</div>
             <div class="kpi-value text-green">{{ kpis.utilisateursActifs || 0 }}</div>
-            <div class="kpi-desc text-danger" v-if="kpis.utilisateursBloques > 0">{{ kpis.utilisateursBloques }} compte(s) bloqué(s)</div>
-            <div class="kpi-desc" v-else>0 compte bloqué</div>
+            <div class="kpi-desc text-danger" v-if="kpis.utilisateursBloques > 0">{{ kpis.utilisateursBloques }} {{ t("adminDashboard.compteBloque") }}</div>
+            <div class="kpi-desc" v-else>{{ t("adminDashboard.aucunCompteBloque") }}</div>
           </div>
           <div class="kpi-icon-circ green">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+            <UserGroupIcon class="w-6 h-6" />
           </div>
         </div>
 
         <div class="kpi-card">
           <div class="kpi-inner">
-            <div class="kpi-label">Encaissements ce mois</div>
+            <div class="kpi-label">{{ t("adminDashboard.encaissementsCeMois") }}</div>
             <div class="kpi-value">{{ formatCurrency(kpis.encaissementsMoisActuel) }}</div>
             <div class="kpi-desc">
-              FCFA · <span :class="kpis.progressionEncaissements >= 0 ? 'text-green' : 'text-red'">
-                {{ kpis.progressionEncaissements > 0 ? '+' : '' }}{{ kpis.progressionEncaissements?.toFixed(1) }}% vs mois dernier
+              {{ selectedCurrency === 'XAF' ? 'FCFA' : 'USD' }} · <span :class="kpis.progressionEncaissements >= 0 ? 'text-green' : 'text-red'">
+                {{ kpis.progressionEncaissements > 0 ? '+' : '' }}{{ kpis.progressionEncaissements?.toFixed(1) }}% {{ t("adminDashboard.vsMoisDernier") }}
               </span>
             </div>
           </div>
@@ -520,11 +572,11 @@ const depPercent = (val) => {
 
         <div class="kpi-card">
           <div class="kpi-inner">
-            <div class="kpi-label">Décaissements ce mois</div>
+            <div class="kpi-label">{{ t("adminDashboard.decaissementsCeMois") }}</div>
             <div class="kpi-value">{{ formatCurrency(kpis.decaissementsMoisActuel) }}</div>
             <div class="kpi-desc">
-              FCFA · <span :class="kpis.progressionDecaissements <= 0 ? 'text-green' : 'text-red'">
-                {{ kpis.progressionDecaissements > 0 ? '+' : '' }}{{ kpis.progressionDecaissements?.toFixed(1) }}% vs mois dernier
+              {{ selectedCurrency === 'XAF' ? 'FCFA' : 'USD' }} · <span :class="kpis.progressionDecaissements <= 0 ? 'text-green' : 'text-red'">
+                {{ kpis.progressionDecaissements > 0 ? '+' : '' }}{{ kpis.progressionDecaissements?.toFixed(1) }}% {{ t("adminDashboard.vsMoisDernier") }}
               </span>
             </div>
           </div>
@@ -532,15 +584,15 @@ const depPercent = (val) => {
 
         <div class="kpi-card">
           <div class="kpi-inner">
-            <div class="kpi-label">Opérations aujourd'hui</div>
+            <div class="kpi-label">{{ t("adminDashboard.operationsAujourdhui") }}</div>
             <div class="kpi-value">{{ kpis.operationsDuJour || 0 }}</div>
             <div class="kpi-desc">
-              <span class="text-green fw-600">{{ kpis.encaissementsDuJourCount || 0 }} enc.</span> 
-              · <span class="text-blue fw-600">{{ kpis.decaissementsDuJourCount || 0 }} déc.</span>
+              <span class="text-green fw-600">{{ kpis.encaissementsDuJourCount || 0 }} {{ t("adminDashboard.enc") }}</span> 
+              · <span class="text-blue fw-600">{{ kpis.decaissementsDuJourCount || 0 }} {{ t("adminDashboard.dec") }}</span>
             </div>
           </div>
           <div class="kpi-icon-circ cyan">
-             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+             <CurrencyDollarIcon class="w-6 h-6" />
           </div>
         </div>
       </div>
@@ -600,11 +652,16 @@ const depPercent = (val) => {
       <div class="charts-row">
         <!-- Prévision de Trésorerie -->
         <div class="chart-card">
-          <div class="chart-header">
-            <div class="chart-title">Prévision de Trésorerie — 30 jours</div>
-            <div class="forecast-badge">
+          <div class="chart-header" style="align-items: center; display: flex;">
+            <div class="chart-title" style="margin-right: 1rem;">Prévision de Trésorerie</div>
+            <select v-model="forecastPeriod" @change="updateForecast" style="padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 0.8rem; background-color: #f8fafc; color: #334155; cursor: pointer; outline: none;">
+              <option :value="30">30 jours</option>
+              <option :value="60">60 jours</option>
+              <option :value="90">90 jours</option>
+            </select>
+            <div class="forecast-badge" style="margin-left: auto;">
               <span :class="forecastTrend >= 0 ? 'text-green' : 'text-red'">
-                {{ forecastTrend >= 0 ? '↑' : '↓' }} {{ formatCurrency(kpis.soldePrevisionnel30j) }} FCFA à J+30
+                {{ forecastTrend >= 0 ? '↑' : '↓' }} {{ formatCurrency(kpis.soldePrevisionnel30j) }} à J+{{ forecastPeriod }}
               </span>
             </div>
           </div>
@@ -664,11 +721,11 @@ const depPercent = (val) => {
       <!-- Action Bar -->
       <div class="action-bar mb-4">
         <div class="input-with-icon">
-           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-           <input v-model="searchUser" type="text" placeholder="Rechercher utilisateur..." />
+           <MagnifyingGlassIcon class="w-4 h-4 text-slate-400" />
+           <input v-model="searchUser" type="text" :placeholder="t('adminDashboard.rechercherUtilisateur')" />
         </div>
         <button @click="openCreateUser" class="btn-primary" style="background-color: #3b82f6; color: white; border-radius: 8px; padding: 0.75rem 1.25rem; border: none; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4); cursor: pointer;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <UserPlusIcon class="w-5 h-5" />
           Nouvel Utilisateur
         </button>
       </div>
@@ -681,12 +738,12 @@ const depPercent = (val) => {
           <table class="data-table">
             <thead>
               <tr>
-                <th>ACTEUR</th>
-                <th>ID CONNEXION (EMAIL)</th>
-                <th>RÔLE SYSTÈME</th>
-                <th>DERNIÈRE CONNEXION</th>
-                <th>STATUT</th>
-                <th class="text-center">ACTIONS</th>
+                <th>{{ t("adminDashboard.acteur") }}</th>
+                <th>{{ t("adminDashboard.idConnexion") }}</th>
+                <th>{{ t("adminDashboard.roleSysteme") }}</th>
+                <th>{{ t("adminDashboard.derniereConnexion") }}</th>
+                <th>{{ t("adminDashboard.statut") }}</th>
+                <th class="text-center">{{ t("adminDashboard.actions") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -710,25 +767,25 @@ const depPercent = (val) => {
                     {{ formatLastLogin(u.dernierAcces) }}
                   </span>
                 </td>
-                <td>
+                <td class="status-badge-cell">
                   <span class="status-badge" :class="u.actif !== false ? 'active' : 'inactive'">
                     <template v-if="u.actif !== false">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Actif
+                      <CheckIcon class="w-3 h-3" /> Actif
                     </template>
                     <template v-else>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Inactif
+                      <XMarkIcon class="w-3 h-3" /> Inactif
                     </template>
                   </span>
                 </td>
                 <td class="cell-actions text-center">
                   <button @click="openEditUser(u)" class="btn-icon" title="Modifier" :disabled="u.email === authStore.userName" style="color:#3b82f6;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    <PencilSquareIcon class="w-4 h-4" />
                   </button>
                   <button v-if="u.actif !== false" @click="bloquerInfo(u.id)" class="btn-icon danger" title="Désactiver" :disabled="u.email === authStore.userName">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                    <NoSymbolIcon class="w-4 h-4" />
                   </button>
                   <button v-else @click="reactiverInfo(u.id)" class="btn-icon" title="Réactiver le compte" style="color:#16a34a;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    <ArrowPathIcon class="w-4 h-4" />
                   </button>
                 </td>
               </tr>
@@ -758,7 +815,7 @@ const depPercent = (val) => {
         <div class="user-modal-head">
           <h3>{{ editUserId ? 'Modifier Utilisateur' : 'Nouvel Utilisateur' }}</h3>
           <button @click="showUserModal = false" class="user-modal-close">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <XMarkIcon class="w-6 h-6" />
           </button>
         </div>
         
@@ -770,11 +827,11 @@ const depPercent = (val) => {
                 <label v-for="r in ['CAISSIER', 'COMPTABLE', 'RESPONSABLE_FINANCIER', 'PDG', 'ADMINISTRATEUR']" :key="r" class="um-role-card" :class="{ active: userForm.role === r }">
                   <input type="radio" v-model="userForm.role" :value="r" style="display:none;" />
                   <span class="um-role-icon">
-                    <svg v-if="r === 'CAISSIER'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>
-                    <svg v-else-if="r === 'COMPTABLE'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                    <svg v-else-if="r === 'RESPONSABLE_FINANCIER'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
-                    <svg v-else-if="r === 'PDG'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"></circle><path d="M3 21v-2a7 7 0 0 1 14 0v2"></path></svg>
-                    <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    <WalletIcon v-if="r === 'CAISSIER'" class="w-5 h-5" />
+                    <DocumentTextIcon v-else-if="r === 'COMPTABLE'" class="w-5 h-5" />
+                    <IdentificationIcon v-else-if="r === 'RESPONSABLE_FINANCIER'" class="w-5 h-5" />
+                    <UserIcon v-else-if="r === 'PDG'" class="w-5 h-5" />
+                    <ShieldCheckIcon v-else class="w-5 h-5" />
                   </span>
                   <span class="um-role-name">{{ r.replace('_', ' ') }}</span>
                 </label>
@@ -805,7 +862,7 @@ const depPercent = (val) => {
 
           <div class="user-modal-sidebar">
             <div class="um-sidebar-title">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              <ShieldCheckIcon class="w-4 h-4" />
               SÉCURITÉ &amp; ACCÈS
             </div>
             
@@ -831,7 +888,7 @@ const depPercent = (val) => {
         </div>
         
         <div class="user-modal-foot">
-          <button type="button" @click="showUserModal = false" class="um-btn-cancel">Annuler</button>
+          <button type="button" @click="showUserModal = false" class="um-btn-cancel">{{ t("common.annuler") }}</button>
           <button type="button" @click="submitUser" class="um-btn-submit" :disabled="!userForm.nom || !userForm.prenom || !userForm.email">
             Confirmer et Enregistrer
           </button>

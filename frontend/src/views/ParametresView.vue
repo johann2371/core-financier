@@ -2,10 +2,29 @@
 import { ref, onMounted, computed } from 'vue'
 import MainLayout from '../components/MainLayout.vue'
 import { useParametrageStore } from '../stores/parametrage.store'
+import { useLangStore } from '../stores/lang.store'
 import { useAuthStore } from '../stores/auth.store'
 import api from '../services/api'
+import { 
+  BuildingOfficeIcon, 
+  CurrencyDollarIcon, 
+  ShieldCheckIcon, 
+  Cog6ToothIcon,
+  BanknotesIcon,
+  LockClosedIcon,
+  ClockIcon,
+  MapPinIcon,
+  PhoneIcon,
+  EnvelopeIcon,
+  PhotoIcon,
+  BellIcon,
+  TagIcon,
+  CogIcon
+} from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 const parametrageStore = useParametrageStore()
 
 const isAdmin = computed(() => authStore.userRole === 'ADMINISTRATEUR')
@@ -15,12 +34,12 @@ onMounted(() => {
 })
 
 const activeTab = ref('IDENTITE')
-const categories = [
-  { id: 'IDENTITE', label: 'Identite & Logo', icon: '🏢', desc: 'Logo, nom et coordonnees de la societe.' },
-  { id: 'FINANCE', label: 'Gestion Financiere', icon: '💰', desc: 'Seuils, devises et alertes financieres.' },
-  { id: 'SECURITE', label: 'Securite & Acces', icon: '🔐', desc: 'Sessions, tentatives et blocages.' },
-  { id: 'SYSTEME', label: 'Systeme', icon: '⚙️', desc: 'Version, notifications et options techniques.' }
-]
+const categories = computed(() => [
+  { id: 'IDENTITE', label: t('parametres.identiteLogo'), icon: BuildingOfficeIcon, desc: t('parametres.identiteDesc') },
+  { id: 'FINANCE', label: t('parametres.gestionFinanciere'), icon: CurrencyDollarIcon, desc: t('parametres.financeDesc') },
+  { id: 'SECURITE', label: t('parametres.securiteAcces'), icon: ShieldCheckIcon, desc: t('parametres.securiteDesc') },
+  { id: 'SYSTEME', label: t('parametres.systeme'), icon: Cog6ToothIcon, desc: t('parametres.systemeDesc') }
+])
 
 const getCategory = (cle) => {
   const c = cle.toUpperCase()
@@ -34,20 +53,20 @@ const filteredParametres = computed(() => {
   return (parametrageStore.parametres || []).filter(p => getCategory(p.cle) === activeTab.value)
 })
 
-const getParamIcon = (cle) => {
+const getParamIconInfo = (cle) => {
   const c = cle.toUpperCase()
-  if (c.includes('SEUIL') || c.includes('MONTANT')) return 'dollar'
-  if (c.includes('DEVISE')) return 'currency'
-  if (c.includes('TENTATIV') || c.includes('BLOCAGE')) return 'lock'
-  if (c.includes('SESSION') || c.includes('DUREE')) return 'clock'
-  if (c.includes('SOCIETE_NOM')) return 'building'
-  if (c.includes('SOCIETE_ADRESSE')) return 'map'
-  if (c.includes('SOCIETE_TEL')) return 'phone'
-  if (c.includes('SOCIETE_EMAIL')) return 'mail'
-  if (c.includes('LOGO')) return 'image'
-  if (c.includes('NOTIF')) return 'bell'
-  if (c.includes('VERSION')) return 'tag'
-  return 'settings'
+  if (c.includes('SEUIL') || c.includes('MONTANT')) return { component: CurrencyDollarIcon, class: 'icon-dollar' }
+  if (c.includes('DEVISE')) return { component: BanknotesIcon, class: 'icon-currency' }
+  if (c.includes('TENTATIV') || c.includes('BLOCAGE')) return { component: LockClosedIcon, class: 'icon-lock' }
+  if (c.includes('SESSION') || c.includes('DUREE')) return { component: ClockIcon, class: 'icon-clock' }
+  if (c.includes('SOCIETE_NOM')) return { component: BuildingOfficeIcon, class: 'icon-building' }
+  if (c.includes('SOCIETE_ADRESSE')) return { component: MapPinIcon, class: 'icon-map' }
+  if (c.includes('SOCIETE_TEL')) return { component: PhoneIcon, class: 'icon-phone' }
+  if (c.includes('SOCIETE_EMAIL')) return { component: EnvelopeIcon, class: 'icon-mail' }
+  if (c.includes('LOGO')) return { component: PhotoIcon, class: 'icon-image' }
+  if (c.includes('NOTIF')) return { component: BellIcon, class: 'icon-bell' }
+  if (c.includes('VERSION')) return { component: TagIcon, class: 'icon-tag' }
+  return { component: CogIcon, class: 'icon-settings' }
 }
 
 // === GESTION CONFIGURATION ===
@@ -109,8 +128,8 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
 
 <template>
   <MainLayout>
-    <template #title>Parametres Systeme</template>
-    <template #subtitle>Configuration globale, identite visuelle, seuils d'approbation et regles metier.</template>
+    <template #title>{{ t("parametres.titre") }}</template>
+    <template #subtitle>{{ t("parametres.sousTitre") }}</template>
 
     <div class="settings-layout">
       
@@ -119,8 +138,8 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
         <div class="sidebar-info">
           <div class="sidebar-icon">⚙️</div>
           <div class="sidebar-text">
-            <h3>Configuration</h3>
-            <p>Gerez les reglages du systeme</p>
+            <h3>{{ t("parametres.configuration") }}</h3>
+            <p>{{ t("parametres.gerezReglages") }}</p>
           </div>
         </div>
         
@@ -132,7 +151,7 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
             class="nav-item"
             :class="{ active: activeTab === cat.id }"
           >
-            <span class="nav-icon">{{ cat.icon }}</span>
+            <span class="nav-icon"><component :is="cat.icon" class="w-5 h-5" /></span>
             <span class="nav-label">{{ cat.label }}</span>
             <div v-if="activeTab === cat.id" class="nav-active-indicator"></div>
           </button>
@@ -157,14 +176,14 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
           <div class="logo-cards-row">
             <div class="logo-card">
               <div class="logo-card-header">
-                <h4>Logo Principal</h4>
-                <span class="logo-hint">Affiche dans la barre laterale et l'en-tete</span>
+                <h4>{{ t("parametres.logoPrincipal") }}</h4>
+                <span class="logo-hint">{{ t("parametres.logoAffiche") }} et l'en-tete</span>
               </div>
               <div class="logo-preview-area" @click="triggerLogoUpload('app')">
                 <img v-if="getLogoUrl('app')" :src="getLogoUrl('app')" alt="Logo principal" class="logo-preview-img" />
                 <div v-else class="logo-placeholder">
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                  <span>Cliquer pour uploader</span>
+                  <span>{{ t("parametres.cliquerUploader") }}</span>
                 </div>
                 <div v-if="uploadingLogo === 'app'" class="logo-uploading">
                   <div class="spinner"></div>
@@ -172,20 +191,20 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
               </div>
               <button class="btn-upload" @click="triggerLogoUpload('app')" :disabled="uploadingLogo === 'app'">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                {{ uploadingLogo === 'app' ? 'Envoi...' : 'Changer le logo' }}
+                {{ uploadingLogo === 'app' ? t('parametres.envoi') : t('parametres.changerLogo') }}
               </button>
             </div>
 
             <div class="logo-card">
               <div class="logo-card-header">
-                <h4>Logo Facture</h4>
-                <span class="logo-hint">Utilise sur les factures et recus PDF</span>
+                <h4>{{ t("parametres.logoFacture") }}</h4>
+                <span class="logo-hint">{{ t("parametres.logoFactureDesc") }}</span>
               </div>
               <div class="logo-preview-area" @click="triggerLogoUpload('invoice')">
                 <img v-if="getLogoUrl('invoice')" :src="getLogoUrl('invoice')" alt="Logo facture" class="logo-preview-img" />
                 <div v-else class="logo-placeholder">
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5"/></svg>
-                  <span>Cliquer pour uploader</span>
+                  <span>{{ t("parametres.cliquerUploader") }}</span>
                 </div>
                 <div v-if="uploadingLogo === 'invoice'" class="logo-uploading">
                   <div class="spinner"></div>
@@ -193,14 +212,14 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
               </div>
               <button class="btn-upload" @click="triggerLogoUpload('invoice')" :disabled="uploadingLogo === 'invoice'">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                {{ uploadingLogo === 'invoice' ? 'Envoi...' : 'Changer le logo' }}
+                {{ uploadingLogo === 'invoice' ? t('parametres.envoi') : t('parametres.changerLogo') }}
               </button>
             </div>
           </div>
 
           <!-- Society info params below logos -->
           <div class="section-divider">
-            <span>Coordonnees de la societe</span>
+            <span>{{ t("parametres.coordonnees") }}</span>
           </div>
         </div>
 
@@ -213,29 +232,8 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
             :class="{ editing: editConfigMode === param.cle, readonly: isReadOnly(param.cle) }"
             v-show="!isLogoParam(param.cle)"
           >
-            <div class="param-card-icon" :class="'icon-' + getParamIcon(param.cle)">
-              <!-- DOLLAR -->
-              <svg v-if="getParamIcon(param.cle)==='dollar'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-              <!-- LOCK -->
-              <svg v-else-if="getParamIcon(param.cle)==='lock'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              <!-- CLOCK -->
-              <svg v-else-if="getParamIcon(param.cle)==='clock'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              <!-- BUILDING -->
-              <svg v-else-if="getParamIcon(param.cle)==='building'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><line x1="8" y1="6" x2="8" y2="6"></line><line x1="12" y1="6" x2="12" y2="6"></line><line x1="16" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="8" y2="10"></line><line x1="12" y1="10" x2="12" y2="10"></line><line x1="16" y1="10" x2="16" y2="10"></line><line x1="8" y1="14" x2="8" y2="14"></line><line x1="12" y1="14" x2="12" y2="14"></line><line x1="16" y1="14" x2="16" y2="14"></line></svg>
-              <!-- MAP -->
-              <svg v-else-if="getParamIcon(param.cle)==='map'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-              <!-- PHONE -->
-              <svg v-else-if="getParamIcon(param.cle)==='phone'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-              <!-- MAIL -->
-              <svg v-else-if="getParamIcon(param.cle)==='mail'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              <!-- BELL -->
-              <svg v-else-if="getParamIcon(param.cle)==='bell'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-              <!-- TAG -->
-              <svg v-else-if="getParamIcon(param.cle)==='tag'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-              <!-- CURRENCY -->
-              <svg v-else-if="getParamIcon(param.cle)==='currency'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-              <!-- DEFAULT SETTINGS -->
-              <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <div class="param-card-icon" :class="getParamIconInfo(param.cle).class">
+              <component :is="getParamIconInfo(param.cle).component" class="w-5 h-5" />
             </div>
             
             <div class="param-card-body">
@@ -253,7 +251,7 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
                       v-model="editConfigValue" 
                       type="text" 
                       class="premium-input" 
-                      placeholder="Nouvelle valeur..."
+                      :placeholder="t('parametres.nouvelleValeur')"
                       @keyup.enter="saveConfig(param)"
                       @keyup.esc="cancelEditConfig"
                     />
@@ -278,7 +276,7 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                       Modifier
                     </button>
-                    <span v-if="isReadOnly(param.cle)" class="readonly-badge">Lecture seule</span>
+                    <span v-if="isReadOnly(param.cle)" class="readonly-badge">{{ t("parametres.lectureSeule") }}</span>
                   </div>
                 </template>
               </div>
@@ -287,7 +285,7 @@ const isReadOnly = (cle) => cle === 'APP_VERSION'
 
           <div v-if="!filteredParametres.filter(p => !isLogoParam(p.cle)).length && activeTab !== 'IDENTITE'" class="empty-params">
             <div class="empty-icon">📂</div>
-            <p>Aucun parametre trouve dans cette categorie.</p>
+            <p>{{ t("parametres.aucunParametre") }}</p>
           </div>
         </div>
       </main>

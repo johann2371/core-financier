@@ -1,12 +1,30 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api'
+import { useLangStore } from '../stores/lang.store'
 import MainLayout from '../components/MainLayout.vue'
 import Pagination from '../components/Pagination.vue'
 import { useEncaissementStore } from '../stores/encaissement.store'
 import { useTierStore } from '../stores/tier.store'
 import { useCompteStore } from '../stores/compte.store'
 import { useRoute, useRouter } from 'vue-router'
+import { 
+  FunnelIcon, 
+  PlusIcon, 
+  MagnifyingGlassIcon, 
+  XMarkIcon, 
+  BanknotesIcon, 
+  EyeIcon, 
+  ArrowDownTrayIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  CheckBadgeIcon,
+  ArrowsRightLeftIcon,
+  DocumentTextIcon,
+  DevicePhoneMobileIcon,
+  CreditCardIcon,
+  ClockIcon
+} from '@heroicons/vue/24/outline'
 
 const route = useRoute()
 const router = useRouter()
@@ -211,6 +229,9 @@ const getStatusClass = (statut) => {
   if (s.includes('ATTENTE') || s.includes('SOUMIS')) return 'badge-warning'
   return 'badge-info'
 }
+
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 </script>
 
 <template>
@@ -219,19 +240,17 @@ const getStatusClass = (statut) => {
 
     <template #actions>
       <button class="icon-btn show-on-mobile" @click="showMobileFilters = !showMobileFilters" title="Filtrer">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-        </svg>
+        <FunnelIcon class="w-5 h-5" />
       </button>
       <button @click="showModal = true" class="btn-primary hide-on-mobile">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <PlusIcon class="w-4 h-4" />
         Nouveau Encaissement
       </button>
     </template>
     
     <div class="show-on-mobile w-100" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
       <button @click="showModal = true" class="btn-primary w-100" style="justify-content: center; padding: 0.75rem;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <PlusIcon class="w-4 h-4" />
         Nouveau Encaissement
       </button>
     </div>
@@ -240,7 +259,7 @@ const getStatusClass = (statut) => {
     <div class="filter-bar" :class="{ 'mobile-collapsed': !showMobileFilters }">
       <div class="filter-group group-search">
         <div class="input-with-icon-left">
-          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <MagnifyingGlassIcon class="icon w-5 h-5 text-slate-400" />
           <input v-model="filters.search" type="text" placeholder="Référence ou Client..." class="filter-input-std" />
         </div>
       </div>
@@ -259,7 +278,7 @@ const getStatusClass = (statut) => {
       </div>
 
       <button @click="resetFilters" class="btn-clear-filters" title="Réinitialiser">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        <XMarkIcon class="w-4 h-4" />
       </button>
     </div>
 
@@ -291,7 +310,7 @@ const getStatusClass = (statut) => {
             <tr v-if="filteredEncaissements.length === 0" class="empty-row text-center">
               <td colspan="7">
                 <div class="empty-state">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M12 12h.01"></path><path d="M17 12h.01"></path><path d="M7 12h.01"></path></svg>
+                  <BanknotesIcon class="w-12 h-12 text-slate-300" />
                   <p>Aucun encaissement trouvé.</p>
                 </div>
               </td>
@@ -325,10 +344,10 @@ const getStatusClass = (statut) => {
               </td>
               <td class="text-center actions-cell">
                 <button @click="openPreview(e.id)" class="icon-btn preview-btn" title="Aperçu">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  <EyeIcon class="w-4 h-4" />
                 </button>
                 <button @click="store.downloadReceipt(e.id)" class="icon-btn download-btn" title="Télécharger">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <ArrowDownTrayIcon class="w-4 h-4" />
                 </button>
               </td>
             </tr>
@@ -359,7 +378,7 @@ const getStatusClass = (statut) => {
         <!-- Header Mode App -->
         <div class="modal-header">
           <h3>Nouveau Encaissement</h3>
-          <button @click="showModal = false" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+          <button @click="showModal = false" class="close-btn"><XMarkIcon class="w-6 h-6" /></button>
         </div>
 
         <div class="modal-split">
@@ -368,7 +387,7 @@ const getStatusClass = (statut) => {
 
             <!-- Bandeau d'erreur métier -->
             <div v-if="formError" class="form-error-banner">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <ExclamationTriangleIcon class="w-5 h-5" />
               <span>{{ formError }}</span>
               <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
             </div>
@@ -385,7 +404,7 @@ const getStatusClass = (statut) => {
                     {{ client.raisonSociale }}
                   </option>
                 </select>
-                <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <MagnifyingGlassIcon class="input-icon w-5 h-5" />
               </div>
 
               <div v-if="selectedClientObj" class="p-2 border border-blue-100 bg-blue-50 rounded-md mt-1 flex justify-between items-center">
@@ -394,7 +413,7 @@ const getStatusClass = (statut) => {
               </div>
               
               <div class="alert-box alert-error mt-2" v-if="tierStore.clients.length === 0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <ExclamationTriangleIcon class="w-4 h-4" />
                 <div>
                   <strong>Aucun client disponible</strong>
                   <span>Veuillez créer un Client dans l'annuaire des Tiers d'abord.</span>
@@ -407,27 +426,27 @@ const getStatusClass = (statut) => {
               <div class="payment-modes" style="grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
                 <label class="mode-card" :class="{ active: selectedMode === 'VIREMENT' }">
                   <input type="radio" v-model="selectedMode" value="VIREMENT" class="hidden-radio"/>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+                  <ArrowsRightLeftIcon class="w-6 h-6" />
                   <span>Virement</span>
                 </label>
                 <label class="mode-card" :class="{ active: selectedMode === 'CHEQUE' }">
                   <input type="radio" v-model="selectedMode" value="CHEQUE" class="hidden-radio"/>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
+                  <DocumentTextIcon class="w-6 h-6" />
                   <span>Chèque</span>
                 </label>
                 <label class="mode-card" :class="{ active: selectedMode === 'ESPECES' }">
                   <input type="radio" v-model="selectedMode" value="ESPECES" class="hidden-radio"/>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                  <BanknotesIcon class="w-6 h-6" />
                   <span>Espèces</span>
                 </label>
                 <label class="mode-card" :class="{ active: selectedMode === 'ORANGE_MONEY' }">
                   <input type="radio" v-model="selectedMode" value="ORANGE_MONEY" class="hidden-radio"/>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                  <DevicePhoneMobileIcon class="w-6 h-6" />
                   <span>OM</span>
                 </label>
                 <label class="mode-card" :class="{ active: selectedMode === 'CARTE_BANCAIRE' }">
                   <input type="radio" v-model="selectedMode" value="CARTE_BANCAIRE" class="hidden-radio"/>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                  <CreditCardIcon class="w-6 h-6" />
                   <span>Carte</span>
                 </label>
               </div>
@@ -516,7 +535,7 @@ const getStatusClass = (statut) => {
             <div class="right-section">
               <div class="section-title-row">
                 <h4>CLIENTS RÉCENTS</h4>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <ClockIcon class="w-4 h-4 text-slate-400" />
               </div>
               
               <div class="recent-list" v-if="tierStore.clients.length > 0">
@@ -533,11 +552,11 @@ const getStatusClass = (statut) => {
             <div class="right-section validation-section">
               <div class="section-title-row">
                 <h4>VALIDATION TEMPS RÉEL</h4>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <CheckBadgeIcon class="w-4 h-4 text-blue-500" />
               </div>
               
               <div class="alert-box alert-error" v-if="!form.montant">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <ExclamationTriangleIcon class="w-4 h-4" />
                 <div>
                   <strong>Montant requis</strong>
                   <span>Veuillez indiquer la somme reçue.</span>
@@ -545,7 +564,7 @@ const getStatusClass = (statut) => {
               </div>
 
               <div class="alert-box alert-info" v-if="!form.factureId">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <InformationCircleIcon class="w-4 h-4" />
                 <div>
                   <strong>Recherche Facture</strong>
                   <span>Entrez un ID pour associer une facture.</span>
@@ -553,7 +572,7 @@ const getStatusClass = (statut) => {
               </div>
 
               <div class="alert-box alert-success" v-if="form.montant && form.clientId">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <CheckBadgeIcon class="w-4 h-4" />
                 <div>
                   <strong>Prêt à valider</strong>
                   <span>Les données minimales sont réunies.</span>
@@ -581,7 +600,7 @@ const getStatusClass = (statut) => {
         <div class="preview-header">
           <h3>Aperçu du Reçu d'Encaissement</h3>
           <button @click="closePreview" class="close-btn-preview">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <XMarkIcon class="w-7 h-7" />
           </button>
         </div>
         <div class="preview-body">

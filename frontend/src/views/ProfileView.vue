@@ -1,9 +1,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useLangStore } from '../stores/lang.store'
 import { useAuthStore } from '../stores/auth.store'
 import MainLayout from '../components/MainLayout.vue'
 
 const authStore = useAuthStore()
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 const loading = ref(false)
 const uploading = ref(false)
 const fileInput = ref(null)
@@ -74,7 +77,7 @@ const handleSubmit = async () => {
 
 <template>
   <MainLayout>
-    <template #title>Mon Profil</template>
+    <template #title>{{ t("profil.titre") }}</template>
     <template #subtitle>Gérez vos informations personnelles et votre photo</template>
 
     <div class="profile-container">

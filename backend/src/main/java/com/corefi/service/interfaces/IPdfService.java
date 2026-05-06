@@ -5,4 +5,5 @@ public interface IPdfService {
     byte[] genererRecuEncaissementPdf(Long encaissementId);
     byte[] genererRecuDecaissementPdf(Long decaissementId);
     byte[] genererRapportCloturePdf(Long sessionId);
+    byte[] genererReleveCompteTiersPdf(Long tiersId);
 }

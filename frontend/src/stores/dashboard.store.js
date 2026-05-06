@@ -9,11 +9,11 @@ export const useDashboardStore = defineStore('dashboard', {
   }),
 
   actions: {
-    async fetchKpis() {
+    async fetchKpis(forecastDays = 30) {
       this.loading = true
       this.error = null
       try {
-        const response = await api.get('/tableau-bord/kpis')
+        const response = await api.get(`/tableau-bord/kpis?forecastDays=${forecastDays}`)
         this.kpis = response.data
       } catch (err) {
         this.error = "Erreur lors du chargement des indicateurs."

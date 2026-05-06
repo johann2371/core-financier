@@ -1,5 +1,9 @@
 <script setup>
 import { computed } from 'vue'
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   currentPage: { type: Number, required: true },
@@ -40,7 +44,7 @@ const visiblePages = computed(() => {
     <div class="pagination-actions">
       <!-- MOCKUP STYLE NUMERIC PAGINATION -->
       <button class="page-btn nav-btn" @click="prevPage" :disabled="currentPage === 1">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <ChevronLeftIcon class="w-5 h-5" />
       </button>
       
       <button 
@@ -54,7 +58,7 @@ const visiblePages = computed(() => {
       </button>
 
       <button class="page-btn nav-btn" @click="nextPage" :disabled="currentPage === totalPages">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        <ChevronRightIcon class="w-5 h-5" />
       </button>
     </div>
   </div>

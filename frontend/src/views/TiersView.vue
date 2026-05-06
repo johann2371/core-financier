@@ -1,8 +1,20 @@
 <script setup>
 import { ref, onMounted, computed } from "vue";
+import { useLangStore } from '../stores/lang.store'
 import MainLayout from "../components/MainLayout.vue";
 import { useTierStore } from "../stores/tier.store";
 import { useRoute, useRouter } from "vue-router";
+import api from "../services/api";
+import {
+  FunnelIcon,
+  UserPlusIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  ArrowUpTrayIcon,
+  ArrowLeftIcon,
+  PlusIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/vue/24/outline'
 
 const store = useTierStore();
 const route = useRoute();
@@ -127,53 +139,44 @@ const filteredTiers = computed(() => {
   }
   return list;
 });
+
+const telechargerReleve = async (tiersId) => {
+  try {
+    const response = await api.get(`/tiers/${tiersId}/releve-pdf`, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `releve_tiers_${tiersId}.pdf`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Erreur téléchargement relevé:', e);
+    alert('Erreur lors du téléchargement du relevé.');
+  }
+};
+
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 </script>
 
 <template>
   <MainLayout>
-    <template #title>Annuaire des Tiers</template>
+    <template #title>{{ t("tiers.titre") }}</template>
 
     <template #actions>
       <button class="icon-btn show-on-mobile" @click="showMobileFilters = !showMobileFilters" title="Filtrer">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-        </svg>
+        <FunnelIcon class="w-5 h-5" />
       </button>
       <button @click="showModal = true; isEditing = false" class="btn-primary hide-on-mobile">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-          <circle cx="8.5" cy="7" r="4"></circle>
-          <line x1="20" y1="8" x2="20" y2="14"></line>
-          <line x1="23" y1="11" x2="17" y2="11"></line>
-        </svg>
+        <UserPlusIcon class="w-5 h-5" />
         Nouveau Tier
       </button>
     </template>
 
     <div class="show-on-mobile w-100" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
       <button @click="showModal = true; isEditing = false" class="btn-primary w-100" style="justify-content: center; padding: 0.75rem;">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-          <circle cx="8.5" cy="7" r="4"></circle>
-          <line x1="20" y1="8" x2="20" y2="14"></line>
-          <line x1="23" y1="11" x2="17" y2="11"></line>
-        </svg>
+        <UserPlusIcon class="w-5 h-5" />
         Nouveau Tier
       </button>
     </div>
@@ -207,7 +210,7 @@ const filteredTiers = computed(() => {
     <!-- Barre de Recherche -->
     <div class="search-bar-container" :class="{ 'mobile-collapsed': !showMobileFilters }">
       <div class="search-input-wrapper">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <MagnifyingGlassIcon class="search-icon w-5 h-5 text-slate-400" />
         <input 
           v-model="searchQuery" 
           type="text" 
@@ -215,7 +218,7 @@ const filteredTiers = computed(() => {
           class="search-input"
         />
         <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
     </div>
@@ -297,24 +300,13 @@ const filteredTiers = computed(() => {
         <div class="modal-header">
           <h3>{{ isEditing ? "Éditer Tier" : "Nouveau Tier" }}</h3>
           <button @click="showModal = false" class="close-btn">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+            <XMarkIcon class="w-6 h-6" />
           </button>
         </div>
 
         <!-- Bandeau d'erreur métier -->
         <div v-if="formError" class="form-error-banner" style="margin: 1rem 1.5rem 0;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <ExclamationTriangleIcon class="w-5 h-5" />
           <span>{{ formError }}</span>
           <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
         </div>
@@ -360,7 +352,7 @@ const filteredTiers = computed(() => {
             <div class="file-upload-wrapper">
               <input type="file" @change="onPhotoChange" accept="image/*" class="file-input-hidden" id="tierPhoto" />
               <label for="tierPhoto" class="file-upload-label">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <ArrowUpTrayIcon class="w-5 h-5" />
                 <span>{{ photoFile ? photoFile.name : 'Choisir une image...' }}</span>
               </label>
             </div>
@@ -501,7 +493,7 @@ const filteredTiers = computed(() => {
         <div class="detail-drawer">
           <div class="drawer-header">
             <button @click="showDetailPanel = false" class="back-btn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+              <ArrowLeftIcon class="w-6 h-6" />
             </button>
             <h3>Profil du Tier</h3>
           </div>
@@ -574,6 +566,12 @@ const filteredTiers = computed(() => {
                   <span class="value">{{ selectedTier.numeroCompte || 'N/A' }}</span>
                 </div>
               </div>
+              
+              <!-- Bouton Relevé de Compte -->
+              <button class="btn-releve" @click="telechargerReleve(selectedTier.id)">
+                <ArrowUpTrayIcon class="w-5 h-5" />
+                Télécharger le relevé de compte
+              </button>
             </div>
           </div>
         </div>
@@ -1042,4 +1040,15 @@ const filteredTiers = computed(() => {
 /* Transitions */
 .slide-right-enter-active, .slide-right-leave-active { transition: all 0.3s ease; }
 .slide-right-enter-from, .slide-right-leave-to { transform: translateX(100%); opacity: 0; }
+
+/* Bouton Relevé */
+.btn-releve {
+  display: flex; align-items: center; gap: 0.5rem; justify-content: center;
+  width: 100%; margin-top: 1rem; padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white;
+  border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-releve:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
 </style>
+

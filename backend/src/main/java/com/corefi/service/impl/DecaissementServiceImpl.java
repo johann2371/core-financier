@@ -39,6 +39,7 @@ public class DecaissementServiceImpl implements IDecaissementService {
     private final com.corefi.service.interfaces.INotificationService notificationService;
     private final ParametrageRepository parametrageRepository;
     private final SessionCaisseRepository sessionCaisseRepository;
+    private final BudgetRepository budgetRepository;
 
     private BigDecimal getSeuilPdg() {
         return parametrageRepository.findByCle("SEUIL_APPROBATION_PDG")
@@ -377,6 +378,23 @@ public class DecaissementServiceImpl implements IDecaissementService {
         d.setExecutePar(getUtilisateurConnecte());
         d.setDateExecution(LocalDateTime.now());
 
+        // ── Mise à jour automatique du budget ──
+        if (d.getCategorie() != null) {
+            int annee = LocalDate.now().getYear();
+            int mois = LocalDate.now().getMonthValue();
+            // Budget mensuel
+            budgetRepository.findByCategorieAndAnneeAndMois(d.getCategorie(), annee, mois)
+                    .ifPresent(budget -> {
+                        budget.setMontantConsomme(budget.getMontantConsomme().add(d.getMontant()));
+                        budgetRepository.save(budget);
+                    });
+            // Budget annuel
+            budgetRepository.findByCategorieAndAnneeAndMois(d.getCategorie(), annee, 0)
+                    .ifPresent(budget -> {
+                        budget.setMontantConsomme(budget.getMontantConsomme().add(d.getMontant()));
+                        budgetRepository.save(budget);
+                    });
+        }
 
         Decaissement saved = decaissementRepository.save(d);
 

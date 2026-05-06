@@ -1,9 +1,25 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
+import { useLangStore } from '../stores/lang.store'
 import MainLayout from '../components/MainLayout.vue'
 import { useAuditStore } from '../stores/audit.store'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { 
+  DocumentArrowDownIcon, 
+  TableCellsIcon, 
+  MagnifyingGlassIcon, 
+  XMarkIcon, 
+  CalendarIcon, 
+  ChevronDownIcon, 
+  AdjustmentsHorizontalIcon, 
+  ArrowPathIcon,
+  ClockIcon,
+  ArrowTrendingUpIcon,
+  TrashIcon,
+  CheckCircleIcon,
+  ServerIcon
+} from '@heroicons/vue/24/outline'
 
 const auditStore = useAuditStore()
 const currentPage = ref(1)
@@ -188,6 +204,9 @@ const uniqueIpsCount = computed(() => {
   })
   return ips.size
 })
+
+const langStore = useLangStore()
+const t = computed(() => langStore.t)
 </script>
 
 <template>
@@ -197,11 +216,11 @@ const uniqueIpsCount = computed(() => {
     
     <template #actions>
       <button @click="exportPDF" class="btn-header-export border-btn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <DocumentArrowDownIcon class="w-4 h-4" />
         Export PDF
       </button>
       <button @click="exportCSV" class="btn-header-export solid-btn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <TableCellsIcon class="w-4 h-4" />
         Export CSV
       </button>
     </template>
@@ -210,14 +229,14 @@ const uniqueIpsCount = computed(() => {
       <!-- Filtres type Mockup -->
       <div class="mockup-filter-bar">
         <div class="filter-input-mock">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <MagnifyingGlassIcon class="w-4 h-4 text-slate-400" />
           <input v-model="filters.search" @keyup.enter="fetchLogs" type="text" placeholder="Rechercher utilisateur, entité..." />
           <button v-if="filters.search" @click="filters.search = ''; fetchLogs()" style="background:none; border:none; cursor:pointer; color:#ef4444; margin-left:8px; display: flex; align-items: center;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <XMarkIcon class="w-4 h-4" />
           </button>
         </div>
         <div class="filter-input-mock date-range">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <CalendarIcon class="w-4 h-4 text-slate-400" />
           <input v-model="filters.dateFrom" type="date" title="Date début" />
           <span style="color:#94a3b8; font-size:0.85rem;">→</span>
           <input v-model="filters.dateTo" type="date" title="Date fin" />
@@ -231,18 +250,18 @@ const uniqueIpsCount = computed(() => {
             <option value="PDG">PDG</option>
             <option value="ADMINISTRATEUR">Administrateur</option>
           </select>
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          <ChevronDownIcon class="w-4 h-4 text-slate-400" />
         </div>
         <div class="filter-input-mock select">
           <select v-model="filters.action" @change="fetchLogs">
             <option v-for="a in actions" :key="a.value" :value="a.value">{{ a.label }}</option>
           </select>
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+          <AdjustmentsHorizontalIcon class="w-4 h-4 text-slate-400" />
         </div>
         
         <button class="btn-apply-mock">Apply Filters</button>
         <button @click="fetchLogs" class="btn-refresh-mock">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.13 15.57a9 9 0 1 0 3.87-11.43L2.5 8"></path></svg>
+          <ArrowPathIcon class="w-4 h-4 text-slate-500" />
         </button>
       </div>
 
@@ -335,19 +354,19 @@ const uniqueIpsCount = computed(() => {
       <div class="mock-widgets-row">
         <div class="mock-widget">
           <div class="mw-head">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <ClockIcon class="w-4 h-4 text-slate-400" />
             <span>JOURNAL EN DIRECT</span>
           </div>
           <div class="mw-value">{{ auditStore.totalElements.toLocaleString() }}</div>
           <div class="mw-footer text-green">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+            <ArrowTrendingUpIcon class="w-3 h-3" />
             Total logs enregistrés
           </div>
         </div>
         
         <div class="mock-widget">
           <div class="mw-head">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <TrashIcon class="w-4 h-4 text-red-500" />
             <span class="text-red">ACTIONS CRITIQUES</span>
           </div>
           <div class="mw-value">{{ criticalActionsCount }}</div>
@@ -356,7 +375,7 @@ const uniqueIpsCount = computed(() => {
 
         <div class="mock-widget">
           <div class="mw-head">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <CheckCircleIcon class="w-4 h-4 text-green-500" />
             <span class="text-green">VALIDATIONS</span>
           </div>
           <div class="mw-value">{{ validationsCount }}</div>
@@ -365,7 +384,7 @@ const uniqueIpsCount = computed(() => {
 
         <div class="mock-widget">
           <div class="mw-head">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+            <ServerIcon class="w-4 h-4 text-blue-500" />
             <span class="text-blue">IPS UNIQUES</span>
           </div>
           <div class="mw-value">{{ uniqueIpsCount }}</div>
@@ -412,7 +431,7 @@ const uniqueIpsCount = computed(() => {
           </div>
         </div>
         <div class="modal-footer">
-          <button @click="showDetailsModal = false" class="btn-primary">Fermer</button>
+          <button @click="showDetailsModal = false" class="btn-primary">{{ t("common.fermer") }}</button>
         </div>
       </div>
     </div>
