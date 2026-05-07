@@ -267,7 +267,7 @@ const t = computed(() => langStore.t)
       <div class="filter-group">
         <select v-model="filters.clientId" class="filter-input-std">
           <option value="">Tous les clients</option>
-          <option v-for="c in tierStore.clients" :key="c.id" :value="c.id">{{ c.raisonSociale }}</option>
+          <option v-for="c in tierStore.clients" :key="c.id" :value="c.id">{{   c.raisonSociale   }}</option>
         </select>
       </div>
 
@@ -288,7 +288,7 @@ const t = computed(() => langStore.t)
       </div>
       
       <div v-else-if="store.error" class="error-state">
-        {{ store.error }}
+        {{   store.error   }}
         <button @click="store.fetchEncaissements" class="btn-outline">Réessayer</button>
       </div>
 
@@ -301,7 +301,7 @@ const t = computed(() => langStore.t)
               <th>Client</th>
               <th>Moyen</th>
               <th class="text-right">Montant (XAF)</th>
-              <th>Opérateur</th>
+              <th>Saisi par</th>
               <th class="text-center">Statut</th>
               <th class="text-center">Action</th>
             </tr>
@@ -318,37 +318,62 @@ const t = computed(() => langStore.t)
             <tr v-for="e in paginatedList" :key="e.id">
               <td>
                 <div class="motif-cell">
-                  <span class="motif-text">{{ e.reference || 'N/A' }}</span>
-                  <span class="motif-sub">{{ e.numero }}</span>
+                  <span class="motif-text">{{   e.reference || 'N/A'   }}</span>
+                  <span class="motif-sub">{{   e.numero   }}</span>
                 </div>
               </td>
-              <td>{{ new Date(e.dateEncaissement).toLocaleDateString() }}</td>
-              <td class="font-semibold text-dark">{{ e.nomClient }}</td>
+              <td>{{   new Date(e.dateEncaissement).toLocaleDateString()   }}</td>
+              <td class="font-semibold text-dark">{{   e.nomClient   }}</td>
               <td>
                 <div class="motif-cell">
-                  <span>{{ e.moyenPaiement }}</span>
-                  <span v-if="e.fraisTransaction > 0" class="text-xs text-orange-500">Frais: {{ e.fraisTransaction }}</span>
+                  <span>{{   e.moyenPaiement   }}</span>
+                  <span v-if="e.fraisTransaction > 0" class="text-xs text-orange-500">Frais: {{   e.fraisTransaction   }}</span>
                 </div>
               </td>
-              <td class="text-right font-semibold">{{ e.montant?.toLocaleString() }}</td>
+              <td class="text-right font-semibold">{{   e.montant?.toLocaleString()   }}</td>
               <td>
-                <div class="cell-stack text-xs">
-                  <span v-if="e.saisiParNom" class="text-muted" title="Saisi par">S: {{ e.saisiParNom }}</span>
-                  <span v-if="e.valideParNom" class="text-blue-600" title="Validé par">V: {{ e.valideParNom }}</span>
+                <div class="validation-timeline">
+                  <!-- Saisie -->
+                  <div v-if="e.saisiParNom" class="val-pill val-saisie">
+                    <ClockIcon class="w-3 h-3" />
+                    <span>SAISIE PAR</span>
+                    <div class="val-tooltip">
+                      <div class="tooltip-header">Enregistrement Transaction</div>
+                      <div class="tooltip-body">
+                        <p><strong>Opérateur:</strong> {{ e.saisiParNom }}</p>
+                        <p v-if="e.dateSaisie"><strong>Le:</strong> {{ new Date(e.dateSaisie).toLocaleString() }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Validation (si applicable) -->
+                  <div v-if="e.valideParNom" class="val-pill val-rf">
+                    <CheckBadgeIcon class="w-3 h-3" />
+                    <span>VALIDÉ</span>
+                    <div class="val-tooltip">
+                      <div class="tooltip-header">Validation Transaction</div>
+                      <div class="tooltip-body">
+                        <p><strong>Validé par:</strong> {{ e.valideParNom }}</p>
+                        <p v-if="e.dateValidation"><strong>Le:</strong> {{ new Date(e.dateValidation).toLocaleString() }}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </td>
               <td class="text-center">
                 <span class="badge" :class="getStatusClass(e.statut)">
-                  {{ e.statut }}
+                  {{   e.statut   }}
                 </span>
               </td>
-              <td class="text-center actions-cell">
-                <button @click="openPreview(e.id)" class="icon-btn preview-btn" title="Aperçu">
-                  <EyeIcon class="w-4 h-4" />
-                </button>
-                <button @click="store.downloadReceipt(e.id)" class="icon-btn download-btn" title="Télécharger">
-                  <ArrowDownTrayIcon class="w-4 h-4" />
-                </button>
+              <td class="text-center">
+                <div class="actions-cell">
+                  <button @click="openPreview(e.id)" class="icon-btn preview-btn" title="Aperçu">
+                    <EyeIcon class="w-5 h-5" />
+                  </button>
+                  <button @click="store.downloadReceipt(e.id)" class="icon-btn download-btn" title="Télécharger">
+                    <ArrowDownTrayIcon class="w-5 h-5" />
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -357,7 +382,7 @@ const t = computed(() => langStore.t)
 
       <!-- Info Pagination -->
       <div class="table-footer-info" v-if="filteredEncaissements.length > 0">
-        Affichage de {{ paginatedList.length }} sur {{ filteredEncaissements.length }} encaissement(s)
+        Affichage de {{   paginatedList.length   }} sur {{   filteredEncaissements.length   }} encaissement(s)
         <span v-if="filteredEncaissements.length < store.encaissements.length" class="text-blue italic">(Filtré)</span>
       </div>
     </div>
@@ -388,7 +413,7 @@ const t = computed(() => langStore.t)
             <!-- Bandeau d'erreur métier -->
             <div v-if="formError" class="form-error-banner">
               <ExclamationTriangleIcon class="w-5 h-5" />
-              <span>{{ formError }}</span>
+              <span>{{   formError   }}</span>
               <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
             </div>
             
@@ -401,7 +426,7 @@ const t = computed(() => langStore.t)
                 <select v-model="form.clientId" class="input-huge" required autofocus>
                   <option value="" disabled>Sélectionner un Client...</option>
                   <option v-for="client in tierStore.clients" :key="client.id" :value="client.id">
-                    {{ client.raisonSociale }}
+                    {{   client.raisonSociale   }}
                   </option>
                 </select>
                 <MagnifyingGlassIcon class="input-icon w-5 h-5" />
@@ -409,7 +434,7 @@ const t = computed(() => langStore.t)
 
               <div v-if="selectedClientObj" class="p-2 border border-blue-100 bg-blue-50 rounded-md mt-1 flex justify-between items-center">
                 <span class="text-xs font-semibold text-blue-700 uppercase">Reste à payer :</span>
-                <span class="text-sm font-bold text-blue-800">{{ selectedClientObj.solde?.toLocaleString() }} XAF</span>
+                <span class="text-sm font-bold text-blue-800">{{   selectedClientObj.solde?.toLocaleString()   }} XAF</span>
               </div>
               
               <div class="alert-box alert-error mt-2" v-if="tierStore.clients.length === 0">
@@ -460,7 +485,7 @@ const t = computed(() => langStore.t)
                   <input v-model="form.banqueEmettrice" type="text" class="input-large" :placeholder="selectedMode === 'CHEQUE' ? 'Banque émettrice...' : 'Banque d\'origine...'" required />
                 </div>
                 <div class="form-group half">
-                  <label>N° {{ selectedMode === 'CHEQUE' ? 'du Chèque' : 'Opération' }} <span class="req">*</span></label>
+                  <label>N° {{   selectedMode === 'CHEQUE' ? 'du Chèque' : 'Opération'   }} <span class="req">*</span></label>
                   <input v-model="form.numeroOperation" type="text" class="input-large" placeholder="Saisir la référence..." required />
                 </div>
               </div>
@@ -485,7 +510,7 @@ const t = computed(() => langStore.t)
                 <label>Frais de transaction (XAF)</label>
                 <input v-model="form.fraisTransaction" type="number" class="input-large" placeholder="0" />
                 <span class="text-xs text-muted" v-if="form.montant > 0">
-                  Montant Net: <strong>{{ (form.montant - (form.fraisTransaction || 0)).toLocaleString() }} XAF</strong>
+                  Montant Net: <strong>{{   (form.montant - (form.fraisTransaction || 0)).toLocaleString()   }} XAF</strong>
                 </span>
               </div>
 
@@ -511,7 +536,7 @@ const t = computed(() => langStore.t)
                 <label>Compte Financier <span class="req">*</span></label>
                 <select v-model="form.compteFinancierId" class="input-std" required>
                   <option v-for="c in availableComptes" :key="c.id" :value="c.id">
-                    {{ c.type === 'CAISSE' ? 'Compte de Caisse' : 'Compte de Banque' }}
+                    {{   c.type === 'CAISSE' ? 'Compte de Caisse' : 'Compte de Banque'   }}
                   </option>
                 </select>
                 <div v-if="availableComptes.length === 0" class="text-xs text-red mt-1">
@@ -541,8 +566,8 @@ const t = computed(() => langStore.t)
               <div class="recent-list" v-if="tierStore.clients.length > 0">
                 <div class="recent-item" v-for="client in tierStore.clients.slice(0, 3)" :key="client.id" @click="form.clientId = client.id">
                   <div>
-                    <strong>{{ client.raisonSociale }}</strong>
-                    <span>Solde : {{ client.solde?.toLocaleString() }} XAF</span>
+                    <strong>{{   client.raisonSociale   }}</strong>
+                    <span>Solde : {{   client.solde?.toLocaleString()   }} XAF</span>
                   </div>
                   <span class="text-muted" style="font-size: 0.75rem;">Choisir</span>
                 </div>
@@ -587,7 +612,7 @@ const t = computed(() => langStore.t)
         <div class="modal-footer pt-0 justify-end">
           <div class="actions-group">
             <button type="submit" form="encaissement-form" class="btn-primary-large" :disabled="store.loading">
-              {{ store.loading ? 'En cours...' : 'Confirmer et Enregistrer' }}
+              {{   store.loading ? 'En cours...' : 'Confirmer et Enregistrer'   }}
             </button>
           </div>
         </div>
@@ -625,6 +650,12 @@ const t = computed(() => langStore.t)
 .btn-primary:hover { background-color: #1d4ed8; }
 .btn-primary:active { transform: scale(0.98); }
 
+
+.actions-cell {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
 
 /* MODAL SAISIE RAPIDE EXPERTE */
 .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(17, 24, 39, 0.6); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 2rem;}
@@ -776,5 +807,147 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246,
     width: 100%;
     justify-content: center;
   }
+}
+
+/* VALIDATION TOOLTIPS & PILLS (COMMON) */
+.validation-timeline {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.val-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: help;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+}
+
+.val-pill span {
+  line-height: 1;
+}
+
+.val-saisie {
+  background-color: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.val-rf {
+  background-color: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+
+.val-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Tooltip Styling */
+.val-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(8px);
+  color: white;
+  padding: 0;
+  border-radius: 0.75rem;
+  width: max-content;
+  min-width: 180px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 100;
+  overflow: hidden;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.val-pill:hover .val-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltip-header {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #93c5fd;
+}
+
+.tooltip-body {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.tooltip-body p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tooltip-body p strong {
+  color: #cbd5e1;
+}
+
+.val-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: #1e293b transparent transparent transparent;
+}
+
+/* DARK MODE OVERRIDES */
+body.dark-mode .val-pill-empty {
+  color: #475569;
+}
+
+body.dark-mode .val-saisie {
+  background-color: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+body.dark-mode .val-rf {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+body.dark-mode .val-tooltip {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode .val-tooltip::after {
+  border-color: #0f172a transparent transparent transparent;
+}
+
+body.dark-mode .tooltip-header {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom-color: #1e293b;
 }
 </style>

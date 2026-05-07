@@ -57,7 +57,9 @@ public class EncaissementMapper {
 
         // Traçabilité
         r.setSaisiParNom(formatFullUser(e.getSaisiPar()));
+        r.setDateSaisie(e.getDateSaisie());
         r.setValideParNom(formatFullUser(e.getValidePar()));
+        r.setDateValidation(e.getDateValidation());
 
         // Frais & Compensation
         r.setFraisTransaction(e.getFraisTransaction());

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useLangStore } from '../stores/lang.store'
 import { useAuthStore } from '../stores/auth.store'
 import MainLayout from '../components/MainLayout.vue'

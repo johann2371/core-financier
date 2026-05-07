@@ -72,8 +72,11 @@ public class DecaissementMapper {
         // Traçabilité
         r.setSaisiParNom(formatFullUser(d.getSaisiPar()));
         r.setValideParNom(formatFullUser(d.getValidePar()));
+        r.setDateValidation(d.getDateValidation());
         r.setApprouveParPdgNom(formatFullUser(d.getApprouveParPdg()));
+        r.setDateApprobationPdg(d.getDateApprobationPdg());
         r.setExecuteParNom(formatFullUser(d.getExecutePar()));
+        r.setDateExecution(d.getDateExecution());
         r.setSessionId(d.getSessionCaisse() != null ? d.getSessionCaisse().getId() : null);
 
         return r;

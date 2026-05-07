@@ -79,18 +79,26 @@ public class EncaissementServiceImpl implements IEncaissementService {
 
         Utilisateur saisiPar = getUtilisateurConnecte();
         encaissement.setSaisiPar(saisiPar);
+        encaissement.setDateSaisie(java.time.LocalDateTime.now());
 
         // 4. Logique conditionnelle selon le type de paiement
         if (moyen == MoyenPaiement.ESPECES) {
-            SessionCaisse session = sessionCaisseRepository.findCurrentActiveSession(saisiPar.getId())
-                    .orElseThrow(() -> new WorkflowException("Aucune session de caisse ouverte pour enregistrer des espèces."));
+            String role = saisiPar.getRole().name();
             
-            if (!session.getCaisse().getId().equals(compte.getId())) {
-                 throw new WorkflowException("Le compte choisi ne correspond pas à la caisse de votre session.");
+            if ("CAISSIER".equalsIgnoreCase(role)) {
+                SessionCaisse session = sessionCaisseRepository.findCurrentActiveSession(saisiPar.getId())
+                        .orElseThrow(() -> new WorkflowException("Aucune session de caisse ouverte pour enregistrer des espèces."));
+                
+                if (!session.getCaisse().getId().equals(compte.getId())) {
+                     throw new WorkflowException("Le compte choisi ne correspond pas à la caisse de votre session.");
+                }
+                
+                encaissement.setSessionCaisse(session);
             }
             
-            encaissement.setSessionCaisse(session);
             encaissement.setStatut(StatutEncaissement.VALIDEE);
+            encaissement.setDateValidation(java.time.LocalDateTime.now());
+            encaissement.setValidePar(saisiPar);
             
             // Impact immédiat sur le solde
             compte.setSolde(compte.getSolde().add(request.getMontant()));
@@ -105,6 +113,9 @@ public class EncaissementServiceImpl implements IEncaissementService {
         else {
             // Mobile Money ou Carte (Impact Net)
             encaissement.setStatut(StatutEncaissement.VALIDEE);
+            encaissement.setDateValidation(java.time.LocalDateTime.now());
+            encaissement.setValidePar(saisiPar);
+            
             compte.setSolde(compte.getSolde().add(encaissement.getMontantNet()));
             compteFinancierRepository.save(compte);
         }

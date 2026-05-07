@@ -26,7 +26,8 @@ import {
   ArrowsRightLeftIcon,
   BanknotesIcon,
   CurrencyDollarIcon,
-  UsersIcon
+  UsersIcon,
+  ClockIcon
 } from '@heroicons/vue/24/outline'
 
 const store = useDecaissementStore()
@@ -438,7 +439,7 @@ const selectedCompteBalance = computed(() => {
 
 <template>
   <MainLayout>
-    <template #title>Décaissements</template>
+    <template #title>{{  t("decaissements.titre")  }}</template>
 
     <template #actions>
       <button class="icon-btn show-on-mobile" @click="showMobileFilters = !showMobileFilters" title="Filtrer">
@@ -446,14 +447,14 @@ const selectedCompteBalance = computed(() => {
       </button>
       <button @click="showCreateModal = true" class="btn-primary hide-on-mobile">
         <PlusIcon class="w-4 h-4" />
-        Nouvel Décaissement
+        {{  t("decaissements.nouveau")  }}
       </button>
     </template>
 
     <div class="show-on-mobile w-100" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
       <button @click="showCreateModal = true" class="btn-primary w-100" style="justify-content: center; padding: 0.75rem;">
         <PlusIcon class="w-5 h-5" />
-        Nouvel Décaissement
+        {{  t("decaissements.nouveau")  }}
       </button>
     </div>
 
@@ -469,14 +470,14 @@ const selectedCompteBalance = computed(() => {
       <div class="filter-group" v-if="isRF || isPDG">
         <button @click="showMyTasksOnly = !showMyTasksOnly" class="btn-toggle-tasks" :class="{ active: showMyTasksOnly }">
           <CheckCircleIcon class="w-4 h-4" />
-          {{ isPDG ? 'Mes signatures en attente' : 'Mes dossiers à valider' }}
+          {{   isPDG ? 'Mes signatures en attente' : 'Mes dossiers à valider'   }}
         </button>
       </div>
       
       <div class="filter-group">
         <select v-model="filters.fournisseurId" class="filter-input-std">
           <option value="">Tous les fournisseurs</option>
-          <option v-for="f in tierStore.fournisseurs" :key="f.id" :value="f.id">{{ f.raisonSociale }}</option>
+          <option v-for="f in tierStore.fournisseurs" :key="f.id" :value="f.id">{{   f.raisonSociale   }}</option>
         </select>
       </div>
 
@@ -510,7 +511,7 @@ const selectedCompteBalance = computed(() => {
       </div>
       
       <div v-else-if="store.error" class="error-state">
-        {{ store.error }}
+        {{   store.error   }}
         <button @click="store.fetchDecaissements" class="btn-outline mt-2">Réessayer</button>
       </div>
 
@@ -538,27 +539,78 @@ const selectedCompteBalance = computed(() => {
               </td>
             </tr>
             <tr v-for="item in paginatedList" :key="item.id">
-              <td class="font-semibold text-dark">{{ item.numero }}</td>
-              <td class="text-muted">{{ new Date(item.dateCreation || item.dateDecaissement).toLocaleDateString() }}</td>
+              <td class="font-semibold text-dark">{{   item.numero   }}</td>
+              <td class="text-muted">{{   new Date(item.dateCreation || item.dateDecaissement).toLocaleDateString()   }}</td>
               <td>
                 <div class="cell-stack">
-                  <strong class="text-dark">{{ item.beneficiaire || item.fournisseurNom || 'N/A' }}</strong>
-                  <span class="text-muted text-sm">{{ item.motif || 'Aucun motif renseigné' }}</span>
+                  <strong class="text-dark">{{   item.beneficiaire || item.fournisseurNom || 'N/A'   }}</strong>
+                  <span class="text-muted text-sm">{{   item.motif || 'Aucun motif renseigné'   }}</span>
                 </div>
               </td>
-              <td class="text-right font-semibold text-dark">{{ item.montant?.toLocaleString() }} XAF</td>
-              <td class="text-sm text-muted">{{ item.saisiParNom || '-' }}</td>
+              <td class="text-right font-semibold text-dark">{{   item.montant?.toLocaleString()   }} XAF</td>
               <td>
-                <div class="cell-stack text-xs">
-                  <span v-if="item.valideParNom" class="text-green-600" title="Validé par RF">RF: {{ item.valideParNom }}</span>
-                  <span v-if="item.approuveParPdgNom" class="text-blue-600" title="Approuvé par PDG">PDG: {{ item.approuveParPdgNom }}</span>
-                  <span v-if="item.executeParNom" class="text-orange-600" title="Exécuté par Caisse">EXE: {{ item.executeParNom }}</span>
-                  <span v-if="!item.valideParNom && !item.approuveParPdgNom" class="italic opacity-50">Aucune validation</span>
+                <div v-if="item.saisiParNom" class="val-pill val-saisie">
+                  <ClockIcon class="w-3 h-3" />
+                  <span>SAISIE PAR</span>
+                  <div class="val-tooltip">
+                    <div class="tooltip-header">Saisie de la demande</div>
+                    <div class="tooltip-body">
+                      <p><strong>Par:</strong> {{ item.saisiParNom }}</p>
+                      <p v-if="item.dateCreation"><strong>Le:</strong> {{ new Date(item.dateCreation).toLocaleString() }}</p>
+                    </div>
+                  </div>
+                </div>
+                <span v-else>-</span>
+              </td>
+              <td>
+                <div class="validation-timeline">
+                  <!-- Validation RF -->
+                  <div v-if="item.valideParNom" class="val-pill val-rf">
+                    <ShieldCheckIcon class="w-3 h-3" />
+                    <span>RF</span>
+                    <div class="val-tooltip">
+                      <div class="tooltip-header">Validation DAF/RF</div>
+                      <div class="tooltip-body">
+                        <p><strong>Validateur:</strong> {{ item.valideParNom }}</p>
+                        <p v-if="item.dateValidation"><strong>Le:</strong> {{ new Date(item.dateValidation).toLocaleString() }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Approbation PDG -->
+                  <div v-if="item.approuveParPdgNom" class="val-pill val-pdg">
+                    <CheckCircleIcon class="w-3 h-3" />
+                    <span>PDG</span>
+                    <div class="val-tooltip">
+                      <div class="tooltip-header">Approbation Direction</div>
+                      <div class="tooltip-body">
+                        <p><strong>Approuvé par:</strong> {{ item.approuveParPdgNom }}</p>
+                        <p v-if="item.dateApprobationPdg"><strong>Le:</strong> {{ new Date(item.dateApprobationPdg).toLocaleString() }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Exécution Caissier -->
+                  <div v-if="item.executeParNom" class="val-pill val-exe">
+                    <WalletIcon class="w-3 h-3" />
+                    <span>EXE</span>
+                    <div class="val-tooltip">
+                      <div class="tooltip-header">Exécution Caisse</div>
+                      <div class="tooltip-body">
+                        <p><strong>Payé par:</strong> {{ item.executeParNom }}</p>
+                        <p v-if="item.dateExecution"><strong>Le:</strong> {{ new Date(item.dateExecution).toLocaleString() }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span v-if="!item.valideParNom && !item.approuveParPdgNom && !item.executeParNom" class="val-pill-empty">
+                    En attente
+                  </span>
                 </div>
               </td>
               <td>
                 <span class="badge" :class="getStatusClass(item.statut)">
-                  {{ item.statut }}
+                  {{   item.statut   }}
                 </span>
               </td>
               <td class="text-center">
@@ -602,7 +654,7 @@ const selectedCompteBalance = computed(() => {
 
       <!-- Info Pagination -->
       <div class="table-footer-info" v-if="filteredDecaissements.length > 0">
-        Affichage de {{ paginatedList.length }} sur {{ filteredDecaissements.length }} décaissement(s)
+        Affichage de {{   paginatedList.length   }} sur {{   filteredDecaissements.length   }} décaissement(s)
         <span v-if="filteredDecaissements.length < store.decaissements.length" class="text-blue italic">(Filtré)</span>
       </div>
     </div>
@@ -631,7 +683,7 @@ const selectedCompteBalance = computed(() => {
             <!-- Bandeau d'erreur métier -->
             <div v-if="formError" class="form-error-banner">
               <ExclamationTriangleIcon class="w-5 h-5" />
-              <span>{{ formError }}</span>
+              <span>{{   formError   }}</span>
               <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
             </div>
 
@@ -641,8 +693,8 @@ const selectedCompteBalance = computed(() => {
               <div class="category-grid">
                 <label v-for="cat in categories" :key="cat.value" class="category-card" :class="{ active: createForm.categorie === cat.value }">
                   <input type="radio" v-model="createForm.categorie" :value="cat.value" class="hidden-radio" />
-                  <span class="cat-icon">{{ cat.icon }}</span>
-                  <span class="cat-label">{{ cat.label }}</span>
+                  <span class="cat-icon">{{   cat.icon   }}</span>
+                  <span class="cat-label">{{   cat.label   }}</span>
                 </label>
               </div>
             </div>
@@ -653,7 +705,7 @@ const selectedCompteBalance = computed(() => {
               <select v-model="createForm.fournisseurId" required class="input-huge" autofocus>
                  <option value="" disabled>Sélectionner un Fournisseur...</option>
                  <option v-for="fou in tierStore.fournisseurs" :key="fou.id" :value="fou.id">
-                   {{ fou.raisonSociale }}
+                   {{   fou.raisonSociale   }}
                  </option>
               </select>
               <UsersIcon class="input-icon w-5 h-5" />
@@ -700,7 +752,7 @@ const selectedCompteBalance = computed(() => {
                   <input v-model="createForm.banqueEmettrice" type="text" class="input-large" :placeholder="createForm.mode === 'CHEQUE' ? 'Banque tirée...' : 'Banque destinataire...'" required />
                 </div>
                 <div class="form-group half">
-                  <label>N° {{ createForm.mode === 'CHEQUE' ? 'du Chèque' : 'Opération' }} <span class="req">*</span></label>
+                  <label>N° {{   createForm.mode === 'CHEQUE' ? 'du Chèque' : 'Opération'   }} <span class="req">*</span></label>
                   <input v-model="createForm.numeroOperation" type="text" class="input-large" placeholder="Saisir la référence..." required />
                 </div>
               </div>
@@ -744,8 +796,8 @@ const selectedCompteBalance = computed(() => {
               <div v-if="uploadFiles.length > 0" class="uploaded-files">
                 <div v-for="(file, index) in uploadFiles" :key="index" class="file-item">
                   <DocumentIcon class="w-4 h-4" />
-                  <span class="file-name">{{ file.name }}</span>
-                  <span class="file-size">{{ (file.size / 1024).toFixed(0) }} Ko</span>
+                  <span class="file-name">{{   file.name   }}</span>
+                  <span class="file-size">{{   (file.size / 1024).toFixed(0)   }} Ko</span>
                   <button type="button" @click="removeFile(index)" class="file-remove">&times;</button>
                 </div>
               </div>
@@ -788,7 +840,7 @@ const selectedCompteBalance = computed(() => {
         </div>
         
         <div class="modal-footer bottom-bar">
-          <button type="button" class="btn-text" @click="showCreateModal = false">{{ t("common.annuler") }}</button>
+          <button type="button" class="btn-text" @click="showCreateModal = false">{{   t("common.annuler")   }}</button>
           <button type="submit" form="create-decaissement-form" class="btn-primary-large">
             Soumettre Demande
           </button>
@@ -805,23 +857,23 @@ const selectedCompteBalance = computed(() => {
           </div>
           <div class="title-block">
             <h3>Confirmer le Décaissement</h3>
-            <span>Validation de sécurité requise pour la transaction #{{ activeDecaissement?.numero }}</span>
+            <span>Validation de sécurité requise pour la transaction #{{   activeDecaissement?.numero   }}</span>
           </div>
         </div>
 
         <div v-if="formError" class="form-error-banner" style="margin: 1rem 1.5rem 0;">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-          <span>{{ formError }}</span>
+          <span>{{   formError   }}</span>
           <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
         </div>
 
         <div class="checklist-section">
-          <span class="section-label">CHECKLIST DE SÉCURITÉ ({{ activeDecaissement?.categorie }})</span>
+          <span class="section-label">CHECKLIST DE SÉCURITÉ ({{   activeDecaissement?.categorie   }})</span>
           <div class="checklist">
             <label v-for="(item, idx) in approveChecklist" :key="idx" class="check-item">
               <input type="checkbox" v-model="approveForm.checks[idx]" />
               <div class="custom-check"></div>
-              <span>{{ item }}</span>
+              <span>{{   item   }}</span>
             </label>
           </div>
         </div>
@@ -833,8 +885,8 @@ const selectedCompteBalance = computed(() => {
               <div class="justif-info">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
                 <div class="justif-text">
-                  <span class="justif-name">{{ j.nomOriginal }}</span>
-                  <span class="justif-size">{{ (j.tailleFichier / 1024).toFixed(1) }} Ko</span>
+                  <span class="justif-name">{{   j.nomOriginal   }}</span>
+                  <span class="justif-size">{{   (j.tailleFichier / 1024).toFixed(1)   }} Ko</span>
                 </div>
               </div>
               <button @click="downloadJustificatif(j.id, j.nomOriginal)" class="btn-justif-view" title="Ouvrir le document">
@@ -848,21 +900,21 @@ const selectedCompteBalance = computed(() => {
         <div class="balance-calc-box">
           <div class="balance-row">
             <div class="b-col">
-              <span class="label">{{ activeDecaissement?.compteFinancierId ? 'SOLDE DU COMPTE' : 'LIQUIDITÉ TOTALE' }}</span>
-              <strong class="val">{{ bankBalance.toLocaleString() }} XAF</strong>
+              <span class="label">{{   activeDecaissement?.compteFinancierId ? 'SOLDE DU COMPTE' : 'LIQUIDITÉ TOTALE'   }}</span>
+              <strong class="val">{{   bankBalance.toLocaleString()   }} XAF</strong>
             </div>
             <div class="arrow-ext">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </div>
             <div class="b-col text-right">
               <span class="label">APRÈS TRANSACTION</span>
-              <strong class="val text-blue">{{ (bankBalance - (activeDecaissement?.montant || 0)).toLocaleString() }} XAF</strong>
+              <strong class="val text-blue">{{   (bankBalance - (activeDecaissement?.montant || 0)).toLocaleString()   }} XAF</strong>
             </div>
           </div>
           <div class="divider"></div>
           <div class="balance-row amounts-row">
             <span class="label">Montant du décaissement :</span>
-            <strong class="val-dark">-{{ activeDecaissement?.montant?.toLocaleString() }} XAF</strong>
+            <strong class="val-dark">-{{   activeDecaissement?.montant?.toLocaleString()   }} XAF</strong>
           </div>
         </div>
 
@@ -894,13 +946,13 @@ const selectedCompteBalance = computed(() => {
           </div>
           <div class="title-block">
             <h3>Exécuter Paiement</h3>
-            <span>Transaction #{{ activeDecaissement?.numero }}</span>
+            <span>Transaction #{{   activeDecaissement?.numero   }}</span>
           </div>
         </div>
 
         <div v-if="formError" class="form-error-banner" style="margin: 1rem 1.5rem 0;">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-          <span>{{ formError }}</span>
+          <span>{{   formError   }}</span>
           <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
         </div>
 
@@ -910,7 +962,7 @@ const selectedCompteBalance = computed(() => {
             <select v-model="executeForm.compteFinancierId" class="input-std" required>
               <option :value="null" disabled>Choisir un compte...</option>
               <option v-for="c in availableComptes" :key="c.id" :value="c.id">
-                {{ c.nom }} ({{ c.type === 'CAISSE' ? 'Caisse' : 'Banque' }}) - {{ c.solde.toLocaleString() }} XAF
+                {{   c.nom   }} ({{   c.type === 'CAISSE' ? 'Caisse' : 'Banque'   }}) - {{   c.solde.toLocaleString()   }} XAF
               </option>
             </select>
             <div v-if="availableComptes.length === 0" class="alert-box alert-error">
@@ -947,25 +999,25 @@ const selectedCompteBalance = computed(() => {
              <div class="balance-row">
                <span>Solde du compte choisi :</span>
                <strong :class="selectedCompteBalance >= (activeDecaissement?.montant || 0) ? 'text-green' : 'text-red'">
-                 {{ selectedCompteBalance.toLocaleString() }} XAF
+                 {{   selectedCompteBalance.toLocaleString()   }} XAF
                </strong>
              </div>
              <div class="balance-row">
                <span>Montant à décaisser :</span>
-               <strong class="text-red">-{{ activeDecaissement?.montant?.toLocaleString() }} XAF</strong>
+               <strong class="text-red">-{{   activeDecaissement?.montant?.toLocaleString()   }} XAF</strong>
              </div>
              <div class="divider"></div>
              <div class="balance-row">
                <span>Solde après opération :</span>
                <strong :class="(selectedCompteBalance - (activeDecaissement?.montant || 0)) >= 0 ? 'text-blue' : 'text-red'">
-                 {{ (selectedCompteBalance - (activeDecaissement?.montant || 0)).toLocaleString() }} XAF
+                 {{   (selectedCompteBalance - (activeDecaissement?.montant || 0)).toLocaleString()   }} XAF
                </strong>
              </div>
           </div>
         </div>
 
         <div class="approve-footer">
-          <button @click="showExecuteModal = false" class="btn-outline-wide">{{ t("common.annuler") }}</button>
+          <button @click="showExecuteModal = false" class="btn-outline-wide">{{   t("common.annuler")   }}</button>
           <button @click="submitExecute" class="btn-confirm-execute" style="background: #2563eb;">
             Confirmer le Paiement
           </button>
@@ -983,13 +1035,13 @@ const selectedCompteBalance = computed(() => {
           </div>
           <div class="title-block">
             <h3>Rejeter le Décaissement</h3>
-            <span>Transaction ID: {{ activeDecaissement?.numero }}</span>
+            <span>Transaction ID: {{   activeDecaissement?.numero   }}</span>
           </div>
         </div>
 
         <div v-if="formError" class="form-error-banner" style="margin: 1rem 1.5rem 0;">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-          <span>{{ formError }}</span>
+          <span>{{   formError   }}</span>
           <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
         </div>
 
@@ -1074,7 +1126,7 @@ const selectedCompteBalance = computed(() => {
 .btn-primary { display: flex; align-items: center; gap: 0.5rem; background-color: #2563eb; color: white; padding: 0.625rem 1rem; border-radius: 8px; border: none; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
 .btn-primary:hover { background-color: #1d4ed8; }
 
-.actions-cell { display: flex; gap: 0.5rem; justify-content: center; }
+.actions-cell { display: flex; gap: 1rem; justify-content: center; }
 .btn-icon { background: none; border: none; padding: 6px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
 .btn-icon:hover { background: #f3f4f6; }
 .icon-btn { background: #f3f4f6; border: none; padding: 0.4rem; border-radius: 6px; color: #4b5563; cursor: pointer; transition: 0.15s;}
@@ -1421,5 +1473,179 @@ textarea.input-std { resize: vertical; min-height: 80px; }
   .justif-name {
     max-width: 150px;
   }
+}
+
+/* VALIDATION TOOLTIPS & PILLS */
+.validation-timeline {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.val-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: help;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+}
+
+.val-pill span {
+  line-height: 1;
+}
+
+.val-saisie {
+  background-color: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.val-rf {
+  background-color: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+
+.val-pdg {
+  background-color: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.val-exe {
+  background-color: #fff7ed;
+  color: #d97706;
+  border-color: #fed7aa;
+}
+
+.val-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.val-pill-empty {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 0.2rem 0;
+}
+
+/* Tooltip Styling */
+.val-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(8px);
+  color: white;
+  padding: 0;
+  border-radius: 0.75rem;
+  width: max-content;
+  min-width: 180px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 100;
+  overflow: hidden;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.val-pill:hover .val-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltip-header {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #93c5fd;
+}
+
+.tooltip-body {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.tooltip-body p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tooltip-body p strong {
+  color: #cbd5e1;
+}
+
+/* Arrow */
+.val-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: #1e293b transparent transparent transparent;
+}
+
+/* DARK MODE OVERRIDES FOR PILLS */
+body.dark-mode .val-pill-empty {
+  color: #475569;
+}
+
+body.dark-mode .val-saisie {
+  background-color: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+body.dark-mode .val-rf {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+body.dark-mode .val-pdg {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+body.dark-mode .val-exe {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+body.dark-mode .val-tooltip {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode .val-tooltip::after {
+  border-color: #0f172a transparent transparent transparent;
+}
+
+body.dark-mode .tooltip-header {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom-color: #1e293b;
 }
 </style>

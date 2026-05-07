@@ -12,6 +12,7 @@ import {
   Legend,
   Filler
 } from 'chart.js'
+import { useUiStore } from '../stores/ui.store'
 
 ChartJS.register(
   CategoryScale,
@@ -23,6 +24,8 @@ ChartJS.register(
   Legend,
   Filler
 )
+
+const uiStore = useUiStore()
 
 const props = defineProps({
   data: {
@@ -40,7 +43,7 @@ const chartData = computed(() => ({
       borderColor: '#10b981',
       backgroundColor: 'rgba(16, 185, 129, 0.08)',
       pointBackgroundColor: '#10b981',
-      pointBorderColor: '#fff',
+      pointBorderColor: uiStore.isDarkMode ? '#1e293b' : '#fff',
       pointBorderWidth: 2,
       pointRadius: 5,
       pointHoverRadius: 7,
@@ -54,7 +57,7 @@ const chartData = computed(() => ({
       borderColor: '#ef4444',
       backgroundColor: 'rgba(239, 68, 68, 0.08)',
       pointBackgroundColor: '#ef4444',
-      pointBorderColor: '#fff',
+      pointBorderColor: uiStore.isDarkMode ? '#1e293b' : '#fff',
       pointBorderWidth: 2,
       pointRadius: 5,
       pointHoverRadius: 7,
@@ -80,17 +83,19 @@ const chartOptions = computed(() => ({
         pointStyle: 'circle',
         padding: 20,
         font: { size: 12, weight: '600', family: 'Inter, sans-serif' },
-        color: '#4b5563'
+        color: uiStore.isDarkMode ? '#94a3b8' : '#4b5563'
       }
     },
     tooltip: {
-      backgroundColor: '#1e293b',
+      backgroundColor: uiStore.isDarkMode ? '#0f172a' : '#1e293b',
       titleFont: { size: 13, weight: '700', family: 'Inter, sans-serif' },
       bodyFont: { size: 12, family: 'Inter, sans-serif' },
       padding: 12,
       cornerRadius: 8,
       displayColors: true,
       boxPadding: 6,
+      borderColor: uiStore.isDarkMode ? '#1e293b' : 'transparent',
+      borderWidth: 1,
       callbacks: {
         label: function (context) {
           return `${context.dataset.label}: ${context.parsed.y.toLocaleString('fr-FR')} XAF`
@@ -103,19 +108,19 @@ const chartOptions = computed(() => ({
       grid: { display: false },
       ticks: {
         font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
-        color: '#9ca3af'
+        color: uiStore.isDarkMode ? '#475569' : '#9ca3af'
       },
       border: { display: false }
     },
     y: {
       beginAtZero: true,
       grid: {
-        color: '#f3f4f6',
+        color: uiStore.isDarkMode ? 'rgba(255, 255, 255, 0.03)' : '#f3f4f6',
         drawBorder: false
       },
       ticks: {
         font: { size: 11, family: 'Inter, sans-serif' },
-        color: '#9ca3af',
+        color: uiStore.isDarkMode ? '#475569' : '#9ca3af',
         callback: function (value) {
           if (value >= 1_000_000) return (value / 1_000_000).toFixed(1) + 'M'
           if (value >= 1_000) return (value / 1_000).toFixed(0) + 'K'

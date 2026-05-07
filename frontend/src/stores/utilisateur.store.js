@@ -13,7 +13,7 @@ export const useUtilisateurStore = defineStore('utilisateur', {
       this.error = null;
       try {
         const { data } = await api.get('/utilisateurs');
-        this.utilisateurs = data;
+        this.utilisateurs = Array.isArray(data) ? data : (data?.content || []);
       } catch (err) {
         this.error = err.response?.data?.message || "Erreur lors du chargement des utilisateurs";
         console.error("Erreur fetchUtilisateurs:", err);

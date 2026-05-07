@@ -12,10 +12,13 @@ public class EmailServiceImpl implements IEmailService {
 
     private final JavaMailSender emailSender;
 
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.username}")
+    private String fromEmail;
+
     @Override
     public void sendSimpleMessage(String to, String subject, String text) {
         SimpleMailMessage message = new SimpleMailMessage(); 
-        message.setFrom("sodica-noreply@corefi.com");
+        message.setFrom(fromEmail);
         message.setTo(to); 
         message.setSubject(subject); 
         message.setText(text);

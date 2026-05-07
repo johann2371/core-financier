@@ -86,6 +86,8 @@ public class FactureMapper {
         // Traçabilité
         r.setCreeParNom(formatFullUser(f.getCreePar()));
         r.setValideParNom(formatFullUser(f.getValidePar()));
+        r.setDateSaisie(f.getDateSaisie());
+        r.setDateValidation(f.getDateValidation());
 
         return r;
     }

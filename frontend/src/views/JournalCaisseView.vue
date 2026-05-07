@@ -12,11 +12,11 @@
         <div class="status-indicator ripple"></div>
         <div class="session-info">
           <span class="label">Session Ouverte</span>
-          <span class="value">{{ formatDate(activeSession.dateOuverture) }}</span>
+          <span class="value">{{   formatDate(activeSession.dateOuverture)   }}</span>
         </div>
         <div class="balance-badge">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>
-          <span>Théorique: {{ formatXAF(soldeTheorique) }}</span>
+          <span>Théorique: {{   formatXAF(soldeTheorique)   }}</span>
         </div>
       </div>
     </header>
@@ -26,7 +26,7 @@
       <div class="banner-content">
         <svg v-if="feedback.type === 'success'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
         <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-        <span>{{ feedback.message }}</span>
+        <span>{{   feedback.message   }}</span>
       </div>
       <button @click="feedback.message = ''" class="close-btn">&times;</button>
     </div>
@@ -48,7 +48,7 @@
             <div class="form-group">
               <label>Choix de la caisse</label>
               <select v-model="openingData.caisseId" class="modern-input">
-                <option v-for="c in caisses" :key="c.id" :value="c.id">{{ c.libelle }}</option>
+                <option v-for="c in caisses" :key="c.id" :value="c.id">{{   c.libelle   }}</option>
               </select>
             </div>
             <div class="form-group mt-3">
@@ -62,7 +62,7 @@
             </div>
             <button @click="ouvrirCaisse" class="btn-primary-large mt-4" :disabled="submitting">
               <span v-if="submitting" class="spinner-small mr-2"></span>
-              {{ submitting ? 'Ouverture...' : 'Ouvrir la Session' }}
+              {{   submitting ? 'Ouverture...' : 'Ouvrir la Session'   }}
             </button>
           </div>
         </div>
@@ -83,7 +83,7 @@
                   @click="filterType = t"
                   :class="{ active: filterType === t }"
                 >
-                  {{ t === 'TOUS' ? 'Tous' : t === 'ENTREES' ? 'Recettes' : 'Dépenses' }}
+                  {{   t === 'TOUS' ? 'Tous' : t === 'ENTREES' ? 'Recettes' : 'Dépenses'   }}
                 </button>
               </div>
             </div>
@@ -100,11 +100,11 @@
                   <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
                 </div>
                 <div class="move-details">
-                  <span class="label">{{ m.reference }} — {{ m.tiersNom }}</span>
-                  <span class="time">{{ formatTime(m.date) }}</span>
+                  <span class="label">{{   m.reference   }} — {{   m.tiersNom   }}</span>
+                  <span class="time">{{   formatTime(m.date)   }}</span>
                 </div>
                 <div class="move-amount" :class="m.type === 'ENTREE' ? 'text-success' : 'text-danger'">
-                  {{ m.type === 'ENTREE' ? '+' : '-' }} {{ formatXAF(m.montant) }}
+                  {{   m.type === 'ENTREE' ? '+' : '-'   }} {{   formatXAF(m.montant)   }}
                 </div>
               </div>
             </div>
@@ -122,20 +122,20 @@
               <div class="summary-box mb-4">
                 <div class="summary-line">
                   <span>Initial</span>
-                  <span>{{ formatXAF(activeSession.soldeInitial) }}</span>
+                  <span>{{   formatXAF(activeSession.soldeInitial)   }}</span>
                 </div>
                 <div class="summary-line">
                   <span>+ Recettes</span>
-                  <span class="text-success">{{ formatXAF(totalEntrees) }}</span>
+                  <span class="text-success">{{   formatXAF(totalEntrees)   }}</span>
                 </div>
                 <div class="summary-line">
                   <span>- Dépenses</span>
-                  <span class="text-danger">{{ formatXAF(totalSorties) }}</span>
+                  <span class="text-danger">{{   formatXAF(totalSorties)   }}</span>
                 </div>
                 <hr />
                 <div class="summary-line total">
                   <span>Solde Théorique</span>
-                  <span class="highlight">{{ formatXAF(soldeTheorique) }}</span>
+                  <span class="highlight">{{   formatXAF(soldeTheorique)   }}</span>
                 </div>
               </div>
 
@@ -152,7 +152,7 @@
               <div v-if="ecartVal !== 0" class="ecart-warning fade-in">
                 <div class="ecart-header">
                   <span>Écart constaté: </span>
-                  <span :class="ecartVal > 0 ? 'text-success' : 'text-warning'">{{ formatXAF(ecartVal) }}</span>
+                  <span :class="ecartVal > 0 ? 'text-success' : 'text-warning'">{{   formatXAF(ecartVal)   }}</span>
                 </div>
                 <textarea 
                   v-model="closingData.motifEcart" 
@@ -163,7 +163,7 @@
 
               <button @click="fermerCaisse" class="btn-danger-large mt-4" :disabled="submitting || (ecartVal !== 0 && !closingData.motifEcart)">
                 <span v-if="submitting" class="spinner-small mr-2"></span>
-                {{ submitting ? 'Calcul...' : 'Fermer la Session' }}
+                {{   submitting ? 'Calcul...' : 'Fermer la Session'   }}
               </button>
             </div>
           </div>
@@ -195,15 +195,15 @@
             </thead>
             <tbody>
               <tr v-for="sess in history" :key="sess.id">
-                <td v-if="isAdmin"><strong>{{ sess.caissierNom }}</strong></td>
-                <td>{{ formatDate(sess.dateOuverture) }}</td>
-                <td>{{ sess.dateFermeture ? formatDate(sess.dateFermeture) : 'Session en cours' }}</td>
-                <td class="font-mono">{{ formatXAF(sess.soldeInitial) }}</td>
-                <td class="font-mono">{{ sess.soldeFinalTheorique ? formatXAF(sess.soldeFinalTheorique) : '-' }}</td>
-                <td class="font-mono">{{ sess.soldeFinalReel ? formatXAF(sess.soldeFinalReel) : '-' }}</td>
+                <td v-if="isAdmin"><strong>{{   sess.caissierNom   }}</strong></td>
+                <td>{{   formatDate(sess.dateOuverture)   }}</td>
+                <td>{{   sess.dateFermeture ? formatDate(sess.dateFermeture) : 'Session en cours'   }}</td>
+                <td class="font-mono">{{   formatXAF(sess.soldeInitial)   }}</td>
+                <td class="font-mono">{{   sess.soldeFinalTheorique ? formatXAF(sess.soldeFinalTheorique) : '-'   }}</td>
+                <td class="font-mono">{{   sess.soldeFinalReel ? formatXAF(sess.soldeFinalReel) : '-'   }}</td>
                 <td>
                   <span v-if="sess.statut === 'FERMEE'" :class="sess.ecart === 0 ? 'status-pill success' : 'status-pill warning'">
-                    {{ formatXAF(sess.ecart) }}
+                    {{   formatXAF(sess.ecart)   }}
                   </span>
                   <span v-else>-</span>
                 </td>

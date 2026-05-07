@@ -87,6 +87,14 @@ const router = createRouter({
       name: 'gestion',
       component: () => import('../views/GestionView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboard',
+      redirect: '/'
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/'
     }
   ]
 })

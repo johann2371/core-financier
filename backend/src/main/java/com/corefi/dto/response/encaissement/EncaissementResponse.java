@@ -3,6 +3,7 @@ package com.corefi.dto.response.encaissement;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 public class EncaissementResponse {
@@ -18,7 +19,9 @@ public class EncaissementResponse {
     
     // Traçabilité
     private String saisiParNom;
+    private LocalDateTime dateSaisie;
     private String valideParNom;
+    private LocalDateTime dateValidation;
 
     // Frais & Compensation
     private BigDecimal fraisTransaction;

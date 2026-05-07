@@ -78,9 +78,13 @@ public class Encaissement {
     @JoinColumn(name = "saisi_par")
     private Utilisateur saisiPar;
 
+    private LocalDateTime dateSaisie;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "valide_par")
     private Utilisateur validePar;
+
+    private LocalDateTime dateValidation;
 
     private boolean rapproche = false;
     private LocalDate dateRapprochement;

@@ -276,9 +276,7 @@ const t = computed(() => langStore.t)
                   <div class="tier-avatar" :style="{ backgroundImage: item.photoUrl ? 'url(' + item.photoUrl + ')' : 'url(https://ui-avatars.com/api/?name=' + encodeURIComponent(item.raisonSociale || 'T') + '&background=random&color=fff&size=128)' }"></div>
                   <div class="tier-info-text">
                     <span class="motif-text clickable-name">{{ item.raisonSociale }}</span>
-                    <span class="text-muted" style="font-size: 0.75rem">{{
-                      item.email || item.telephone || "Pas de contact"
-                    }}</span>
+                    <span class="text-muted" style="font-size: 0.75rem">{{ item.ville || item.pays }}</span>
                   </div>
                 </div>
               </td>

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -48,6 +49,10 @@ public class Facture {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "devise_id")
     private Devise devise;
+
+    // Traçabilité
+    private LocalDateTime dateSaisie;
+    private LocalDateTime dateValidation;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cree_par")

@@ -61,7 +61,6 @@ const formatCurrencyPlain = (val) => {
   return new Intl.NumberFormat('fr-FR').format(val)
 }
 
-const authStore = useAuthStore()
 const router = useRouter()
 
 const kpis = ref({
@@ -74,8 +73,8 @@ const kpis = ref({
   totalDettesFournisseurs: 0,
   repartitionDecaissementsParCategorie: {},
   activitesRecentes: [],
-  dernierMouvement{{ t("dashboard.caisse") }}: 0,
-  dernierMouvement{{ t("dashboard.banque") }}: 0,
+  dernierMouvementCaisse: 0,
+  dernierMouvementBanque: 0,
   derniereCreanceClient: 0,
   derniereDetteFournisseur: 0,
   evolutionMensuelle: [],
@@ -109,6 +108,8 @@ const fetchKpis = async () => {
   }
 }
 
+import { onUnmounted } from 'vue'
+
 let refreshInterval = null
 
 onMounted(() => {
@@ -118,7 +119,6 @@ onMounted(() => {
   refreshInterval = setInterval(fetchKpis, 30000)
 })
 
-import { onUnmounted } from 'vue'
 onUnmounted(() => {
   if (refreshInterval) clearInterval(refreshInterval)
 })
@@ -314,16 +314,16 @@ const dsoClass = computed(() => {
 
 const dsoMessage = computed(() => {
   const v = kpis.value.dso || 0
-  if (v <= 30) return t('dashboard.dsoExcellent')
-  if (v <= 60) return t('dashboard.dsoAttention')
-  return t('dashboard.dsoCritique')
+  if (v <= 30) return t.value('dashboard.dsoExcellent')
+  if (v <= 60) return t.value('dashboard.dsoAttention')
+  return t.value('dashboard.dsoCritique')
 })
 
 const dpoMessage = computed(() => {
   const v = kpis.value.dpo || 0
-  if (v <= 15) return t('dashboard.dpoRapide')
-  if (v <= 45) return t('dashboard.dpoRaisonnable')
-  return t('dashboard.dpoEleve')
+  if (v <= 15) return t.value('dashboard.dpoRapide')
+  if (v <= 45) return t.value('dashboard.dpoRaisonnable')
+  return t.value('dashboard.dpoEleve')
 })
 
 // === RÉPARTITION DÉPENSES ===
@@ -340,48 +340,48 @@ const depPercent = (val) => {
   <MainLayout>
     <!-- ACTIONS RAPIDES -->
     <div class="dashboard-section">
-      <h3 class="section-title">{{ t("dashboard.actionsRapides") }}</h3>
+      <h3 class="section-title">{{  t("dashboard.actionsRapides")  }}</h3>
       <div class="quick-actions-grid">
         <router-link v-if="isAdmin || isComptable || authStore.userRole === 'CAISSIER'" to="/encaissements" class="action-card">
           <div class="action-icon light-blue">
             <BanknotesIcon class="w-5 h-5" />
           </div>
-          <h4>{{ t("dashboard.nouvelEncaissement") }}</h4>
+          <h4>{{  t("dashboard.nouvelEncaissement")  }}</h4>
         </router-link>
 
         <router-link v-if="isCaissier" to="/decaissements" class="action-card highlight">
           <div class="action-icon light-orange">
             <CheckCircleIcon class="w-5 h-5" />
           </div>
-          <h4>{{ t("dashboard.executerPaiement") }}</h4>
+          <h4>{{  t("dashboard.executerPaiement")  }}</h4>
         </router-link>
 
         <router-link v-if="isAdmin || isRF || isPDG" to="/decaissements" class="action-card highlight" :class="{ 'pdg-primary': isPDG }">
           <div class="action-icon light-orange">
             <CheckCircleIcon class="w-5 h-5" />
           </div>
-          <h4>{{ isPDG ? t('dashboard.signerDecaissements') : t('dashboard.validerDemandes') }}</h4>
+          <h4>{{  isPDG ? t('dashboard.signerDecaissements') : t('dashboard.validerDemandes')  }}</h4>
         </router-link>
         
         <router-link v-if="isAdmin || isComptable" to="/factures?create=VENTE" class="action-card">
           <div class="action-icon light-indigo">
             <DocumentPlusIcon class="w-5 h-5" />
           </div>
-          <h4>{{ t("dashboard.nouvelleFacture") }}</h4>
+          <h4>{{  t("dashboard.nouvelleFacture")  }}</h4>
         </router-link>
 
         <router-link v-if="isAdmin || isComptable" to="/decaissements" class="action-card">
           <div class="action-icon light-blue">
             <PlusIcon class="w-5 h-5" />
           </div>
-          <h4>{{ t("dashboard.saisirDecaissement") }}</h4>
+          <h4>{{  t("dashboard.saisirDecaissement")  }}</h4>
         </router-link>
 
         <router-link to="/tiers" class="action-card">
           <div class="action-icon light-indigo">
             <UsersIcon class="w-5 h-5" />
           </div>
-          <h4>{{ t("dashboard.consulterTiers") }}</h4>
+          <h4>{{  t("dashboard.consulterTiers")  }}</h4>
         </router-link>
       </div>
     </div>
@@ -392,44 +392,44 @@ const depPercent = (val) => {
       <div class="left-col">
         <!-- POSTE DE CAISSE (CAISSIER UNIQUEMENT) -->
         <div class="dashboard-section" v-if="isCaissier">
-          <h3 class="section-title">{{ t("dashboard.posteCaisse") }}</h3>
+          <h3 class="section-title">{{  t("dashboard.posteCaisse")  }}</h3>
           <div class="kpi-grid">
             <div class="kpi-card tresorerie-globale-card">
-              <span class="kpi-label">{{ t("dashboard.soldeDeCaisse") }}</span>
+              <span class="kpi-label">{{  t("dashboard.soldeDeCaisse")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value tresorerie-value">{{ formatCurrencyPlain(kpis.soldeTotalCaisses?) }}<span class="currency light">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
+                <span class="kpi-value tresorerie-value">{{  formatCurrencyPlain(kpis.soldeTotalCaisses)  }}<span class="currency light">{{  selectedCurrency === 'XAF' ? 'XAF' : ''  }}</span></span>
               </div>
             </div>
 
             <div class="kpi-card caissier-highlight">
-              <span class="kpi-label">{{ t("dashboard.paiementsAExecuter") }}</span>
+              <span class="kpi-label">{{  t("dashboard.paiementsAExecuter")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value" :class="{ 'urgent-gold': kpis.decaissementsAExecuter > 0 }">{{ kpis.decaissementsAExecuter }}</span>
-                <span class="kpi-trend attention" v-if="kpis.decaissementsAExecuter > 0">{{ formatCurrency(kpis.montantTotalAExecuter?) }}</span>
-                <span class="kpi-trend" v-else>{{ t("dashboard.aucunDossier") }}</span>
+                <span class="kpi-value" :class="{ 'urgent-gold': kpis.decaissementsAExecuter > 0 }">{{  kpis.decaissementsAExecuter  }}</span>
+                <span class="kpi-trend attention" v-if="kpis.decaissementsAExecuter > 0">{{  formatCurrency(kpis.montantTotalAExecuter)  }}</span>
+                <span class="kpi-trend" v-else>{{  t("dashboard.aucunDossier")  }}</span>
               </div>
               <router-link to="/decaissements" class="kpi-action-link" v-if="kpis.decaissementsAExecuter > 0">Traiter maintenant</router-link>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">{{ t("dashboard.encaisseAujourdhui") }}</span>
+              <span class="kpi-label">{{  t("dashboard.encaisseAujourdhui")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value success">{{ formatCurrencyPlain(kpis.encaissementsDuJour?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
+                <span class="kpi-value success">{{  formatCurrencyPlain(kpis.encaissementsDuJour)  }}<span class="currency">{{  selectedCurrency === 'XAF' ? 'XAF' : ''  }}</span></span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">{{ t("dashboard.decaisseAujourdhui") }}</span>
+              <span class="kpi-label">{{  t("dashboard.decaisseAujourdhui")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value danger">{{ formatCurrencyPlain(kpis.decaissementsExecutesDuJour?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
+                <span class="kpi-value danger">{{  formatCurrencyPlain(kpis.decaissementsExecutesDuJour)  }}<span class="currency">{{  selectedCurrency === 'XAF' ? 'XAF' : ''  }}</span></span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">{{ t("dashboard.operationsDuJour") }}</span>
+              <span class="kpi-label">{{  t("dashboard.operationsDuJour")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value">{{ kpis.operationsDuJour }}</span>
-                <span class="kpi-trend">{{ t("dashboard.transactionsTraitees") }}</span>
+                <span class="kpi-value">{{  kpis.operationsDuJour  }}</span>
+                <span class="kpi-trend">{{  t("dashboard.transactionsTraitees")  }}</span>
               </div>
             </div>
           </div>
@@ -437,56 +437,56 @@ const depPercent = (val) => {
 
         <!-- ÉTAT FINANCIER GLOBAL (non-CAISSIER) -->
         <div class="dashboard-section" v-if="!isCaissier">
-          <h3 class="section-title">{{ t("dashboard.etatFinancier") }}</h3>
+          <h3 class="section-title">{{  t("dashboard.etatFinancier")  }}</h3>
           <div class="kpi-grid">
             <!-- Widget Trésorerie Globale (PDG Uniquement) -->
             <div class="kpi-card tresorerie-globale-card" v-if="isPDG">
-              <span class="kpi-label">{{ t("dashboard.tresorerieGlobale") }}</span>
+              <span class="kpi-label">{{  t("dashboard.tresorerieGlobale")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value gold">{{ formatCurrencyPlain(totalTresorerie?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
+                <span class="kpi-value gold">{{  formatCurrencyPlain(totalTresorerie)  }}<span class="currency">{{  selectedCurrency === 'XAF' ? 'XAF' : ''  }}</span></span>
                 <div class="tresorerie-split">
-                  <span class="split-item">{{ t("dashboard.caisse") }}: {{ kpis.soldeTotalCaisses?.toLocaleString() }}</span>
-                  <span class="split-item">{{ t("dashboard.banque") }}: {{ kpis.soldeTotalBanques?.toLocaleString() }}</span>
+                  <span class="split-item">{{  t("dashboard.caisse")  }}: {{  kpis.soldeTotalCaisses?.toLocaleString()  }}</span>
+                  <span class="split-item">{{  t("dashboard.banque")  }}: {{  kpis.soldeTotalBanques?.toLocaleString()  }}</span>
                 </div>
               </div>
             </div>
 
             <div class="kpi-card" v-if="!isPDG">
-              <span class="kpi-label">{{ t("dashboard.soldeCaisses") }}</span>
+              <span class="kpi-label">{{  t("dashboard.soldeCaisses")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value">{{ formatCurrencyPlain(kpis.soldeTotalCaisses?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
+                <span class="kpi-value">{{  formatCurrencyPlain(kpis.soldeTotalCaisses)  }}<span class="currency">{{  selectedCurrency === 'XAF' ? 'XAF' : ''  }}</span></span>
                 <span v-if="kpis.dernierMouvementCaisse" class="kpi-trend" :class="kpis.dernierMouvementCaisse >= 0 ? 'positive' : 'negative'">
-                  {{ formatCurrency(kpis.dernierMouvementCaisse >= 0 ? '+' : '' }} {{ kpis.dernierMouvementCaisse) }}
+                  {{ kpis.dernierMouvementCaisse >= 0 ? '+' : '' }}{{ formatCurrency(kpis.dernierMouvementCaisse) }}
                 </span>
               </div>
             </div>
 
             <div class="kpi-card" v-if="!isPDG">
-              <span class="kpi-label">{{ t("dashboard.soldeBanques") }}</span>
+              <span class="kpi-label">{{  t("dashboard.soldeBanques")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value">{{ formatCurrencyPlain(kpis.soldeTotalBanques?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
+                <span class="kpi-value">{{  formatCurrencyPlain(kpis.soldeTotalBanques)  }}<span class="currency">{{  selectedCurrency === 'XAF' ? 'XAF' : ''  }}</span></span>
                 <span v-if="kpis.dernierMouvementBanque" class="kpi-trend" :class="kpis.dernierMouvementBanque >= 0 ? 'positive' : 'negative'">
-                  {{ formatCurrency(kpis.dernierMouvementBanque >= 0 ? '+' : '' }} {{ kpis.dernierMouvementBanque) }}
+                  {{ kpis.dernierMouvementBanque >= 0 ? '+' : '' }}{{ formatCurrency(kpis.dernierMouvementBanque) }}
                 </span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">{{ t("dashboard.creancesClients") }}</span>
+              <span class="kpi-label">{{  t("dashboard.creancesClients")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value success">{{ formatCurrencyPlain(kpis.totalCreancesClients?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
+                <span class="kpi-value success">{{  formatCurrencyPlain(kpis.totalCreancesClients)  }}<span class="currency">{{  selectedCurrency === 'XAF' ? 'XAF' : ''  }}</span></span>
                 <span v-if="kpis.derniereCreanceClient" class="kpi-trend" :class="kpis.derniereCreanceClient >= 0 ? 'positive' : 'negative'">
-                  {{ formatCurrency(kpis.derniereCreanceClient >= 0 ? '+' : '' }} {{ kpis.derniereCreanceClient) }}
+                  {{ kpis.derniereCreanceClient >= 0 ? '+' : '' }}{{ formatCurrency(kpis.derniereCreanceClient) }}
                 </span>
               </div>
             </div>
 
             <div class="kpi-card">
-              <span class="kpi-label">{{ t("dashboard.dettesFournisseurs") }}</span>
+              <span class="kpi-label">{{  t("dashboard.dettesFournisseurs")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value danger">{{ formatCurrencyPlain(kpis.totalDettesFournisseurs?) }}<span class="currency">{{ selectedCurrency === \'XAF\' ? \'XAF\' : \'\' }}</span></span>
+                <span class="kpi-value danger">{{  formatCurrencyPlain(kpis.totalDettesFournisseurs)  }}<span class="currency">{{  selectedCurrency === 'XAF' ? 'XAF' : ''  }}</span></span>
                 <span v-if="kpis.derniereDetteFournisseur" class="kpi-trend" :class="kpis.derniereDetteFournisseur >= 0 ? 'negative' : 'positive'">
-                   {{ formatCurrency(kpis.derniereDetteFournisseur > 0 ? '+' : '' }} {{ kpis.derniereDetteFournisseur) }}
+                   {{ kpis.derniereDetteFournisseur > 0 ? '+' : '' }}{{ formatCurrency(kpis.derniereDetteFournisseur) }}
                 </span>
               </div>
             </div>
@@ -495,34 +495,34 @@ const depPercent = (val) => {
               <span class="kpi-label">Pipeline de Validation</span>
               <div class="pipeline-display">
                 <div class="pipeline-step">
-                  <span class="step-count">{{ kpis.decaissementsEnAttenteRF }}</span>
-                  <span class="step-label">{{ t("dashboard.attenteRF") }}</span>
+                  <span class="step-count">{{  kpis.decaissementsEnAttenteRF  }}</span>
+                  <span class="step-label">{{  t("dashboard.attenteRF")  }}</span>
                 </div>
                 <div class="pipeline-arrow">
                   <ChevronRightIcon class="w-4 h-4" />
                 </div>
                 <div class="pipeline-step">
-                  <span class="step-count">{{ kpis.decaissementsEnAttentePDG }}</span>
-                  <span class="step-label">{{ t("dashboard.attentePDG") }}</span>
+                  <span class="step-count">{{  kpis.decaissementsEnAttentePDG  }}</span>
+                  <span class="step-label">{{  t("dashboard.attentePDG")  }}</span>
                 </div>
               </div>
               <router-link to="/decaissements" class="kpi-action-link">Gérer le flux</router-link>
             </div>
 
             <div class="kpi-card highlight-card pdg-alert-card" v-if="isPDG">
-              <span class="kpi-label">{{ t("dashboard.approbationPDG") }}</span>
+              <span class="kpi-label">{{  t("dashboard.approbationPDG")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value" :class="{ 'urgent-gold': kpis.decaissementsEnAttentePDG > 0 }">{{ kpis.decaissementsEnAttentePDG }}</span>
-                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttentePDG > 0">{{ t("dashboard.signatureAttendue") }}</span>
+                <span class="kpi-value" :class="{ 'urgent-gold': kpis.decaissementsEnAttentePDG > 0 }">{{  kpis.decaissementsEnAttentePDG  }}</span>
+                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttentePDG > 0">{{  t("dashboard.signatureAttendue")  }}</span>
               </div>
               <router-link to="/decaissements" class="kpi-action-link">Ouvrir le parapheur</router-link>
             </div>
 
             <div class="kpi-card" v-if="!isRF && !isPDG">
-              <span class="kpi-label">{{ t("dashboard.decaissementsEnAttente") }}</span>
+              <span class="kpi-label">{{  t("dashboard.decaissementsEnAttente")  }}</span>
               <div class="kpi-body">
-                <span class="kpi-value" :class="{ 'warning': kpis.decaissementsEnAttente > 0 }">{{ kpis.decaissementsEnAttente }}</span>
-                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttente > 0">{{ t("dashboard.actionRequise") }}</span>
+                <span class="kpi-value" :class="{ 'warning': kpis.decaissementsEnAttente > 0 }">{{  kpis.decaissementsEnAttente  }}</span>
+                <span class="kpi-trend attention" v-if="kpis.decaissementsEnAttente > 0">{{  t("dashboard.actionRequise")  }}</span>
               </div>
             </div>
           </div>
@@ -530,7 +530,7 @@ const depPercent = (val) => {
 
         <!-- PILOTAGE STRATÉGIQUE (PDG UNIQUEMENT) -->
         <div class="dashboard-section" v-if="isPDG">
-          <h3 class="section-title">{{ t("dashboard.pilotageStrategique") }}</h3>
+          <h3 class="section-title">{{  t("dashboard.pilotageStrategique")  }}</h3>
           <div class="strategic-grid">
             <!-- Graphique de Flux -->
             <div class="strategic-card flux-chart-card">
@@ -538,7 +538,7 @@ const depPercent = (val) => {
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <div>
                     <h4>Flux de Trésorerie Mensuel</h4>
-                    <span class="card-subtitle">Évolution des encaissements et décaissements sur 3 {{ t("dashboard.mois") }}</span>
+                    <span class="card-subtitle">Évolution des encaissements et décaissements sur 3 {{  t("dashboard.mois")  }}</span>
                   </div>
                   <div class="chart-legend-custom" style="display: flex; gap: 1rem; font-size: 0.8rem; font-weight: 600;">
                     <div style="display: flex; align-items: center; gap: 6px;">
@@ -562,8 +562,8 @@ const depPercent = (val) => {
                 <div class="suppliers-list">
                   <div v-for="sup in kpis.topFournisseurs" :key="sup.nom" class="supplier-row">
                     <div class="sup-info">
-                      <span class="sup-name">{{ sup.nom }}</span>
-                      <span class="sup-amount">{{ formatCurrency(sup.total) }}</span>
+                      <span class="sup-name">{{  sup.nom  }}</span>
+                      <span class="sup-amount">{{  formatCurrency(sup.total)  }}</span>
                     </div>
                     <div class="sup-progress">
                       <div class="sup-bar" :style="{ width: (sup.total / (kpis.topFournisseurs[0]?.total || 1) * 100) + '%' }"></div>
@@ -579,14 +579,14 @@ const depPercent = (val) => {
                 </div>
                 <div class="burn-body">
                   <div class="burn-item">
-                    <span class="burn-label">{{ t("dashboard.depensesMoyennes") }}</span>
-                    <span class="burn-value">{{ kpis.burnRateMensuel?.toLocaleString() }} <span class="unit">{{ selectedCurrency === 'XAF' ? 'XAF' : 'USD' }} / {{ t("dashboard.mois") }}</span></span>
+                    <span class="burn-label">{{  t("dashboard.depensesMoyennes")  }}</span>
+                    <span class="burn-value">{{  kpis.burnRateMensuel?.toLocaleString()  }} <span class="unit">{{  selectedCurrency === 'XAF' ? 'XAF' : 'USD'  }} / {{  t("dashboard.mois")  }}</span></span>
                   </div>
                   <div class="divider"></div>
                   <div class="burn-item runway-item">
                     <div class="threshold-info">
-                      <span class="burn-label">{{ t("dashboard.runway") }}</span>
-                      <span class="threshold-value">{{ runwayMois }} <span class="unit">mois</span></span>
+                      <span class="burn-label">{{  t("dashboard.runway")  }}</span>
+                      <span class="threshold-value">{{  runwayMois  }} <span class="unit">mois</span></span>
                     </div>
                   </div>
                 </div>
@@ -597,12 +597,12 @@ const depPercent = (val) => {
 
         <!-- RÉPARTITION DU BUDGET (Uniquement pour RF/ADMIN) -->
         <div class="dashboard-section" v-if="isRF && sortedCategories.length > 0">
-          <h3 class="section-title">{{ t("dashboard.repartitionBudget") }}</h3>
+          <h3 class="section-title">{{  t("dashboard.repartitionBudget")  }}</h3>
           <div class="budget-chart-container">
             <div v-for="cat in sortedCategories" :key="cat.key" class="budget-row">
               <div class="budget-row-header">
-                <span class="cat-label">{{ cat.label }}</span>
-                <span class="cat-amount">{{ formatCurrency(cat.value) }}</span>
+                <span class="cat-label">{{  cat.label  }}</span>
+                <span class="cat-amount">{{  formatCurrency(cat.value)  }}</span>
               </div>
               <div class="budget-progress-bg">
                 <div class="budget-progress-fill" :style="{ width: (cat.value / totalBudget * 100) + '%' }"></div>
@@ -613,7 +613,7 @@ const depPercent = (val) => {
 
         <!-- INDICATEURS STRATÉGIQUES (PDG + RF) -->
         <div class="dashboard-section" v-if="isPDG || isRF">
-          <h3 class="section-title">{{ t("dashboard.indicateursStrategiques") }}</h3>
+          <h3 class="section-title">{{  t("dashboard.indicateursStrategiques")  }}</h3>
           <div class="strategic-indicators-grid">
             <!-- Prévision Trésorerie 30j -->
             <div class="strategic-ind-card forecast-card">
@@ -629,18 +629,18 @@ const depPercent = (val) => {
                   </div>
                 </div>
                 <span class="ind-badge" :class="forecastTrend >= 0 ? 'badge-green' : 'badge-red'">
-                  {{ formatCurrency(forecastTrend >= 0 ? '↑' : '↓' }} {{ Math.abs(forecastTrend)?) }}
+                  {{ forecastTrend >= 0 ? '↑' : '↓' }} {{ formatCurrency(Math.abs(forecastTrend)) }}
                 </span>
               </div>
               <div class="forecast-points">
                 <div v-for="pt in (kpis.pointsPrevisionnels || [])" :key="pt.date" class="forecast-point">
-                  <span class="fp-date">{{ pt.date }}</span>
-                  <span class="fp-value">{{ formatCurrency(pt.solde?) }}</span>
+                  <span class="fp-date">{{  pt.date  }}</span>
+                  <span class="fp-value">{{  formatCurrency(pt.solde)  }}</span>
                 </div>
                 <div v-if="!kpis.pointsPrevisionnels?.length" class="empty-mini">Aucune projection disponible</div>
               </div>
               <div class="forecast-summary" v-if="kpis.soldePrevisionnel30j">
-                <strong>{{ t("dashboard.soldeEstime") }}{{ formatCurrency(forecastPeriod }} :</strong> {{ kpis.soldePrevisionnel30j?) }}
+                <strong>{{ t("dashboard.soldeEstime") }} ({{ forecastPeriod }}j) :</strong> {{ formatCurrency(kpis.soldePrevisionnel30j) }}
               </div>
             </div>
 
@@ -650,25 +650,25 @@ const depPercent = (val) => {
                 <div class="dso-block">
                   <div class="dso-head">
                     <span class="dso-title" title="DSO = (Délai d'encaissement moyen des clients)">DSO</span>
-                    <span class="dso-sub">{{ t("dashboard.delaiClients") }}</span>
+                    <span class="dso-sub">{{  t("dashboard.delaiClients")  }}</span>
                   </div>
-                  <div class="dso-big">{{ kpis.dso || 0 }} <span>jours</span></div>
+                  <div class="dso-big">{{  kpis.dso || 0  }} <span>jours</span></div>
                   <div class="dso-bar-mini">
                     <div class="dso-fill-mini" :class="dsoClass" :style="{ width: Math.min(kpis.dso || 0, 90) / 90 * 100 + '%' }"></div>
                   </div>
-                  <div class="dso-msg">{{ dsoMessage }}</div>
+                  <div class="dso-msg">{{  dsoMessage  }}</div>
                 </div>
                 <div class="dso-divider"></div>
                 <div class="dso-block">
                   <div class="dso-head">
                     <span class="dso-title" title="DPO = (Délai d'exécution moyen des fournisseurs)">DPO</span>
-                    <span class="dso-sub">{{ t("dashboard.delaiFournisseurs") }}</span>
+                    <span class="dso-sub">{{  t("dashboard.delaiFournisseurs")  }}</span>
                   </div>
-                  <div class="dso-big">{{ kpis.dpo || 0 }} <span>jours</span></div>
+                  <div class="dso-big">{{  kpis.dpo || 0  }} <span>jours</span></div>
                   <div class="dso-bar-mini">
                     <div class="dso-fill-mini dpo-color" :style="{ width: Math.min(kpis.dpo || 0, 90) / 90 * 100 + '%' }"></div>
                   </div>
-                  <div class="dso-msg">{{ dpoMessage }}</div>
+                  <div class="dso-msg">{{  dpoMessage  }}</div>
                 </div>
               </div>
             </div>
@@ -677,11 +677,11 @@ const depPercent = (val) => {
             <div class="strategic-ind-card" v-if="Object.keys(kpis.repartitionDepensesParCategorie || {}).length > 0">
               <h4 style="margin-bottom: 1rem;">Dépenses du mois par catégorie</h4>
               <div v-for="(val, cat) in kpis.repartitionDepensesParCategorie" :key="cat" class="dep-row-db">
-                <span class="dep-cat-db">{{ cat }}</span>
+                <span class="dep-cat-db">{{  cat  }}</span>
                 <div class="dep-track-db">
                   <div class="dep-fill-db" :style="{ width: depPercent(val) + '%' }"></div>
                 </div>
-                <span class="dep-val-db">{{ formatCurrency(val?) }}</span>
+                <span class="dep-val-db">{{  formatCurrency(val)  }}</span>
               </div>
             </div>
           </div>
@@ -690,56 +690,56 @@ const depPercent = (val) => {
         <!-- A FAIRE AUJOURD'HUI -->
         <div class="dashboard-section">
           <div class="section-header-row">
-            <h3 class="section-title">{{ t("dashboard.aFaireAujourdhui") }}</h3>
-            <a href="#" class="view-all-link">{{ t("dashboard.voirTaches") }}</a>
+            <h3 class="section-title">{{  t("dashboard.aFaireAujourdhui")  }}</h3>
+            <a href="#" class="view-all-link">{{  t("dashboard.voirTaches")  }}</a>
           </div>
           
           <div class="table-container">
             <table class="tasks-table">
               <thead>
                 <tr>
-                  <th>{{ t("dashboard.priorite") }}</th>
-                  <th>{{ t("dashboard.element") }}</th>
-                  <th>{{ t("dashboard.montant") }}</th>
-                  <th>{{ t("dashboard.action") }}</th>
+                  <th>{{  t("dashboard.priorite")  }}</th>
+                  <th>{{  t("dashboard.element")  }}</th>
+                  <th>{{  t("dashboard.montant")  }}</th>
+                  <th>{{  t("dashboard.action")  }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="kpis.decaissementsEnAttenteRF > 0 && isRF">
-                  <td><span class="badge badge-urgent">{{ t("dashboard.critique") }}</span></td>
+                  <td><span class="badge badge-urgent">{{  t("dashboard.critique")  }}</span></td>
                   <td>
                     <div class="task-info">
-                      <strong>{{ kpis.decaissementsEnAttenteRF }} dossiers à VOTRE validation</strong>
+                      <strong>{{  kpis.decaissementsEnAttenteRF  }} dossiers à VOTRE validation</strong>
                       <span>Délai moyen constaté : 2h</span>
                     </div>
                   </td>
                   <td class="task-amount">--</td>
-                  <td><router-link to="/decaissements" class="task-action highlight">{{ t("dashboard.valider") }}</router-link></td>
+                  <td><router-link to="/decaissements" class="task-action highlight">{{  t("dashboard.valider")  }}</router-link></td>
                 </tr>
                 <tr v-if="kpis.decaissementsEnAttentePDG > 0 && isPDG">
-                  <td><span class="badge badge-urgent">{{ t("dashboard.direction") }}</span></td>
+                  <td><span class="badge badge-urgent">{{  t("dashboard.direction")  }}</span></td>
                   <td>
                     <div class="task-info">
-                      <strong>{{ kpis.decaissementsEnAttentePDG }} dossier(s) en attente de signature</strong>
+                      <strong>{{  kpis.decaissementsEnAttentePDG  }} dossier(s) en attente de signature</strong>
                       <span>Seuil de validation PDG atteint</span>
                     </div>
                   </td>
                   <td class="task-amount">--</td>
-                  <td><router-link to="/decaissements" class="task-action highlight gold-btn">{{ t("dashboard.signer") }}</router-link></td>
+                  <td><router-link to="/decaissements" class="task-action highlight gold-btn">{{  t("dashboard.signer")  }}</router-link></td>
                 </tr>
                 <tr v-if="kpis.decaissementsEnAttente > 0 && !isRF && !isPDG">
-                  <td><span class="badge badge-urgent">{{ t("dashboard.urgent") }}</span></td>
+                  <td><span class="badge badge-urgent">{{  t("dashboard.urgent")  }}</span></td>
                   <td>
                     <div class="task-info">
-                      <strong>{{ kpis.decaissementsEnAttente }} décaissement(s) en attente</strong>
+                      <strong>{{  kpis.decaissementsEnAttente  }} décaissement(s) en attente</strong>
                       <span>Plusieurs demandes en attente de traitement</span>
                     </div>
                   </td>
                   <td class="task-amount">--</td>
-                  <td><router-link to="/decaissements" class="task-action">{{ t("dashboard.voir") }}</router-link></td>
+                  <td><router-link to="/decaissements" class="task-action">{{  t("dashboard.voir")  }}</router-link></td>
                 </tr>
                 <tr>
-                  <td><span class="badge badge-normal">{{ t("dashboard.normale") }}</span></td>
+                  <td><span class="badge badge-normal">{{  t("dashboard.normale")  }}</span></td>
                   <td>
                     <div class="task-info">
                       <strong>Rapprochement bancaire</strong>
@@ -760,7 +760,7 @@ const depPercent = (val) => {
         <!-- ACTIVITÉ RÉCENTE -->
         <div class="dashboard-section right-panel">
           <div class="section-header-row">
-            <h3 class="section-title">{{ t("dashboard.activiteRecente") }}</h3>
+            <h3 class="section-title">{{  t("dashboard.activiteRecente")  }}</h3>
             <button @click="fetchKpis" class="refresh-btn" :class="{ 'spinning': loading }" title="Rafraîchir">
                <ArrowPathIcon class="w-4 h-4" />
             </button>
@@ -774,25 +774,25 @@ const depPercent = (val) => {
                 <ClockIcon v-else class="w-3 h-3" />
               </div>
               <div class="timeline-content">
-                <h4>{{ act.action === 'CREATE' ? 'Création' : act.action }} {{ act.type.toLowerCase() }}</h4>
-                <p>{{ act.message }}</p>
+                <h4>{{  act.action === 'CREATE' ? 'Création' : act.action  }} {{  act.type.toLowerCase()  }}</h4>
+                <p>{{  act.message  }}</p>
                 <div class="timeline-meta">
-                  <span class="user">{{ act.utilisateur }}</span>
-                  <span class="time">{{ formatDateLabel(act.date) }} • {{ formatTime(act.date) }}</span>
+                  <span class="user">{{  act.utilisateur  }}</span>
+                  <span class="time">{{  formatDateLabel(act.date)  }} • {{  formatTime(act.date)  }}</span>
                 </div>
               </div>
             </div>
           </div>
           <div class="empty-activity" v-else>
-            <p>{{ t("dashboard.aucuneActivite") }}</p>
+            <p>{{  t("dashboard.aucuneActivite")  }}</p>
           </div>
         </div>
 
         <!-- SCORE D'EFFICACITE -->
         <div class="dashboard-section right-panel score-panel">
-          <h3 class="section-title">{{ t("dashboard.scoreEfficacite") }}</h3>
+          <h3 class="section-title">{{  t("dashboard.scoreEfficacite")  }}</h3>
           <div class="score-header">
-            <span class="score-label">{{ t("dashboard.vitesseTraitement") }}</span>
+            <span class="score-label">{{  t("dashboard.vitesseTraitement")  }}</span>
             <span class="score-percent">94%</span>
           </div>
           <div class="progress-bar-bg">
@@ -805,7 +805,7 @@ const depPercent = (val) => {
             </div>
             <div class="stat-col">
               <strong>0.02%</strong>
-              <span>{{ t("dashboard.tauxErreur") }}</span>
+              <span>{{  t("dashboard.tauxErreur")  }}</span>
             </div>
           </div>
         </div>
@@ -829,9 +829,9 @@ const depPercent = (val) => {
           </div>
         </div>
         <div class="modal-footer">
-          <button @click="showSeuilModal = false" class="btn-secondary">{{ t("common.annuler") }}</button>
+          <button @click="showSeuilModal = false" class="btn-secondary">{{  t("common.annuler")  }}</button>
           <button @click="updateSeuil" class="btn-primary gold-btn" :disabled="updatingSeuil">
-            {{ updatingSeuil ? 'Confirmer' : 'Enregistrer' }}
+            {{  updatingSeuil ? 'Confirmer' : 'Enregistrer'  }}
           </button>
         </div>
       </div>
@@ -1086,20 +1086,19 @@ const depPercent = (val) => {
 }
 
 .kpi-card {
-  background: white;
+  background: var(--c-surface);
   border-radius: 12px;
-  padding: 1.25rem;
+  padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   border: 1px solid #f3f4f6;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
 }
 
 .kpi-label {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #6b7280;
+  color: #64748b;
   margin-bottom: 0.75rem;
 }
 
@@ -1112,7 +1111,7 @@ const depPercent = (val) => {
 .kpi-value {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--c-text);
   letter-spacing: -0.025em;
 }
 
@@ -1157,7 +1156,7 @@ const depPercent = (val) => {
 .view-all-link:hover { text-decoration: underline; }
 
 .table-container {
-  background: white;
+  background: var(--c-surface);
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   border: 1px solid #f3f4f6;
@@ -1674,4 +1673,47 @@ const depPercent = (val) => {
   .dso-dpo-pair { flex-direction: column; }
   .dso-divider { width: 100%; height: 1px; }
 }
+/* DARK MODE OVERRIDES */
+body.dark-mode .section-title { color: #ffffff; }
+body.dark-mode .kpi-card,
+body.dark-mode .table-container,
+body.dark-mode .right-panel,
+body.dark-mode .strategic-card,
+body.dark-mode .strategic-ind-card {
+  background: #151b2d;
+  border-color: #1e293b;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .kpi-label { color: #94a3b8; }
+body.dark-mode .kpi-value { color: #ffffff; }
+body.dark-mode .tasks-table th { background: #0b0f1a; color: #94a3b8; border-color: #1e293b; }
+body.dark-mode .tasks-table td { border-color: #1e293b; }
+body.dark-mode .task-info strong { color: #f1f5f9; }
+body.dark-mode .task-amount { color: #f1f5f9; }
+body.dark-mode .timeline-content h4 { color: #f1f5f9; }
+body.dark-mode .timeline-content p { color: #94a3b8; }
+body.dark-mode .timeline-meta .user { color: #cbd5e1; }
+body.dark-mode .score-label { color: #f1f5f9; }
+body.dark-mode .stat-col strong { color: #f1f5f9; }
+body.dark-mode .strategic-card h4,
+body.dark-mode .strategic-ind-card h4 { color: #f1f5f9; }
+body.dark-mode .card-subtitle { color: #64748b; }
+body.dark-mode .sup-name { color: #cbd5e1; }
+body.dark-mode .sup-amount { color: #f1f5f9; }
+body.dark-mode .sup-progress { background: #0b0f1a; }
+body.dark-mode .divider { background: #1e293b; }
+body.dark-mode .forecast-point { background: #0b0f1a; }
+body.dark-mode .fp-value { color: #f1f5f9; }
+body.dark-mode .forecast-summary { background: rgba(59, 130, 246, 0.1); border-color: #1e3a8a; color: #93c5fd; }
+body.dark-mode .forecast-select { background: #0b0f1a; border-color: #1e293b; color: #cbd5e1; }
+body.dark-mode .dso-title { color: #f1f5f9; }
+body.dark-mode .dso-big { color: #f1f5f9; }
+body.dark-mode .dso-bar-mini { background: #0b0f1a; }
+body.dark-mode .dep-cat-db { color: #94a3b8; }
+body.dark-mode .dep-track-db { background: #0b0f1a; }
+body.dark-mode .dep-val-db { color: #f1f5f9; }
+body.dark-mode .action-card { background: #151b2d; border-color: #1e293b; }
+body.dark-mode .action-card h4 { color: #f1f5f9; }
+body.dark-mode .action-card:hover { border-color: #3b82f6; background: #1e293b; }
 </style>

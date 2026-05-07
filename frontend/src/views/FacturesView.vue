@@ -252,11 +252,22 @@ const submitForm = async () => {
     formError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Erreur lors de la création de la facture.'
   }
 }
+const formatFullDate = (dateStr) => {
+  if (!dateStr) return 'Date inconnue'
+  const date = new Date(dateStr)
+  return date.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 </script>
 
 <template>
   <MainLayout>
-    <template #title>{{ t("factures.titre") }}</template>
+    <template #title>{{   t("factures.titre")   }}</template>
 
     <template #actions>
       <button class="icon-btn show-on-mobile" @click="showMobileFilters = !showMobileFilters" title="Filtrer">
@@ -277,9 +288,9 @@ const submitForm = async () => {
 
     <!-- Navigation par Onglets -->
     <div v-if="authStore.userRole !== 'CAISSIER'" class="tabs-nav" :class="{ 'mobile-collapsed': !showMobileFilters }">
-      <button class="tab-btn" :class="{ active: activeTab === 'TOUS' }" @click="setTab('TOUS')">Toutes ({{ store.factures.length }})</button>
-      <button class="tab-btn" :class="{ active: activeTab === 'VENTE' }" @click="setTab('VENTE')">Ventes ({{ store.ventes.length }})</button>
-      <button class="tab-btn" :class="{ active: activeTab === 'ACHAT' }" @click="setTab('ACHAT')">Achats ({{ store.achats.length }})</button>
+      <button class="tab-btn" :class="{ active: activeTab === 'TOUS' }" @click="setTab('TOUS')">Toutes ({{   store.factures.length   }})</button>
+      <button class="tab-btn" :class="{ active: activeTab === 'VENTE' }" @click="setTab('VENTE')">Ventes ({{   store.ventes.length   }})</button>
+      <button class="tab-btn" :class="{ active: activeTab === 'ACHAT' }" @click="setTab('ACHAT')">Achats ({{   store.achats.length   }})</button>
     </div>
 
     <!-- Barre de Filtres -->
@@ -294,7 +305,7 @@ const submitForm = async () => {
       <div class="filter-group">
         <select v-model="filters.tiersId" class="filter-input-std">
           <option value="">Tous les tiers</option>
-          <option v-for="t in tierStore.tiers" :key="t.id" :value="t.id">{{ t.raisonSociale }}</option>
+          <option v-for="t in tierStore.tiers" :key="t.id" :value="t.id">{{   t.raisonSociale   }}</option>
         </select>
       </div>
 
@@ -324,7 +335,7 @@ const submitForm = async () => {
       <div v-if="store.loading && store.factures.length === 0" class="loading-state">Chargement...</div>
       
       <div v-else-if="store.error" class="error-state">
-        {{ store.error }}
+        {{   store.error   }}
         <button @click="store.fetchFactures" class="btn-outline">Réessayer</button>
       </div>
 
@@ -348,34 +359,69 @@ const submitForm = async () => {
             </tr>
             
             <tr v-for="item in paginatedList" :key="item.id">
-              <td class="font-semibold text-dark">{{ item.numero }}</td>
+              <td class="font-semibold text-dark">{{   item.numero   }}</td>
               <td>
                 <span class="badge" :class="item.type === 'VENTE' ? 'badge-vente' : 'badge-achat'">
-                  {{ item.type }}
+                  {{   item.type   }}
                 </span>
               </td>
               <td>
                 <div class="motif-cell">
-                  <span class="motif-text">{{ item.tiersNom || 'Inconnu' }}</span>
+                  <span class="motif-text">{{   item.tiersNom || 'Inconnu'   }}</span>
                 </div>
               </td>
-              <td>{{ item.dateFacture ? new Date(item.dateFacture).toLocaleDateString() : 'Non définie' }}</td>
+              <td>{{   item.dateFacture ? new Date(item.dateFacture).toLocaleDateString() : 'Non définie'   }}</td>
               <td>
                 <span class="badge" :class="{
                   'badge-attente': item.statut === 'EN_ATTENTE_PAIEMENT' || item.statut === 'VALIDEE',
                   'badge-paye': item.statut === 'SOLDEE',
                   'badge-partiel': item.statut === 'PARTIELLEMENT_PAYEE'
                 }">
-                  {{ (item.statut === 'VALIDEE' ? 'EN ATTENTE PAIEMENT' : item.statut).replace(/_/g, ' ') }}
+                  {{   (item.statut === 'VALIDEE' ? 'EN ATTENTE PAIEMENT' : item.statut).replace(/_/g, ' ')   }}
                 </span>
               </td>
-              <td class="text-xs">
-                <div class="cell-stack">
-                  <span v-if="item.creeParNom" class="text-muted" title="Créé par">C: {{ item.creeParNom }}</span>
-                  <span v-if="item.valideParNom" class="text-blue-600" title="Validé par">V: {{ item.valideParNom }}</span>
+              <td>
+                <div class="operator-pills">
+                  <!-- Pill Saisie -->
+                  <div class="op-pill-wrapper">
+                    <span class="op-pill-mini blue">
+                      <span class="op-label">Saisie par</span>
+                      <span class="op-name">{{ item.creeParNom || 'Système' }}</span>
+                    </span>
+                    <div class="op-tooltip">
+                      <div class="tooltip-header">Détails de Saisie</div>
+                      <div class="tooltip-row">
+                        <span class="t-label">Opérateur :</span>
+                        <span class="t-value">{{ item.creeParNom }}</span>
+                      </div>
+                      <div class="tooltip-row">
+                        <span class="t-label">Date/Heure :</span>
+                        <span class="t-value">{{ formatFullDate(item.dateSaisie) }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Pill Validation -->
+                  <div v-if="item.valideParNom" class="op-pill-wrapper">
+                    <span class="op-pill-mini green">
+                      <span class="op-label">Validé par</span>
+                      <span class="op-name">{{ item.valideParNom }}</span>
+                    </span>
+                    <div class="op-tooltip">
+                      <div class="tooltip-header">Détails de Validation</div>
+                      <div class="tooltip-row">
+                        <span class="t-label">Validateur :</span>
+                        <span class="t-value">{{ item.valideParNom }}</span>
+                      </div>
+                      <div class="tooltip-row">
+                        <span class="t-label">Date/Heure :</span>
+                        <span class="t-value">{{ formatFullDate(item.dateValidation) }}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </td>
-              <td class="text-right font-semibold text-dark">{{ item.montantTtc?.toLocaleString() || '0' }}</td>
+              <td class="text-right font-semibold text-dark">{{   item.montantTtc?.toLocaleString() || '0'   }}</td>
               <td class="text-center">
                   <div class="actions-cell">
                     <button v-if="item.statut !== 'SOLDEE' && item.type === 'VENTE'" class="icon-btn" @click="router.push({ path: '/encaissements', query: { invoiceId: item.id, clientId: item.tiersId, amount: item.resteAPayer || item.montantTtc, numero: item.numero } })" title="Enregistrer le paiement" style="color: #16a34a; background: #dcfce7;">
@@ -394,8 +440,8 @@ const submitForm = async () => {
         </table>
       </div>
       <div v-if="filteredFactures.length > 0" class="table-footer-info">
-        Affichage de {{ paginatedList.length }} sur {{ filteredFactures.length }} facture(s) 
-        <span v-if="activeTab !== 'TOUS'"> (Filtre: {{ activeTab }})</span>
+        Affichage de {{   paginatedList.length   }} sur {{   filteredFactures.length   }} facture(s) 
+        <span v-if="activeTab !== 'TOUS'"> (Filtre: {{   activeTab   }})</span>
       </div>
     </div>
 
@@ -436,7 +482,7 @@ const submitForm = async () => {
           <!-- Bandeau d'erreur métier -->
           <div v-if="formError" class="form-error-banner">
             <ExclamationTriangleIcon class="w-5 h-5" />
-            <span>{{ formError }}</span>
+            <span>{{   formError   }}</span>
             <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
           </div>
 
@@ -449,10 +495,10 @@ const submitForm = async () => {
                </select>
             </div>
             <div class="form-group half input-with-icon">
-               <label class="hide-on-mobile">{{ form.type === 'VENTE' ? 'Client Associé' : 'Fournisseur Associé' }} <span class="req">*</span></label>
+               <label class="hide-on-mobile">{{   form.type === 'VENTE' ? 'Client Associé' : 'Fournisseur Associé'   }} <span class="req">*</span></label>
                <select v-model="form.tiersId" required class="input-std">
-                 <option value="" disabled>{{ form.type === 'VENTE' ? 'Sélectionner un Client...' : 'Sélectionner un Fournisseur...' }}</option>
-                 <option v-for="t in tiersDisponibles" :key="t.id" :value="t.id">{{ t.raisonSociale }}</option>
+                 <option value="" disabled>{{   form.type === 'VENTE' ? 'Sélectionner un Client...' : 'Sélectionner un Fournisseur...'   }}</option>
+                 <option v-for="t in tiersDisponibles" :key="t.id" :value="t.id">{{   t.raisonSociale   }}</option>
                </select>
             </div>
           </div>
@@ -479,7 +525,7 @@ const submitForm = async () => {
                  <input v-model.number="ligne.prixUnitaire" type="number" required min="0" step="25" class="input-std text-right" placeholder="Prix Unitaire (XAF)" />
                </div>
                <div class="line-col total-col v-center hide-on-mobile">
-                 <span class="font-semibold text-dark">{{ (ligne.quantite * ligne.prixUnitaire).toLocaleString() }}</span>
+                 <span class="font-semibold text-dark">{{   (ligne.quantite * ligne.prixUnitaire).toLocaleString()   }}</span>
                </div>
                 <div class="line-col act-col v-center">
                   <button type="button" class="icon-btn-danger" @click="removeLigne(index)" :disabled="form.lignes.length === 1">
@@ -496,17 +542,17 @@ const submitForm = async () => {
 
           <!-- Totalisation -->
           <div class="totaux-card mt-3">
-             <div class="tot-row"><span>Total HT</span> <span>{{ totalHT.toLocaleString() }} XAF</span></div>
-             <div class="tot-row"><span>TVA (19.25%)</span> <span>{{ (totalHT * 0.1925).toLocaleString() }} XAF</span></div>
-             <div class="tot-row total-ttc"><span>TTC Estimé</span> <span>{{ totalTTC.toLocaleString() }} XAF</span></div>
+             <div class="tot-row"><span>Total HT</span> <span>{{   totalHT.toLocaleString()   }} XAF</span></div>
+             <div class="tot-row"><span>TVA (19.25%)</span> <span>{{   (totalHT * 0.1925).toLocaleString()   }} XAF</span></div>
+             <div class="tot-row total-ttc"><span>TTC Estimé</span> <span>{{   totalTTC.toLocaleString()   }} XAF</span></div>
           </div>
           
-          <div v-if="store.error" class="form-error">{{ store.error }}</div>
+          <div v-if="store.error" class="form-error">{{   store.error   }}</div>
 
           <div class="modal-footer pt-3 pb-0">
-             <button type="button" class="btn-text" @click="showModal = false">{{ t("common.annuler") }}</button>
+             <button type="button" class="btn-text" @click="showModal = false">{{   t("common.annuler")   }}</button>
              <button type="submit" class="btn-primary" :disabled="store.loading">
-               {{ store.loading ? 'Création...' : 'Générer la Facture' }}
+               {{   store.loading ? 'Création...' : 'Générer la Facture'   }}
              </button>
           </div>
         </form>
@@ -526,7 +572,7 @@ const submitForm = async () => {
 .icon-btn-danger:hover:not(:disabled) { background: #fee2e2; color: #ef4444; }
 .icon-btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.actions-cell { display: flex; gap: 0.5rem; justify-content: center; }
+.actions-cell { display: flex; gap: 1rem; justify-content: center; }
 .preview-btn:hover { color: #2563eb; background: #eff6ff; }
 .download-btn:hover { color: #059669; background: #ecfdf5; }
 
@@ -660,4 +706,171 @@ const submitForm = async () => {
     flex-wrap: wrap;
   }
 }
+/* OPERATOR PILLS & TOOLTIPS (Premium) */
+.operator-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.op-pill-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.op-pill-mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: help;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.op-pill-mini.blue {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #dbeafe;
+}
+
+.op-pill-mini.green {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #d1fae5;
+}
+
+.op-pill-mini:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.op-label {
+  opacity: 0.7;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.6rem;
+}
+
+.op-name {
+  font-weight: 700;
+}
+
+/* Tooltip Premium */
+.op-tooltip {
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  width: 240px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.op-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: #ffffff transparent transparent transparent;
+}
+
+.op-pill-wrapper:hover .op-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltip-header {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f1f5f9;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.t-label {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.t-value {
+  font-size: 0.7rem;
+  color: #0f172a;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* DARK MODE ADAPTATION */
+body.dark-mode .op-pill-mini.blue {
+  background: rgba(37, 99, 235, 0.1);
+  color: #60a5fa;
+  border-color: rgba(37, 99, 235, 0.2);
+}
+
+body.dark-mode .op-pill-mini.green {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+body.dark-mode .op-tooltip {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode .op-tooltip::after {
+  border-color: #1e293b transparent transparent transparent;
+}
+
+body.dark-mode .tooltip-header {
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+body.dark-mode .t-label {
+  color: #94a3b8;
+}
+
+body.dark-mode .t-value {
+  color: #f8fafc;
+}
+
+body.dark-mode .table-card { background: #151b2d; border-color: #1e293b; }
+body.dark-mode .data-table th { background: #0b0f1a; color: #94a3b8; border-color: #1e293b; }
+body.dark-mode .data-table td { border-color: #1e293b; color: #cbd5e1; }
+body.dark-mode .text-dark { color: #f1f5f9 !important; }
+body.dark-mode .motif-text { color: #cbd5e1; }
+body.dark-mode .filter-bar { background: #151b2d; border-color: #1e293b; }
+body.dark-mode .filter-input-std { background: #0b0f1a; border-color: #1e293b; color: #f1f5f9; }
+body.dark-mode .tab-btn { color: #64748b; }
+body.dark-mode .tab-btn:hover { color: #cbd5e1; }
+body.dark-mode .tab-btn.active { color: #3b82f6; border-color: #3b82f6; }
 </style>

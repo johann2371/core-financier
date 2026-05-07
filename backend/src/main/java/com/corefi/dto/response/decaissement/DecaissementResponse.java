@@ -27,8 +27,11 @@ public class DecaissementResponse {
     // Traçabilité
     private String saisiParNom;
     private String valideParNom;
+    private LocalDateTime dateValidation;
     private String approuveParPdgNom;
+    private LocalDateTime dateApprobationPdg;
     private String executeParNom;
+    private LocalDateTime dateExecution;
     private Long sessionId;
 
     @Data

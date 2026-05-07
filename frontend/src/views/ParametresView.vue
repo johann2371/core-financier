@@ -35,13 +35,14 @@ onMounted(() => {
 
 const activeTab = ref('IDENTITE')
 const categories = computed(() => [
-  { id: 'IDENTITE', label: t('parametres.identiteLogo'), icon: BuildingOfficeIcon, desc: t('parametres.identiteDesc') },
-  { id: 'FINANCE', label: t('parametres.gestionFinanciere'), icon: CurrencyDollarIcon, desc: t('parametres.financeDesc') },
-  { id: 'SECURITE', label: t('parametres.securiteAcces'), icon: ShieldCheckIcon, desc: t('parametres.securiteDesc') },
-  { id: 'SYSTEME', label: t('parametres.systeme'), icon: Cog6ToothIcon, desc: t('parametres.systemeDesc') }
+  { id: 'IDENTITE', label: t.value('parametres.identiteLogo'), icon: BuildingOfficeIcon, desc: t.value('parametres.identiteDesc') },
+  { id: 'FINANCE', label: t.value('parametres.gestionFinanciere'), icon: CurrencyDollarIcon, desc: t.value('parametres.financeDesc') },
+  { id: 'SECURITE', label: t.value('parametres.securiteAcces'), icon: ShieldCheckIcon, desc: t.value('parametres.securiteDesc') },
+  { id: 'SYSTEME', label: t.value('parametres.systeme'), icon: Cog6ToothIcon, desc: t.value('parametres.systemeDesc') }
 ])
 
 const getCategory = (cle) => {
+  if (!cle) return 'SYSTEME'
   const c = cle.toUpperCase()
   if (c.includes('INFO_SOCIETE') || c.includes('LOGO')) return 'IDENTITE'
   if (c.includes('SEUIL') || c.includes('MONTANT') || c.includes('DEVISE') || c.includes('APPROBATION') || c.includes('PIECE')) return 'FINANCE'
@@ -54,6 +55,7 @@ const filteredParametres = computed(() => {
 })
 
 const getParamIconInfo = (cle) => {
+  if (!cle) return { component: CogIcon, class: 'icon-settings' }
   const c = cle.toUpperCase()
   if (c.includes('SEUIL') || c.includes('MONTANT')) return { component: CurrencyDollarIcon, class: 'icon-dollar' }
   if (c.includes('DEVISE')) return { component: BanknotesIcon, class: 'icon-currency' }

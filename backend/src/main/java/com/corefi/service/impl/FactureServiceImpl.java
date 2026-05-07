@@ -80,6 +80,9 @@ public class FactureServiceImpl implements IFactureService {
         Utilisateur creePar = utilisateurRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur connecté introuvable."));
         facture.setCreePar(creePar);
+        facture.setDateSaisie(java.time.LocalDateTime.now());
+        facture.setDateValidation(java.time.LocalDateTime.now());
+        facture.setValidePar(creePar); // Validée par le créateur car passage direct à EN_ATTENTE_PAIEMENT
 
         // 5. Devise par défaut (XAF)
         facture.setDevise(deviseRepository.findByCode("XAF")
@@ -173,6 +176,7 @@ public class FactureServiceImpl implements IFactureService {
 
         facture.setStatut(StatutFacture.EN_ATTENTE_PAIEMENT);
         facture.setValidePar(validePar);
+        facture.setDateValidation(java.time.LocalDateTime.now());
 
         // Ajout au solde du Tiers
         Tiers tiers = facture.getTiers();

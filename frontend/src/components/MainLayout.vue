@@ -63,16 +63,7 @@ const showLogoutModal = ref(false)
 const showNotifications = ref(false)
 const expandedNotifId = ref(null)
 const isSidebarOpen = ref(false)
-const isDarkMode = ref(localStorage.getItem('darkMode') === 'true')
-
-// Appliquer le mode sombre au chargement
-if (isDarkMode.value) document.body.classList.add('dark-mode')
-
-const toggleDarkMode = () => {
-  isDarkMode.value = !isDarkMode.value
-  document.body.classList.toggle('dark-mode', isDarkMode.value)
-  localStorage.setItem('darkMode', isDarkMode.value)
-}
+// Le mode sombre est géré par uiStore.toggleDarkMode()
 
 const searchRef = ref(null)
 
@@ -331,8 +322,8 @@ onMounted(() => {
               <span class="lang-flag">{{ langStore.locale === 'fr' ? '🇫🇷' : '🇬🇧' }}</span>
             </button>
 
-            <button @click="toggleDarkMode" class="action-btn" :title="isDarkMode ? t('topbar.modeClair') : t('topbar.modeSombre')">
-              <MoonIcon v-if="!isDarkMode" class="w-5 h-5" />
+            <button @click="uiStore.toggleDarkMode()" class="action-btn" :title="uiStore.isDarkMode ? t('topbar.modeClair') : t('topbar.modeSombre')">
+              <MoonIcon v-if="!uiStore.isDarkMode" class="w-5 h-5" />
               <SunIcon v-else class="w-5 h-5" />
             </button>
 
@@ -438,9 +429,10 @@ onMounted(() => {
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background-color: #f9fafb;
+  background-color: var(--c-bg);
   color: var(--c-text);
   font-family: var(--font-family);
+  transition: background-color 0.3s ease;
 }
 
 /* ====== SIDEBAR ====== */
@@ -607,11 +599,20 @@ onMounted(() => {
 }
 
 .topbar {
-  padding: 2rem 2.5rem 1.5rem;
+  padding: 1.5rem 2.5rem;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   flex-shrink: 0;
+  background: var(--c-bg);
+  border-bottom: 1px solid #e5e7eb;
+  transition: all 0.3s ease;
+}
+
+body.dark-mode .topbar {
+  background: rgba(11, 15, 26, 0.8);
+  backdrop-filter: blur(12px);
+  border-color: #1e293b;
 }
 
 .topbar-left {
@@ -1212,4 +1213,21 @@ onMounted(() => {
 .lang-toggle-btn:hover .lang-flag {
   transform: scale(1.15);
 }
+/* DARK MODE SCOPED OVERRIDES */
+body.dark-mode .nav-item { color: #94a3b8; }
+body.dark-mode .nav-item:hover { background-color: rgba(255, 255, 255, 0.03); color: #ffffff; }
+body.dark-mode .user-name { color: #ffffff; }
+body.dark-mode .user-role { color: #64748b; }
+body.dark-mode .page-title { color: #ffffff; }
+body.dark-mode .page-subtitle { color: #64748b; }
+body.dark-mode .action-btn { background: #151b2d; border-color: #1e293b; color: #94a3b8; }
+body.dark-mode .action-btn:hover { border-color: #3b82f6; color: #ffffff; }
+body.dark-mode .search-box input { background: #0b0f1a; border-color: #1e293b; color: #ffffff; }
+body.dark-mode .notifications-dropdown { background: #151b2d; border-color: #1e293b; }
+body.dark-mode .notif-header { border-color: #1e293b; }
+body.dark-mode .notif-header h3 { color: #ffffff; }
+body.dark-mode .notif-item:hover { background: rgba(255, 255, 255, 0.02); }
+body.dark-mode .notif-message { color: #cbd5e1; }
+body.dark-mode .sidebar-user-block { border-color: #1e293b; }
+body.dark-mode .sidebar-logout:hover { background: rgba(239, 68, 68, 0.1); }
 </style>

@@ -7,6 +7,7 @@ import { useAuditStore } from '../stores/audit.store'
 import { useDashboardStore } from '../stores/dashboard.store'
 import { useParametrageStore } from '../stores/parametrage.store'
 import { useLangStore } from '../stores/lang.store'
+import { useUiStore } from '../stores/ui.store'
 import { Line } from 'vue-chartjs'
 import { 
   Chart as ChartJS, 
@@ -41,7 +42,9 @@ import {
   ChartBarIcon,
   BuildingOfficeIcon,
   NoSymbolIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  DocumentTextIcon,
+  UserIcon
 } from '@heroicons/vue/24/outline'
 
 ChartJS.register(Title, Tooltip, Legend, LineElement, CategoryScale, LinearScale, PointElement, Filler)
@@ -52,6 +55,7 @@ const auditStore = useAuditStore()
 const dashboardStore = useDashboardStore()
 const parametrageStore = useParametrageStore()
 const langStore = useLangStore()
+const uiStore = useUiStore()
 const t = computed(() => langStore.t)
 
 const forecastPeriod = ref(30)
@@ -60,11 +64,12 @@ const updateForecast = async () => {
   await dashboardStore.fetchKpis(forecastPeriod.value)
 }
 
-onMounted(async () => {
-  await dashboardStore.fetchKpis(forecastPeriod.value)
-  await utilisateurStore.fetchUtilisateurs()
-  await auditStore.fetchLogs(0, 200, '', '')
-  await parametrageStore.fetchParametres()
+onMounted(() => {
+  // Chargement en parallèle pour éviter qu'un échec ne bloque les autres
+  dashboardStore.fetchKpis(forecastPeriod.value)
+  utilisateurStore.fetchUtilisateurs()
+  auditStore.fetchLogs(0, 200, '', '')
+  parametrageStore.fetchParametres()
 })
 
 const kpis = computed(() => dashboardStore.kpis || {})
@@ -86,9 +91,10 @@ const formatCurrency = (val) => {
 // === GESTION UTILISATEURS ===
 const searchUser = ref('')
 const usersFiltered = computed(() => {
-  if (!searchUser.value) return utilisateurStore.utilisateurs
+  const users = utilisateurStore.utilisateurs || []
+  if (!searchUser.value) return users
   const s = searchUser.value.toLowerCase()
-  return utilisateurStore.utilisateurs.filter(u => 
+  return users.filter(u => 
     u.nom?.toLowerCase().includes(s) || 
     u.prenom?.toLowerCase().includes(s) || 
     u.email?.toLowerCase().includes(s)
@@ -162,9 +168,9 @@ const reactiverInfo = async (id) => {
 }
 
 // === KPIs ===
-const totalUsers = computed(() => utilisateurStore.utilisateurs.length)
-const activeUsers = computed(() => utilisateurStore.utilisateurs.filter(u => u.actif !== false).length)
-const blockedUsers = computed(() => utilisateurStore.utilisateurs.filter(u => u.actif === false).length)
+const totalUsers = computed(() => (utilisateurStore.utilisateurs || []).length)
+const activeUsers = computed(() => (utilisateurStore.utilisateurs || []).filter(u => u.actif !== false).length)
+const blockedUsers = computed(() => (utilisateurStore.utilisateurs || []).filter(u => u.actif === false).length)
 
 // === GRAPHIQUE RÉPARTITION DES RÔLES ===
 const roleColors = {
@@ -177,7 +183,8 @@ const roleColors = {
 
 const roleDistribution = computed(() => {
   const roles = {}
-  utilisateurStore.utilisateurs.forEach(u => {
+  const users = utilisateurStore.utilisateurs || []
+  users.forEach(u => {
     const r = u.role || 'INCONNU'
     roles[r] = (roles[r] || 0) + 1
   })
@@ -258,11 +265,13 @@ const evolutionChartOptions = {
     tooltip: {
       mode: 'index',
       intersect: false,
-      backgroundColor: 'rgba(30, 41, 59, 0.9)',
+      backgroundColor: uiStore.isDarkMode ? '#0f172a' : 'rgba(30, 41, 59, 0.9)',
       titleColor: '#fff',
       bodyColor: '#fff',
       padding: 12,
       cornerRadius: 8,
+      borderColor: uiStore.isDarkMode ? '#1e293b' : 'transparent',
+      borderWidth: 1,
       callbacks: {
         label: function(context) {
           let label = context.dataset.label || '';
@@ -283,11 +292,11 @@ const evolutionChartOptions = {
     y: {
       beginAtZero: true,
       grid: {
-        color: 'rgba(226, 232, 240, 0.5)',
+        color: uiStore.isDarkMode ? 'rgba(255, 255, 255, 0.03)' : 'rgba(226, 232, 240, 0.5)',
         drawBorder: false
       },
       ticks: {
-        color: '#94a3b8',
+        color: uiStore.isDarkMode ? '#475569' : '#94a3b8',
         font: { size: 11 },
         callback: function(value) {
           if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'
@@ -301,7 +310,7 @@ const evolutionChartOptions = {
         display: false
       },
       ticks: {
-        color: '#94a3b8',
+        color: uiStore.isDarkMode ? '#475569' : '#94a3b8',
         font: { size: 11, weight: '600' }
       }
     }
@@ -310,11 +319,11 @@ const evolutionChartOptions = {
 
 // === FORMAT DATE ET ACTIVITÉS ===
 const formatLastLogin = (dateStr) => {
-  if (!dateStr) return t('adminDashboard.jamais')
+  if (!dateStr) return t.value('adminDashboard.jamais')
   const d = new Date(dateStr)
   const now = new Date()
   const diff = Math.floor((now - d) / 1000)
-  if (diff < 60) return t('adminDashboard.aLinstant')
+  if (diff < 60) return t.value('adminDashboard.aLinstant')
   if (diff < 3600) return `Il y a ${Math.floor(diff / 60)} min`
   if (diff < 86400) return `Il y a ${Math.floor(diff / 3600)}h`
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -435,16 +444,16 @@ const dsoClass = computed(() => {
 
 const dsoMessage = computed(() => {
   const v = kpis.value.dso || 0
-  if (v <= 30) return 'Excellent ! Vos clients paient rapidement.'
-  if (v <= 60) return 'Attention, les délais de paiement s\'allongent.'
-  return 'Délai critique ! Relancez vos clients.'
+  if (v <= 30) return t.value('dashboard.dsoExcellent')
+  if (v <= 60) return t.value('dashboard.dsoAttention')
+  return t.value('dashboard.dsoCritique')
 })
 
 const dpoMessage = computed(() => {
   const v = kpis.value.dpo || 0
-  if (v <= 15) return 'Vous payez très rapidement vos fournisseurs.'
-  if (v <= 45) return 'Délai de paiement raisonnable.'
-  return 'Délai élevé. Attention aux pénalités.'
+  if (v <= 15) return t.value('dashboard.dpoRapide')
+  if (v <= 45) return t.value('dashboard.dpoRaisonnable')
+  return t.value('dashboard.dpoEleve')
 })
 
 // === RÉPARTITION DÉPENSES ===
@@ -459,11 +468,11 @@ const depPercent = (val) => {
 
 <template>
   <MainLayout>
-    <template #title>{{ t("adminDashboard.titre") }}</template>
-    <template #subtitle>{{ t("adminDashboard.sousTitre") }}</template>
+    <template #title>{{   t("adminDashboard.titre")   }}</template>
+    <template #subtitle>{{   t("adminDashboard.sousTitre")   }}</template>
 
     <div class="admin-dashboard">
-      <div v-if="utilisateurStore.error" class="error-banner mb-4">{{ utilisateurStore.error }}</div>
+      <div v-if="utilisateurStore.error" class="error-banner mb-4">{{   utilisateurStore.error   }}</div>
 
       <!-- HEADER SECTION: Main Financial KPIs (2x2) + Recent Activities -->
       <div class="dashboard-header-row">
@@ -471,9 +480,9 @@ const depPercent = (val) => {
         <div class="main-kpis-wrapper">
           <div class="kpi-card premium highlight-primary">
             <div class="kpi-inner">
-              <div class="kpi-label">{{ t("adminDashboard.soldeTresorerie") }}</div>
-              <div class="kpi-value text-blue">{{ formatCurrency(kpis.soldeTresorerieTotal) }}</div>
-              <div class="kpi-desc">{{ selectedCurrency === 'XAF' ? 'FCFA' : 'USD' }} {{ t("adminDashboard.disponibles") }}</div>
+              <div class="kpi-label">{{   t("adminDashboard.soldeTresorerie")   }}</div>
+              <div class="kpi-value text-blue">{{   formatCurrency(kpis.soldeTresorerieTotal)   }}</div>
+              <div class="kpi-desc">{{   selectedCurrency === 'XAF' ? 'FCFA' : 'USD'   }} {{   t("adminDashboard.disponibles")   }}</div>
             </div>
             <div class="kpi-icon-circ blue">
               <BanknotesIcon class="w-6 h-6" />
@@ -482,9 +491,9 @@ const depPercent = (val) => {
 
           <div class="kpi-card">
             <div class="kpi-inner">
-              <div class="kpi-label">{{ t("adminDashboard.decaissementsAttente") }}</div>
-              <div class="kpi-value">{{ kpis.decaissementsEnAttente || 0 }}</div>
-              <div class="kpi-desc">{{ t("adminDashboard.dontAttentePDG") }} <span class="fw-700">{{ kpis.decaissementsEnAttentePDG || 0 }}</span> {{ t("adminDashboard.enAttentePDG") }}</div>
+              <div class="kpi-label">{{   t("adminDashboard.decaissementsAttente")   }}</div>
+              <div class="kpi-value">{{   kpis.decaissementsEnAttente || 0   }}</div>
+              <div class="kpi-desc">{{   t("adminDashboard.dontAttentePDG")   }} <span class="fw-700">{{   kpis.decaissementsEnAttentePDG || 0   }}</span> {{   t("adminDashboard.enAttentePDG")   }}</div>
             </div>
             <div class="kpi-icon-circ orange">
               <ClockIcon class="w-6 h-6" />
@@ -493,9 +502,9 @@ const depPercent = (val) => {
 
           <div class="kpi-card">
             <div class="kpi-inner">
-              <div class="kpi-label">{{ t("adminDashboard.facturesImpayees") }}</div>
-              <div class="kpi-value text-red">{{ kpis.facturesImpayeesCount || 0 }}</div>
-              <div class="kpi-desc" :class="{'text-red fw-700': kpis.facturesEnRetardCount > 0}">{{ kpis.facturesEnRetardCount || 0 }} {{ t("adminDashboard.enRetard") }}</div>
+              <div class="kpi-label">{{   t("adminDashboard.facturesImpayees")   }}</div>
+              <div class="kpi-value text-red">{{   kpis.facturesImpayeesCount || 0   }}</div>
+              <div class="kpi-desc" :class="{'text-red fw-700': kpis.facturesEnRetardCount > 0}">{{   kpis.facturesEnRetardCount || 0   }} {{   t("adminDashboard.enRetard")   }}</div>
             </div>
             <div class="kpi-icon-circ red">
                <ExclamationTriangleIcon class="w-6 h-6" />
@@ -504,9 +513,9 @@ const depPercent = (val) => {
 
           <div class="kpi-card">
             <div class="kpi-inner">
-              <div class="kpi-label">{{ t("adminDashboard.dettesFournisseurs") }}</div>
-              <div class="kpi-value text-purple">{{ formatCurrency(kpis.totalDettesFournisseurs) }}</div>
-              <div class="kpi-desc">{{ t("adminDashboard.totalFacturesDues") }}</div>
+              <div class="kpi-label">{{   t("adminDashboard.dettesFournisseurs")   }}</div>
+              <div class="kpi-value text-purple">{{   formatCurrency(kpis.totalDettesFournisseurs)   }}</div>
+              <div class="kpi-desc">{{   t("adminDashboard.totalFacturesDues")   }}</div>
             </div>
             <div class="kpi-icon-circ purple">
               <CreditCardIcon class="w-6 h-6" />
@@ -517,8 +526,8 @@ const depPercent = (val) => {
         <!-- Recent Activities Card (Style DashboardView) -->
         <div class="activities-card">
           <div class="activities-head">
-            <h3 class="activities-title">{{ t("dashboard.activiteRecente") }}</h3>
-            <div class="activities-badge">{{ kpis.activitesRecentes?.length || 0 }}</div>
+            <h3 class="activities-title">{{   t("dashboard.activiteRecente")   }}</h3>
+            <div class="activities-badge">{{   kpis.activitesRecentes?.length || 0   }}</div>
           </div>
           
           <div class="timeline" v-if="kpis.activitesRecentes?.length > 0">
@@ -529,17 +538,17 @@ const depPercent = (val) => {
                 <ClockIcon v-else class="w-3 h-3" />
               </div>
               <div class="timeline-content">
-                <h4>{{ act.action === 'CREATE' ? 'Création' : act.action }} {{ act.type.toLowerCase() }}</h4>
-                <p>{{ act.message }}</p>
+                <h4>{{   act.action === 'CREATE' ? 'Création' : act.action   }} {{   act.type.toLowerCase()   }}</h4>
+                <p>{{   act.message   }}</p>
                 <div class="timeline-meta">
-                  <span class="user">{{ act.utilisateur }}</span>
-                  <span class="time">{{ formatDateLabel(act.date) }} • {{ formatTime(act.date) }}</span>
+                  <span class="user">{{   act.utilisateur   }}</span>
+                  <span class="time">{{   formatDateLabel(act.date)   }} • {{   formatTime(act.date)   }}</span>
                 </div>
               </div>
             </div>
           </div>
           <div class="empty-activities" v-else>
-            <p>{{ t("dashboard.aucuneActivite") }}</p>
+            <p>{{   t("dashboard.aucuneActivite")   }}</p>
           </div>
         </div>
       </div>
@@ -548,10 +557,10 @@ const depPercent = (val) => {
       <div class="kpi-grid secondary-kpis-row">
         <div class="kpi-card">
           <div class="kpi-inner">
-            <div class="kpi-label">{{ t("adminDashboard.utilisateursActifs") }}</div>
-            <div class="kpi-value text-green">{{ kpis.utilisateursActifs || 0 }}</div>
-            <div class="kpi-desc text-danger" v-if="kpis.utilisateursBloques > 0">{{ kpis.utilisateursBloques }} {{ t("adminDashboard.compteBloque") }}</div>
-            <div class="kpi-desc" v-else>{{ t("adminDashboard.aucunCompteBloque") }}</div>
+            <div class="kpi-label">{{   t("adminDashboard.utilisateursActifs")   }}</div>
+            <div class="kpi-value text-green">{{   kpis.utilisateursActifs || 0   }}</div>
+            <div class="kpi-desc text-danger" v-if="kpis.utilisateursBloques > 0">{{   kpis.utilisateursBloques   }} {{   t("adminDashboard.compteBloque")   }}</div>
+            <div class="kpi-desc" v-else>{{   t("adminDashboard.aucunCompteBloque")   }}</div>
           </div>
           <div class="kpi-icon-circ green">
             <UserGroupIcon class="w-6 h-6" />
@@ -560,11 +569,11 @@ const depPercent = (val) => {
 
         <div class="kpi-card">
           <div class="kpi-inner">
-            <div class="kpi-label">{{ t("adminDashboard.encaissementsCeMois") }}</div>
-            <div class="kpi-value">{{ formatCurrency(kpis.encaissementsMoisActuel) }}</div>
+            <div class="kpi-label">{{   t("adminDashboard.encaissementsCeMois")   }}</div>
+            <div class="kpi-value">{{   formatCurrency(kpis.encaissementsMoisActuel)   }}</div>
             <div class="kpi-desc">
-              {{ selectedCurrency === 'XAF' ? 'FCFA' : 'USD' }} · <span :class="kpis.progressionEncaissements >= 0 ? 'text-green' : 'text-red'">
-                {{ kpis.progressionEncaissements > 0 ? '+' : '' }}{{ kpis.progressionEncaissements?.toFixed(1) }}% {{ t("adminDashboard.vsMoisDernier") }}
+              {{   selectedCurrency === 'XAF' ? 'FCFA' : 'USD'   }} · <span :class="kpis.progressionEncaissements >= 0 ? 'text-green' : 'text-red'">
+                {{   kpis.progressionEncaissements > 0 ? '+' : ''   }}{{   kpis.progressionEncaissements?.toFixed(1)   }}% {{   t("adminDashboard.vsMoisDernier")   }}
               </span>
             </div>
           </div>
@@ -572,11 +581,11 @@ const depPercent = (val) => {
 
         <div class="kpi-card">
           <div class="kpi-inner">
-            <div class="kpi-label">{{ t("adminDashboard.decaissementsCeMois") }}</div>
-            <div class="kpi-value">{{ formatCurrency(kpis.decaissementsMoisActuel) }}</div>
+            <div class="kpi-label">{{   t("adminDashboard.decaissementsCeMois")   }}</div>
+            <div class="kpi-value">{{   formatCurrency(kpis.decaissementsMoisActuel)   }}</div>
             <div class="kpi-desc">
-              {{ selectedCurrency === 'XAF' ? 'FCFA' : 'USD' }} · <span :class="kpis.progressionDecaissements <= 0 ? 'text-green' : 'text-red'">
-                {{ kpis.progressionDecaissements > 0 ? '+' : '' }}{{ kpis.progressionDecaissements?.toFixed(1) }}% {{ t("adminDashboard.vsMoisDernier") }}
+              {{   selectedCurrency === 'XAF' ? 'FCFA' : 'USD'   }} · <span :class="kpis.progressionDecaissements <= 0 ? 'text-green' : 'text-red'">
+                {{   kpis.progressionDecaissements > 0 ? '+' : ''   }}{{   kpis.progressionDecaissements?.toFixed(1)   }}% {{   t("adminDashboard.vsMoisDernier")   }}
               </span>
             </div>
           </div>
@@ -584,11 +593,11 @@ const depPercent = (val) => {
 
         <div class="kpi-card">
           <div class="kpi-inner">
-            <div class="kpi-label">{{ t("adminDashboard.operationsAujourdhui") }}</div>
-            <div class="kpi-value">{{ kpis.operationsDuJour || 0 }}</div>
+            <div class="kpi-label">{{   t("adminDashboard.operationsAujourdhui")   }}</div>
+            <div class="kpi-value">{{   kpis.operationsDuJour || 0   }}</div>
             <div class="kpi-desc">
-              <span class="text-green fw-600">{{ kpis.encaissementsDuJourCount || 0 }} {{ t("adminDashboard.enc") }}</span> 
-              · <span class="text-blue fw-600">{{ kpis.decaissementsDuJourCount || 0 }} {{ t("adminDashboard.dec") }}</span>
+              <span class="text-green fw-600">{{   kpis.encaissementsDuJourCount || 0   }} {{   t("adminDashboard.enc")   }}</span> 
+              · <span class="text-blue fw-600">{{   kpis.decaissementsDuJourCount || 0   }} {{   t("adminDashboard.dec")   }}</span>
             </div>
           </div>
           <div class="kpi-icon-circ cyan">
@@ -601,9 +610,18 @@ const depPercent = (val) => {
       <div class="charts-row">
         <!-- Donut Chart: Répartition des rôles -->
         <div class="chart-card">
-          <div class="chart-title">Répartition des rôles</div>
-          <div class="donut-container">
-            <svg viewBox="0 0 36 36" class="donut-chart">
+          <div class="chart-title">
+            Répartition des rôles
+            <span v-if="utilisateurStore.loading" class="loading-inline">(Chargement...)</span>
+          </div>
+          
+          <div v-if="utilisateurStore.error" class="chart-error">
+             <ExclamationTriangleIcon class="w-5 h-5" />
+             <span>{{ utilisateurStore.error }}</span>
+          </div>
+          
+          <div v-else class="donut-container">
+            <svg v-if="donutSegments.length > 0" viewBox="0 0 36 36" class="donut-chart">
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f1f5f9" stroke-width="3" />
               <circle 
                 v-for="seg in donutSegments" 
@@ -617,11 +635,15 @@ const depPercent = (val) => {
                 stroke-linecap="round"
               />
             </svg>
-            <div class="donut-legend">
+            <div v-else class="empty-donut">
+               <UserGroupIcon class="w-8 h-8 text-slate-200" />
+               <span>Aucun utilisateur</span>
+            </div>
+            <div class="donut-legend" v-if="donutSegments.length > 0">
               <div v-for="seg in donutSegments" :key="seg.role" class="legend-item">
                 <span class="legend-dot" :style="{ background: seg.color }"></span>
-                <span class="legend-label">{{ seg.role.replace('_', ' ') }}</span>
-                <span class="legend-count">{{ seg.count }}</span>
+                <span class="legend-label">{{   seg.role.replace('_', ' ')   }}</span>
+                <span class="legend-count">{{   seg.count   }}</span>
               </div>
             </div>
           </div>
@@ -661,7 +683,7 @@ const depPercent = (val) => {
             </select>
             <div class="forecast-badge" style="margin-left: auto;">
               <span :class="forecastTrend >= 0 ? 'text-green' : 'text-red'">
-                {{ forecastTrend >= 0 ? '↑' : '↓' }} {{ formatCurrency(kpis.soldePrevisionnel30j) }} à J+{{ forecastPeriod }}
+                {{   forecastTrend >= 0 ? '↑' : '↓'   }} {{   formatCurrency(kpis.soldePrevisionnel30j)   }} à J+{{   forecastPeriod   }}
               </span>
             </div>
           </div>
@@ -678,13 +700,13 @@ const depPercent = (val) => {
               <span class="dso-sublabel">Délai moyen encaissement clients</span>
             </div>
             <div class="dso-value">
-              <span class="dso-number">{{ kpis.dso || 0 }}</span>
+              <span class="dso-number">{{   kpis.dso || 0   }}</span>
               <span class="dso-unit">jours</span>
             </div>
             <div class="dso-bar">
               <div class="dso-fill" :class="dsoClass" :style="{ width: Math.min(kpis.dso || 0, 90) / 90 * 100 + '%' }"></div>
             </div>
-            <div class="dso-hint">{{ dsoMessage }}</div>
+            <div class="dso-hint">{{   dsoMessage   }}</div>
           </div>
 
           <div class="dso-card">
@@ -693,13 +715,13 @@ const depPercent = (val) => {
               <span class="dso-sublabel">Délai moyen paiement fournisseurs</span>
             </div>
             <div class="dso-value">
-              <span class="dso-number">{{ kpis.dpo || 0 }}</span>
+              <span class="dso-number">{{   kpis.dpo || 0   }}</span>
               <span class="dso-unit">jours</span>
             </div>
             <div class="dso-bar">
               <div class="dso-fill dpo" :style="{ width: Math.min(kpis.dpo || 0, 90) / 90 * 100 + '%' }"></div>
             </div>
-            <div class="dso-hint">{{ dpoMessage }}</div>
+            <div class="dso-hint">{{   dpoMessage   }}</div>
           </div>
 
           <!-- Répartition Dépenses -->
@@ -707,11 +729,11 @@ const depPercent = (val) => {
             <div class="chart-title" style="margin-bottom: 0.75rem;">Dépenses du mois par catégorie</div>
             <div class="dep-bars">
               <div v-for="(val, cat) in kpis.repartitionDepensesParCategorie" :key="cat" class="dep-row">
-                <span class="dep-cat">{{ cat }}</span>
+                <span class="dep-cat">{{   cat   }}</span>
                 <div class="dep-track">
                   <div class="dep-fill" :style="{ width: depPercent(val) + '%' }"></div>
                 </div>
-                <span class="dep-amount">{{ formatCurrency(val) }}</span>
+                <span class="dep-amount">{{   formatCurrency(val)   }}</span>
               </div>
             </div>
           </div>
@@ -730,7 +752,7 @@ const depPercent = (val) => {
         </button>
       </div>
 
-      <div v-if="utilisateurStore.error" class="error-banner mb-4">{{ utilisateurStore.error }}</div>
+      <div v-if="utilisateurStore.error" class="error-banner mb-4">{{   utilisateurStore.error   }}</div>
 
       <!-- Table Utilisateurs -->
       <div class="feature-card">
@@ -738,12 +760,12 @@ const depPercent = (val) => {
           <table class="data-table">
             <thead>
               <tr>
-                <th>{{ t("adminDashboard.acteur") }}</th>
-                <th>{{ t("adminDashboard.idConnexion") }}</th>
-                <th>{{ t("adminDashboard.roleSysteme") }}</th>
-                <th>{{ t("adminDashboard.derniereConnexion") }}</th>
-                <th>{{ t("adminDashboard.statut") }}</th>
-                <th class="text-center">{{ t("adminDashboard.actions") }}</th>
+                <th>{{   t("adminDashboard.acteur")   }}</th>
+                <th>{{   t("adminDashboard.idConnexion")   }}</th>
+                <th>{{   t("adminDashboard.roleSysteme")   }}</th>
+                <th>{{   t("adminDashboard.derniereConnexion")   }}</th>
+                <th>{{   t("adminDashboard.statut")   }}</th>
+                <th class="text-center">{{   t("adminDashboard.actions")   }}</th>
               </tr>
             </thead>
             <tbody>
@@ -751,20 +773,20 @@ const depPercent = (val) => {
                 <td>
                   <div class="user-cell">
                     <div class="user-avatar" :style="{ backgroundColor: getAvatarColor(u.prenom), color: 'white' }">
-                      {{ u.prenom ? u.prenom.charAt(0) + (u.nom ? u.nom.charAt(0) : '') : '?' }}
+                      {{   u.prenom ? u.prenom.charAt(0) + (u.nom ? u.nom.charAt(0) : '') : '?'   }}
                     </div>
                     <div class="user-info">
-                      <strong>{{ u.prenom }} {{ u.nom }}</strong>
+                      <strong>{{   u.prenom   }} {{   u.nom   }}</strong>
                     </div>
                   </div>
                 </td>
-                <td><span class="text-mono">{{ u.email }}</span></td>
+                <td><span class="text-mono">{{   u.email   }}</span></td>
                 <td>
-                  <span class="role-badge">{{ u.role?.replace('_', ' ') }}</span>
+                  <span class="role-badge">{{   u.role?.replace('_', ' ')   }}</span>
                 </td>
                 <td>
                   <span class="last-login" :class="{ 'never': !u.dernierAcces }">
-                    {{ formatLastLogin(u.dernierAcces) }}
+                    {{   formatLastLogin(u.dernierAcces)   }}
                   </span>
                 </td>
                 <td class="status-badge-cell">
@@ -795,14 +817,14 @@ const depPercent = (val) => {
 
         <!-- Pagination -->
         <div v-if="totalPages > 1" class="table-pagination">
-          <span class="pag-info">Affichage {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, usersFiltered.length) }} sur {{ usersFiltered.length }}</span>
+          <span class="pag-info">Affichage {{   (currentPage - 1) * pageSize + 1   }}–{{   Math.min(currentPage * pageSize, usersFiltered.length)   }} sur {{   usersFiltered.length   }}</span>
           <div class="pag-buttons">
             <button @click="currentPage = Math.max(1, currentPage - 1)" :disabled="currentPage === 1" class="pag-btn">‹</button>
             <button 
               v-for="p in totalPages" :key="p" 
               @click="currentPage = p" 
               :class="['pag-btn', { active: p === currentPage }]"
-            >{{ p }}</button>
+            >{{   p   }}</button>
             <button @click="currentPage = Math.min(totalPages, currentPage + 1)" :disabled="currentPage === totalPages" class="pag-btn">›</button>
           </div>
         </div>
@@ -813,7 +835,7 @@ const depPercent = (val) => {
     <div v-if="showUserModal" class="user-modal-overlay" @click.self="showUserModal = false">
       <div class="user-modal-box">
         <div class="user-modal-head">
-          <h3>{{ editUserId ? 'Modifier Utilisateur' : 'Nouvel Utilisateur' }}</h3>
+          <h3>{{   editUserId ? 'Modifier Utilisateur' : 'Nouvel Utilisateur'   }}</h3>
           <button @click="showUserModal = false" class="user-modal-close">
             <XMarkIcon class="w-6 h-6" />
           </button>
@@ -833,7 +855,7 @@ const depPercent = (val) => {
                     <UserIcon v-else-if="r === 'PDG'" class="w-5 h-5" />
                     <ShieldCheckIcon v-else class="w-5 h-5" />
                   </span>
-                  <span class="um-role-name">{{ r.replace('_', ' ') }}</span>
+                  <span class="um-role-name">{{   r.replace('_', ' ')   }}</span>
                 </label>
               </div>
             </div>
@@ -855,7 +877,7 @@ const depPercent = (val) => {
             </div>
 
             <div class="um-form-group">
-              <label class="um-label">Mot de passe {{ editUserId ? '(laisser vide pour ne pas changer)' : 'par défaut' }} <span v-if="!editUserId" style="color:#ef4444;">*</span></label>
+              <label class="um-label">Mot de passe {{   editUserId ? '(laisser vide pour ne pas changer)' : 'par défaut'   }} <span v-if="!editUserId" style="color:#ef4444;">*</span></label>
               <input v-model="userForm.password" type="text" :required="!editUserId" class="um-input" :placeholder="editUserId ? 'Laisser vide pour conserver l\'ancien' : 'Définir un mot de passe...'" />
             </div>
           </form>
@@ -867,7 +889,7 @@ const depPercent = (val) => {
             </div>
             
             <div class="um-alert um-alert-blue" v-if="userForm.role">
-              <strong>Permissions {{ userForm.role.replace('_', ' ') }}</strong>
+              <strong>Permissions {{   userForm.role.replace('_', ' ')   }}</strong>
               <span v-if="userForm.role === 'CAISSIER'">Accès aux encaissements et paiements physiques.</span>
               <span v-else-if="userForm.role === 'COMPTABLE'">Saisie factures et demandes de décaissements.</span>
               <span v-else-if="userForm.role === 'RESPONSABLE_FINANCIER'">Approbation des dépenses &lt; 500k XAF.</span>
@@ -888,7 +910,7 @@ const depPercent = (val) => {
         </div>
         
         <div class="user-modal-foot">
-          <button type="button" @click="showUserModal = false" class="um-btn-cancel">{{ t("common.annuler") }}</button>
+          <button type="button" @click="showUserModal = false" class="um-btn-cancel">{{   t("common.annuler")   }}</button>
           <button type="button" @click="submitUser" class="um-btn-submit" :disabled="!userForm.nom || !userForm.prenom || !userForm.email">
             Confirmer et Enregistrer
           </button>
@@ -1128,7 +1150,8 @@ const depPercent = (val) => {
 .dot.orange { background: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.1); }
 
 /* Donut Chart */
-.donut-container { display: flex; align-items: center; gap: 1.5rem; }
+.donut-container { display: flex; align-items: center; gap: 1.5rem; min-height: 120px; }
+.empty-donut { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #94a3b8; font-size: 0.8rem; font-weight: 600; border: 2px dashed #f1f5f9; border-radius: 12px; padding: 20px; }
 .donut-chart { width: 120px; height: 120px; transform: rotate(-90deg); }
 .donut-legend { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
@@ -1282,5 +1305,38 @@ const depPercent = (val) => {
   .user-avatar { width: 28px; height: 28px; font-size: 0.7rem; }
   .pag-btn { width: 28px; height: 28px; font-size: 0.75rem; }
 }
+/* DARK MODE OVERRIDES */
+body.dark-mode .kpi-card,
+body.dark-mode .activities-card,
+body.dark-mode .chart-card,
+body.dark-mode .feature-card,
+body.dark-mode .dso-card,
+body.dark-mode .depenses-card {
+  background: #151b2d;
+  border-color: #1e293b;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .kpi-label { color: #94a3b8; }
+body.dark-mode .kpi-value { color: #ffffff; }
+body.dark-mode .kpi-desc { color: #64748b; }
+body.dark-mode .activities-title { color: #ffffff; }
+body.dark-mode .timeline-content h4 { color: #f1f5f9; }
+body.dark-mode .timeline-content p { color: #94a3b8; }
+body.dark-mode .timeline-meta .user { color: #cbd5e1; }
+body.dark-mode .chart-title { color: #ffffff; }
+body.dark-mode .legend-label { color: #94a3b8; }
+body.dark-mode .legend-count { color: #f1f5f9; }
+body.dark-mode .dso-label { color: #f1f5f9; }
+body.dark-mode .dso-number { color: #ffffff; }
+body.dark-mode .dso-bar { background: #0b0f1a; }
+body.dark-mode .dep-cat { color: #94a3b8; }
+body.dark-mode .dep-track { background: #0b0f1a; }
+body.dark-mode .dep-amount { color: #f1f5f9; }
+body.dark-mode .data-table th { background: #0b0f1a; color: #94a3b8; border-color: #1e293b; }
+body.dark-mode .data-table td { border-color: #1e293b; color: #cbd5e1; }
+body.dark-mode .user-info strong { color: #f1f5f9; }
+body.dark-mode .input-with-icon input { background: #0b0f1a; border-color: #1e293b; color: #f1f5f9; }
+body.dark-mode .role-badge { background: #1e293b; color: #94a3b8; }
 </style>
 

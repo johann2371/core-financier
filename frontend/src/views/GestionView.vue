@@ -116,7 +116,7 @@ const t = computed(() => langStore.t)
 
 <template>
   <MainLayout>
-    <template #title>{{ t("gestion.titre") }}</template>
+    <template #title>{{   t("gestion.titre")   }}</template>
     <template #subtitle>Budget, factures récurrentes et automatisations</template>
 
     <div class="gestion-page">
@@ -143,19 +143,19 @@ const t = computed(() => langStore.t)
         <div class="budget-grid" v-if="budgets.length > 0">
           <div v-for="b in budgets" :key="b.id" class="budget-card" :class="'status-' + getBudgetStatus(b)">
             <div class="budget-header">
-              <span class="budget-cat">{{ categoryLabels[b.categorie] || b.categorie }}</span>
-              <span class="budget-period">{{ getMoisLabel(b.mois) }} {{ b.annee }}</span>
+              <span class="budget-cat">{{   categoryLabels[b.categorie] || b.categorie   }}</span>
+              <span class="budget-period">{{   getMoisLabel(b.mois)   }} {{   b.annee   }}</span>
             </div>
             <div class="budget-amounts">
-              <span class="consumed">{{ formatCurrency(b.montantConsomme) }}</span>
+              <span class="consumed">{{   formatCurrency(b.montantConsomme)   }}</span>
               <span class="separator">/</span>
-              <span class="total">{{ formatCurrency(b.montantPlafond) }} XAF</span>
+              <span class="total">{{   formatCurrency(b.montantPlafond)   }} XAF</span>
             </div>
             <div class="budget-bar-track">
               <div class="budget-bar-fill" :class="'fill-' + getBudgetStatus(b)" :style="{ width: getBudgetPercent(b) + '%' }"></div>
             </div>
             <div class="budget-footer">
-              <span class="budget-pct">{{ getBudgetPercent(b) }}% utilisé</span>
+              <span class="budget-pct">{{   getBudgetPercent(b)   }}% utilisé</span>
               <span class="budget-alert" v-if="b.alerteEnvoyee">⚠️ Alerte envoyée</span>
               <div class="budget-actions">
                 <button class="btn-icon" @click="openEditBudget(b)" title="Modifier">✏️</button>
@@ -205,7 +205,7 @@ const t = computed(() => langStore.t)
               <li>Statut « En Attente de Paiement » automatique</li>
               <li>Notification envoyée au comptable</li>
             </ul>
-            <div class="auto-status active">✅ Actif — {{ recurrentes.filter(r => r.actif).length }} récurrence(s) configurée(s)</div>
+            <div class="auto-status active">✅ Actif — {{   recurrentes.filter(r => r.actif).length   }} récurrence(s) configurée(s)</div>
           </div>
 
           <div class="auto-card">
@@ -217,7 +217,7 @@ const t = computed(() => langStore.t)
               <li>Notification au RF et au PDG</li>
               <li>Vérification quotidienne</li>
             </ul>
-            <div class="auto-status active">✅ Actif — {{ budgets.length }} budget(s) surveillé(s)</div>
+            <div class="auto-status active">✅ Actif — {{   budgets.length   }} budget(s) surveillé(s)</div>
           </div>
         </div>
       </div>
@@ -226,14 +226,14 @@ const t = computed(() => langStore.t)
       <div v-if="showBudgetModal" class="modal-backdrop fade-in">
         <div class="modal">
           <div class="modal-header">
-            <h3>{{ editBudgetId ? 'Modifier le Budget' : 'Nouveau Budget' }}</h3>
+            <h3>{{   editBudgetId ? 'Modifier le Budget' : 'Nouveau Budget'   }}</h3>
             <button @click="showBudgetModal = false" class="close-btn">&times;</button>
           </div>
           <form @submit.prevent="submitBudget" class="modal-body">
             <div class="form-group">
               <label>Catégorie</label>
               <select v-model="budgetForm.categorie" class="input-std">
-                <option v-for="c in categories" :key="c" :value="c">{{ categoryLabels[c] || c }}</option>
+                <option v-for="c in categories" :key="c" :value="c">{{   categoryLabels[c] || c   }}</option>
               </select>
             </div>
             <div class="form-row">
@@ -244,7 +244,7 @@ const t = computed(() => langStore.t)
               <div class="form-group half">
                 <label>Période</label>
                 <select v-model.number="budgetForm.mois" class="input-std">
-                  <option v-for="m in moisOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
+                  <option v-for="m in moisOptions" :key="m.value" :value="m.value">{{   m.label   }}</option>
                 </select>
               </div>
             </div>
@@ -259,8 +259,8 @@ const t = computed(() => langStore.t)
               </div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn-text" @click="showBudgetModal = false">{{ t("common.annuler") }}</button>
-              <button type="submit" class="btn-primary">{{ editBudgetId ? 'Enregistrer' : 'Créer' }}</button>
+              <button type="button" class="btn-text" @click="showBudgetModal = false">{{   t("common.annuler")   }}</button>
+              <button type="submit" class="btn-primary">{{   editBudgetId ? 'Enregistrer' : 'Créer'   }}</button>
             </div>
           </form>
         </div>

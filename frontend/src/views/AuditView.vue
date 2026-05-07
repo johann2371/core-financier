@@ -254,7 +254,7 @@ const t = computed(() => langStore.t)
         </div>
         <div class="filter-input-mock select">
           <select v-model="filters.action" @change="fetchLogs">
-            <option v-for="a in actions" :key="a.value" :value="a.value">{{ a.label }}</option>
+            <option v-for="a in actions" :key="a.value" :value="a.value">{{   a.label   }}</option>
           </select>
           <AdjustmentsHorizontalIcon class="w-4 h-4 text-slate-400" />
         </div>
@@ -285,19 +285,19 @@ const t = computed(() => langStore.t)
               <tr v-for="log in filteredLogs" :key="log.id">
                 <!-- Timestamp -->
                 <td class="log-date-col">
-                  <div class="log-date">{{ new Date(log.dateAction).toLocaleDateString('en-US', {month:'short', day:'2-digit', year:'numeric'}) }}</div>
-                  <div class="log-time">{{ new Date(log.dateAction).toLocaleTimeString('en-US', {hour12:false}) }} UTC</div>
+                  <div class="log-date">{{   new Date(log.dateAction).toLocaleDateString('en-US', {month:'short', day:'2-digit', year:'numeric'})   }}</div>
+                  <div class="log-time">{{   new Date(log.dateAction).toLocaleTimeString('en-US', {hour12:false})   }} UTC</div>
                 </td>
                 
                 <!-- USER -->
                 <td>
                   <div class="mock-user-cell">
                     <div class="mock-avatar" :style="{ backgroundColor: getAvatarColor(log.utilisateur?.prenom), color: 'white' }">
-                      {{ log.utilisateur?.prenom ? log.utilisateur.prenom.charAt(0) + (log.utilisateur.nom ? log.utilisateur.nom.charAt(0) : '') : 'SY' }}
+                      {{   log.utilisateur?.prenom ? log.utilisateur.prenom.charAt(0) + (log.utilisateur.nom ? log.utilisateur.nom.charAt(0) : '') : 'SY'   }}
                     </div>
                     <div class="mock-user-info">
-                      <strong class="mock-user-name">{{ log.utilisateur ? `${log.utilisateur.prenom} ${log.utilisateur.nom}` : 'Système' }}</strong>
-                      <span class="mock-role">{{ log.utilisateur?.role ? log.utilisateur.role.replace('_', ' ') : 'System Admin' }}</span>
+                      <strong class="mock-user-name">{{   log.utilisateur ? `${log.utilisateur.prenom} ${log.utilisateur.nom}` : 'Système'   }}</strong>
+                      <span class="mock-role">{{   log.utilisateur?.role ? log.utilisateur.role.replace('_', ' ') : 'System Admin'   }}</span>
                     </div>
                   </div>
                 </td>
@@ -305,21 +305,21 @@ const t = computed(() => langStore.t)
                 <!-- ACTION TYPE -->
                 <td>
                   <div class="mock-badge" :class="getActionBadgeClass(log.action)">
-                    {{ log.action || 'INCONNU' }}
+                    {{   log.action || 'INCONNU'   }}
                   </div>
                 </td>
                 
                 <!-- MODULE -->
-                <td class="mock-module">{{ log.entite || 'Général' }}</td>
+                <td class="mock-module">{{   log.entite || 'Général'   }}</td>
                 
                 <!-- DETAILS -->
                 <td class="mock-details">
-                  {{ log.entiteId ? `Action sur la ressource #${log.entiteId}` : 'Modification globale' }}
+                  {{   log.entiteId ? `Action sur la ressource #${log.entiteId}` : 'Modification globale'   }}
                   <button v-if="log.nouvellesValeurs || log.anciennesValeurs" class="btn-link" style="margin-left:8px; font-size:12px; color:#2563eb; background:none; border:none; cursor:pointer;" @click="openDetails(log)">Détails</button>
                 </td>
                 
                 <!-- IP -->
-                <td class="mock-ip">{{ log.adresseIp || 'N/A' }}</td>
+                <td class="mock-ip">{{   log.adresseIp || 'N/A'   }}</td>
               </tr>
               <tr v-if="filteredLogs.length === 0">
                 <td colspan="6" class="text-center" style="padding: 2rem; color: #64748b;">Aucun événement d'audit trouvé.</td>
@@ -330,7 +330,7 @@ const t = computed(() => langStore.t)
 
         <!-- NEW MOCK PAGINATION ATTACHED TO TABLE -->
         <div class="mock-pagination-bar" v-if="auditStore.totalPages > 1">
-          <div class="pag-left">Affichage de <strong>{{ (auditStore.currentPage * auditStore.pageSize) + 1 }} à {{ Math.min((auditStore.currentPage + 1) * auditStore.pageSize, auditStore.totalElements) }}</strong> sur <strong>{{ auditStore.totalElements }}</strong> événements</div>
+          <div class="pag-left">Affichage de <strong>{{   (auditStore.currentPage * auditStore.pageSize) + 1   }} à {{   Math.min((auditStore.currentPage + 1) * auditStore.pageSize, auditStore.totalElements)   }}</strong> sur <strong>{{   auditStore.totalElements   }}</strong> événements</div>
           <div class="pag-center">
             <button class="pag-btn" :disabled="auditStore.currentPage === 0" @click="auditStore.fetchLogs(auditStore.currentPage - 1)">&lt;</button>
             <button 
@@ -340,12 +340,12 @@ const t = computed(() => langStore.t)
                 :class="{ active: auditStore.currentPage === (page - 1) }"
                 @click="auditStore.fetchLogs(page - 1)"
             >
-              {{ page }}
+              {{   page   }}
             </button>
             <button class="pag-btn" :disabled="auditStore.currentPage >= auditStore.totalPages - 1" @click="auditStore.fetchLogs(auditStore.currentPage + 1)">&gt;</button>
           </div>
           <div class="pag-right">
-            Limiter à: <strong>{{ auditStore.pageSize }}</strong> / page
+            Limiter à: <strong>{{   auditStore.pageSize   }}</strong> / page
           </div>
         </div>
       </div>
@@ -357,7 +357,7 @@ const t = computed(() => langStore.t)
             <ClockIcon class="w-4 h-4 text-slate-400" />
             <span>JOURNAL EN DIRECT</span>
           </div>
-          <div class="mw-value">{{ auditStore.totalElements.toLocaleString() }}</div>
+          <div class="mw-value">{{   auditStore.totalElements.toLocaleString()   }}</div>
           <div class="mw-footer text-green">
             <ArrowTrendingUpIcon class="w-3 h-3" />
             Total logs enregistrés
@@ -369,7 +369,7 @@ const t = computed(() => langStore.t)
             <TrashIcon class="w-4 h-4 text-red-500" />
             <span class="text-red">ACTIONS CRITIQUES</span>
           </div>
-          <div class="mw-value">{{ criticalActionsCount }}</div>
+          <div class="mw-value">{{   criticalActionsCount   }}</div>
           <div class="mw-footer">Sur la page actuelle</div>
         </div>
 
@@ -378,7 +378,7 @@ const t = computed(() => langStore.t)
             <CheckCircleIcon class="w-4 h-4 text-green-500" />
             <span class="text-green">VALIDATIONS</span>
           </div>
-          <div class="mw-value">{{ validationsCount }}</div>
+          <div class="mw-value">{{   validationsCount   }}</div>
           <div class="mw-footer">Sur la page actuelle</div>
         </div>
 
@@ -387,7 +387,7 @@ const t = computed(() => langStore.t)
             <ServerIcon class="w-4 h-4 text-blue-500" />
             <span class="text-blue">IPS UNIQUES</span>
           </div>
-          <div class="mw-value">{{ uniqueIpsCount }}</div>
+          <div class="mw-value">{{   uniqueIpsCount   }}</div>
           <div class="mw-footer">Sur la page actuelle</div>
         </div>
       </div>
@@ -397,41 +397,41 @@ const t = computed(() => langStore.t)
     <div v-if="showDetailsModal" class="modal-backdrop fade-in" @click.self="showDetailsModal = false">
       <div class="modal modal-lg">
         <div class="modal-header">
-          <h3>Détails du Log #{{ selectedLog?.id }}</h3>
+          <h3>Détails du Log #{{   selectedLog?.id   }}</h3>
           <button @click="showDetailsModal = false" class="close-btn">&times;</button>
         </div>
         <div class="modal-body">
           <div class="audit-details-grid">
             <div class="detail-item">
               <label>Date</label>
-              <span>{{ new Date(selectedLog?.dateAction).toLocaleString() }}</span>
+              <span>{{   new Date(selectedLog?.dateAction).toLocaleString()   }}</span>
             </div>
             <div class="detail-item">
               <label>Utilisateur</label>
-              <span>{{ selectedLog?.utilisateur ? `${selectedLog.utilisateur.prenom} ${selectedLog.utilisateur.nom}` : 'SYSTEM' }}</span>
+              <span>{{   selectedLog?.utilisateur ? `${selectedLog.utilisateur.prenom} ${selectedLog.utilisateur.nom}` : 'SYSTEM'   }}</span>
             </div>
             <div class="detail-item">
               <label>Action</label>
-              <span class="badge" :class="getActionBadgeClass(selectedLog?.action)">{{ selectedLog?.action }}</span>
+              <span class="badge" :class="getActionBadgeClass(selectedLog?.action)">{{   selectedLog?.action   }}</span>
             </div>
             <div class="detail-item">
               <label>Entité</label>
-              <span>{{ selectedLog?.entite }} (ID: {{ selectedLog?.entiteId }})</span>
+              <span>{{   selectedLog?.entite   }} (ID: {{   selectedLog?.entiteId   }})</span>
             </div>
           </div>
 
           <div class="mt-4">
             <label class="section-label">ANCIEENNES VALEURS</label>
-            <pre class="code-block">{{ formatValues(selectedLog?.anciennesValeurs) }}</pre>
+            <pre class="code-block">{{   formatValues(selectedLog?.anciennesValeurs)   }}</pre>
           </div>
 
           <div class="mt-4">
             <label class="section-label">NOUVELLES VALEURS</label>
-            <pre class="code-block">{{ formatValues(selectedLog?.nouvellesValeurs) }}</pre>
+            <pre class="code-block">{{   formatValues(selectedLog?.nouvellesValeurs)   }}</pre>
           </div>
         </div>
         <div class="modal-footer">
-          <button @click="showDetailsModal = false" class="btn-primary">{{ t("common.fermer") }}</button>
+          <button @click="showDetailsModal = false" class="btn-primary">{{   t("common.fermer")   }}</button>
         </div>
       </div>
     </div>

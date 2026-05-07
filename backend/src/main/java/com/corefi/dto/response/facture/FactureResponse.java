@@ -3,6 +3,7 @@ package com.corefi.dto.response.facture;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 public class FactureResponse {
@@ -19,4 +20,6 @@ public class FactureResponse {
     // Traçabilité
     private String creeParNom;
     private String valideParNom;
+    private LocalDateTime dateSaisie;
+    private LocalDateTime dateValidation;
 }
