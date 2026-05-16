@@ -41,10 +41,42 @@ public class PdfServiceImpl implements IPdfService {
     private final SessionCaisseRepository sessionCaisseRepository;
     private final com.corefi.repository.TiersRepository tiersRepository;
 
+    @org.springframework.beans.factory.annotation.Value("${file.upload-dir:uploads}")
+    private String uploadDir;
+
     private String getNomSociete() {
         return parametrageRepository.findByCle("INFO_SOCIETE_NOM")
                 .map(Parametrage::getValeur)
                 .orElse("SODICA SARL");
+    }
+
+    private boolean ajouterLogo(Document document) {
+        try {
+            String logoPath = parametrageRepository.findByCle("INVOICE_LOGO_URL")
+                    .map(Parametrage::getValeur)
+                    .orElse("");
+
+            if (logoPath != null && !logoPath.isEmpty()) {
+                if (logoPath.startsWith("/api/uploads/")) {
+                    logoPath = logoPath.substring("/api/uploads/".length());
+                } else if (logoPath.startsWith("/uploads/")) {
+                    logoPath = logoPath.substring("/uploads/".length());
+                }
+
+                java.nio.file.Path path = java.nio.file.Paths.get(uploadDir).resolve(logoPath).toAbsolutePath().normalize();
+
+                if (java.nio.file.Files.exists(path)) {
+                    Image img = Image.getInstance(path.toString());
+                    img.scaleToFit(140, 100); // Taille augmentée
+                    img.setAlignment(Element.ALIGN_CENTER);
+                    document.add(img);
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erreur lors de l'ajout du logo au PDF: " + e.getMessage());
+        }
+        return false;
     }
 
     @Override
@@ -73,17 +105,23 @@ public class PdfServiceImpl implements IPdfService {
             document.open();
             System.out.println("Document ouvert");
 
-            // En-tête de l'entreprise (SODICA SARL)
-            Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
-            Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
-            titreApp.setAlignment(Element.ALIGN_CENTER);
-            document.add(titreApp);
+            // Ajout du Logo si configuré
+            boolean logoAjoute = ajouterLogo(document);
+
+            if (!logoAjoute) {
+                // En-tête de l'entreprise (uniquement si pas de logo)
+                Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
+                Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
+                titreApp.setAlignment(Element.ALIGN_CENTER);
+                document.add(titreApp);
+            }
 
             document.add(new Paragraph(" ")); // Espace vide
-            
+
             // Titre Facture
             Font fontFacture = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
-            Paragraph titreFact = new Paragraph("FACTURE N° " + (facture.getNumero() != null ? facture.getNumero() : "N/A"), fontFacture);
+            Paragraph titreFact = new Paragraph(
+                    "FACTURE N° " + (facture.getNumero() != null ? facture.getNumero() : "N/A"), fontFacture);
             titreFact.setAlignment(Element.ALIGN_CENTER);
             document.add(titreFact);
 
@@ -92,18 +130,24 @@ public class PdfServiceImpl implements IPdfService {
             // Informations générales
             PdfPTable tableInfo = new PdfPTable(2);
             tableInfo.setWidthPercentage(100);
-            
+
             PdfPCell cellG = new PdfPCell();
             cellG.setBorder(Rectangle.NO_BORDER);
-            String dateF = facture.getDateFacture() != null ? facture.getDateFacture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
+            String dateF = facture.getDateFacture() != null
+                    ? facture.getDateFacture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    : "N/A";
             cellG.addElement(new Paragraph("Date d'émission: " + dateF));
-            cellG.addElement(new Paragraph("Date d'échéance: " + (facture.getDateEcheance() != null ? facture.getDateEcheance().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "-")));
-            
+            cellG.addElement(new Paragraph("Date d'échéance: " + (facture.getDateEcheance() != null
+                    ? facture.getDateEcheance().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    : "-")));
+
             PdfPCell cellD = new PdfPCell();
             cellD.setBorder(Rectangle.NO_BORDER);
             cellD.addElement(new Paragraph("Client: " + (client != null ? client.getRaisonSociale() : "Divers")));
-            cellD.addElement(new Paragraph("Adresse: " + (client != null && client.getAdresse() != null ? client.getAdresse() : "-")));
-            cellD.addElement(new Paragraph("Téléphone: " + (client != null && client.getTelephone() != null ? client.getTelephone() : "-")));
+            cellD.addElement(new Paragraph(
+                    "Adresse: " + (client != null && client.getAdresse() != null ? client.getAdresse() : "-")));
+            cellD.addElement(new Paragraph(
+                    "Téléphone: " + (client != null && client.getTelephone() != null ? client.getTelephone() : "-")));
 
             tableInfo.addCell(cellG);
             tableInfo.addCell(cellD);
@@ -128,8 +172,10 @@ public class PdfServiceImpl implements IPdfService {
                 for (LigneFacture ligne : facture.getLignes()) {
                     tableLignes.addCell(new Phrase(ligne.getDesignation() != null ? ligne.getDesignation() : ""));
                     tableLignes.addCell(new Phrase(ligne.getQuantite() != null ? ligne.getQuantite().toString() : "0"));
-                    tableLignes.addCell(new Phrase(String.format("%.2f", ligne.getPrixUnitaire() != null ? ligne.getPrixUnitaire() : 0.0)));
-                    tableLignes.addCell(new Phrase(String.format("%.2f", ligne.getMontantHt() != null ? ligne.getMontantHt() : 0.0)));
+                    tableLignes.addCell(new Phrase(
+                            String.format("%.2f", ligne.getPrixUnitaire() != null ? ligne.getPrixUnitaire() : 0.0)));
+                    tableLignes.addCell(new Phrase(
+                            String.format("%.2f", ligne.getMontantHt() != null ? ligne.getMontantHt() : 0.0)));
                 }
             }
             document.add(tableLignes);
@@ -143,25 +189,33 @@ public class PdfServiceImpl implements IPdfService {
 
             PdfPCell cellVide = new PdfPCell(new Phrase(""));
             cellVide.setBorder(Rectangle.NO_BORDER);
-            
+
             String cur = (facture.getDevise() != null ? facture.getDevise().getCode() : "XAF");
 
             tableTotal.addCell(cellVide);
-            tableTotal.addCell(new Phrase("Montant HT: " + String.format("%.2f", facture.getMontantHt() != null ? facture.getMontantHt() : 0.0) + " " + cur));
-            
+            tableTotal.addCell(new Phrase("Montant HT: "
+                    + String.format("%.2f", facture.getMontantHt() != null ? facture.getMontantHt() : 0.0) + " "
+                    + cur));
+
             tableTotal.addCell(cellVide);
-            tableTotal.addCell(new Phrase("Montant TVA: " + String.format("%.2f", facture.getMontantTva() != null ? facture.getMontantTva() : 0.0) + " " + cur));
-            
+            tableTotal.addCell(new Phrase("Montant TVA: "
+                    + String.format("%.2f", facture.getMontantTva() != null ? facture.getMontantTva() : 0.0) + " "
+                    + cur));
+
             tableTotal.addCell(cellVide);
-            PdfPCell cellTTC = new PdfPCell(new Phrase("Montant TTC: " + String.format("%.2f", facture.getMontantTtc() != null ? facture.getMontantTtc() : 0.0) + " " + cur, fontHead));
+            PdfPCell cellTTC = new PdfPCell(new Phrase("Montant TTC: "
+                    + String.format("%.2f", facture.getMontantTtc() != null ? facture.getMontantTtc() : 0.0) + " "
+                    + cur, fontHead));
             cellTTC.setBorder(Rectangle.TOP);
             tableTotal.addCell(cellTTC);
-            
+
             document.add(tableTotal);
 
             // Pied de page
             document.add(new Paragraph(" "));
-            Paragraph footer = new Paragraph("Statut de la facture : " + (facture.getStatut() != null ? facture.getStatut().name() : "N/A"), FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10));
+            Paragraph footer = new Paragraph(
+                    "Statut de la facture : " + (facture.getStatut() != null ? facture.getStatut().name() : "N/A"),
+                    FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10));
             footer.setAlignment(Element.ALIGN_CENTER);
             document.add(footer);
 
@@ -175,7 +229,6 @@ public class PdfServiceImpl implements IPdfService {
             throw new WorkflowException("Erreur lors de la génération du PDF : " + e.getMessage());
         }
     }
-
 
     @Override
     @Transactional(readOnly = true)
@@ -195,14 +248,19 @@ public class PdfServiceImpl implements IPdfService {
 
             document.open();
 
-            // En-tête
-            Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
-            Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
-            titreApp.setAlignment(Element.ALIGN_CENTER);
-            document.add(titreApp);
+            // Logo
+            boolean logoAjoute = ajouterLogo(document);
 
-            document.add(new Paragraph(" ")); 
-            
+            if (!logoAjoute) {
+                // En-tête
+                Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
+                Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
+                titreApp.setAlignment(Element.ALIGN_CENTER);
+                document.add(titreApp);
+            }
+
+            document.add(new Paragraph(" "));
+
             // Titre Reçu
             Font fontRecu = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
             Paragraph titreRecu = new Paragraph("REÇU D'ENCAISSEMENT N° " + encaissement.getNumero(), fontRecu);
@@ -214,9 +272,12 @@ public class PdfServiceImpl implements IPdfService {
 
             // Informations
             Font fontTexte = FontFactory.getFont(FontFactory.HELVETICA, 12);
-            document.add(new Paragraph("Date du paiement: " + encaissement.getDateEncaissement().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
+            document.add(new Paragraph(
+                    "Date du paiement: "
+                            + encaissement.getDateEncaissement().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                    fontTexte));
             document.add(new Paragraph("Moyen de paiement: " + encaissement.getMoyenPaiement().name(), fontTexte));
-            
+
             // Métadonnées de paiement dynamiques
             if (encaissement.getBanqueEmettrice() != null) {
                 document.add(new Paragraph("Banque: " + encaissement.getBanqueEmettrice(), fontTexte));
@@ -225,7 +286,10 @@ public class PdfServiceImpl implements IPdfService {
                 document.add(new Paragraph("N° Opération: " + encaissement.getNumeroOperation(), fontTexte));
             }
             if (encaissement.getDateOperation() != null) {
-                document.add(new Paragraph("Date Opération: " + encaissement.getDateOperation().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
+                document.add(new Paragraph(
+                        "Date Opération: "
+                                + encaissement.getDateOperation().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                        fontTexte));
             }
             if (encaissement.getTelephone() != null) {
                 document.add(new Paragraph("Téléphone (Mobile Money): " + encaissement.getTelephone(), fontTexte));
@@ -234,24 +298,27 @@ public class PdfServiceImpl implements IPdfService {
             if (encaissement.getReference() != null && !encaissement.getReference().isEmpty()) {
                 document.add(new Paragraph("Référence / Motif: " + encaissement.getReference(), fontTexte));
             }
-            
+
             document.add(new Paragraph(" "));
-            
+
             String clientNom = client != null ? client.getRaisonSociale() : "Client Divers";
             document.add(new Paragraph("Client: " + clientNom, fontTexte));
-            
+
             document.add(new Paragraph(" "));
-            
+
             Font fontMontant = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
             String deviseCode = encaissement.getDevise() != null ? encaissement.getDevise().getCode() : "XAF";
-            Paragraph pMontant = new Paragraph("Montant encaissé : " + String.format("%.2f", encaissement.getMontant()) + " " + deviseCode, fontMontant);
+            Paragraph pMontant = new Paragraph(
+                    "Montant encaissé : " + String.format("%.2f", encaissement.getMontant()) + " " + deviseCode,
+                    fontMontant);
             pMontant.setAlignment(Element.ALIGN_RIGHT);
             document.add(pMontant);
 
             // Pied de page
             document.add(new Paragraph(" "));
             document.add(new Paragraph(" "));
-            Paragraph footer = new Paragraph("Reçu généré électroniquement. Merci de votre confiance.", FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10));
+            Paragraph footer = new Paragraph("Reçu généré électroniquement. Merci de votre confiance.",
+                    FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10));
             footer.setAlignment(Element.ALIGN_CENTER);
             document.add(footer);
 
@@ -289,13 +356,18 @@ public class PdfServiceImpl implements IPdfService {
 
             document.open();
 
-            // En-tête
-            Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
-            Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
-            titreApp.setAlignment(Element.ALIGN_CENTER);
-            document.add(titreApp);
-            document.add(new Paragraph(" ")); 
-            
+            // Logo
+            boolean logoAjoute = ajouterLogo(document);
+
+            if (!logoAjoute) {
+                // En-tête
+                Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
+                Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
+                titreApp.setAlignment(Element.ALIGN_CENTER);
+                document.add(titreApp);
+            }
+            document.add(new Paragraph(" "));
+
             // Titre Reçu
             Font fontRecu = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
             Paragraph titreRecu = new Paragraph("BON DE DÉCAISSEMENT N° " + decaissement.getNumero(), fontRecu);
@@ -307,14 +379,20 @@ public class PdfServiceImpl implements IPdfService {
 
             // Informations
             Font fontTexte = FontFactory.getFont(FontFactory.HELVETICA, 12);
-            document.add(new Paragraph("Date de création: " + decaissement.getDateSaisie().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
+            document.add(new Paragraph(
+                    "Date de création: "
+                            + decaissement.getDateSaisie().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                    fontTexte));
             if (decaissement.getDateExecution() != null) {
-                document.add(new Paragraph("Date d'exécution: " + decaissement.getDateExecution().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
+                document.add(new Paragraph(
+                        "Date d'exécution: "
+                                + decaissement.getDateExecution().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                        fontTexte));
             }
             if (decaissement.getMoyenPaiement() != null) {
                 document.add(new Paragraph("Moyen de paiement: " + decaissement.getMoyenPaiement().name(), fontTexte));
             }
-            
+
             // Métadonnées de paiement dynamiques
             if (decaissement.getBanqueEmettrice() != null) {
                 document.add(new Paragraph("Banque: " + decaissement.getBanqueEmettrice(), fontTexte));
@@ -323,33 +401,39 @@ public class PdfServiceImpl implements IPdfService {
                 document.add(new Paragraph("N° Opération: " + decaissement.getNumeroOperation(), fontTexte));
             }
             if (decaissement.getDateOperation() != null) {
-                document.add(new Paragraph("Date Opération: " + decaissement.getDateOperation().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), fontTexte));
+                document.add(new Paragraph(
+                        "Date Opération: "
+                                + decaissement.getDateOperation().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                        fontTexte));
             }
             if (decaissement.getTelephone() != null) {
                 document.add(new Paragraph("Téléphone (Mobile Money): " + decaissement.getTelephone(), fontTexte));
             }
 
             document.add(new Paragraph("Motif: " + decaissement.getMotif(), fontTexte));
-            
+
             document.add(new Paragraph(" "));
-            
+
             String fournNom = fournisseur != null ? fournisseur.getRaisonSociale() : "Fournisseur Divers";
             document.add(new Paragraph("Bénéficiaire / Fournisseur: " + fournNom, fontTexte));
             if (decaissement.getBeneficiaire() != null) {
                 document.add(new Paragraph("À l'attention de: " + decaissement.getBeneficiaire(), fontTexte));
             }
-            
+
             document.add(new Paragraph(" "));
-            
+
             Font fontMontant = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
             String deviseCode = decaissement.getDevise() != null ? decaissement.getDevise().getCode() : "XAF";
-            Paragraph pMontant = new Paragraph("Montant payé : " + String.format("%.2f", decaissement.getMontant()) + " " + deviseCode, fontMontant);
+            Paragraph pMontant = new Paragraph(
+                    "Montant payé : " + String.format("%.2f", decaissement.getMontant()) + " " + deviseCode,
+                    fontMontant);
             pMontant.setAlignment(Element.ALIGN_RIGHT);
             document.add(pMontant);
 
             document.add(new Paragraph(" "));
             document.add(new Paragraph(" "));
-            Paragraph footer = new Paragraph("Bon de décaissement - " + decaissement.getStatut().name(), FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10));
+            Paragraph footer = new Paragraph("Bon de décaissement - " + decaissement.getStatut().name(),
+                    FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10));
             footer.setAlignment(Element.ALIGN_CENTER);
             document.add(footer);
 
@@ -382,11 +466,16 @@ public class PdfServiceImpl implements IPdfService {
 
             document.open();
 
-            // Header
-            Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
-            Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
-            titreApp.setAlignment(Element.ALIGN_CENTER);
-            document.add(titreApp);
+            // Logo
+            boolean logoAjoute = ajouterLogo(document);
+
+            if (!logoAjoute) {
+                // Header
+                Font fontTitre = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.DARK_GRAY);
+                Paragraph titreApp = new Paragraph(getNomSociete(), fontTitre);
+                titreApp.setAlignment(Element.ALIGN_CENTER);
+                document.add(titreApp);
+            }
 
             document.add(new Paragraph(" "));
 
@@ -400,14 +489,22 @@ public class PdfServiceImpl implements IPdfService {
             // Session Info
             Font fontBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11);
             Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 11);
-            
+
             document.add(new Paragraph("Caisse: " + session.getCaisse().getLibelle(), fontNormal));
-            document.add(new Paragraph("Caissier: " + session.getCaissier().getNom() + " " + session.getCaissier().getPrenom(), fontNormal));
-            document.add(new Paragraph("Date Ouverture: " + session.getDateOuverture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")), fontNormal));
+            document.add(new Paragraph(
+                    "Caissier: " + session.getCaissier().getNom() + " " + session.getCaissier().getPrenom(),
+                    fontNormal));
+            document.add(new Paragraph(
+                    "Date Ouverture: "
+                            + session.getDateOuverture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
+                    fontNormal));
             if (session.getDateFermeture() != null) {
-                document.add(new Paragraph("Date Fermeture: " + session.getDateFermeture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")), fontNormal));
+                document.add(new Paragraph(
+                        "Date Fermeture: "
+                                + session.getDateFermeture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
+                        fontNormal));
             }
-            
+
             document.add(new Paragraph(" "));
 
             // Table Encaissements
@@ -415,14 +512,16 @@ public class PdfServiceImpl implements IPdfService {
             document.add(new Paragraph(" "));
             PdfPTable tableEnc = new PdfPTable(3);
             tableEnc.setWidthPercentage(100);
-            tableEnc.setWidths(new float[]{2f, 5f, 3f});
+            tableEnc.setWidths(new float[] { 2f, 5f, 3f });
             ajouterCelluleEnTete(tableEnc, "N°", fontBold);
             ajouterCelluleEnTete(tableEnc, "Motif / Client", fontBold);
             ajouterCelluleEnTete(tableEnc, "Montant (XAF)", fontBold);
 
             for (Encaissement e : encaissements) {
                 tableEnc.addCell(new Phrase(e.getNumero(), fontNormal));
-                tableEnc.addCell(new Phrase((e.getClient() != null ? e.getClient().getRaisonSociale() + " - " : "") + e.getReference(), fontNormal));
+                tableEnc.addCell(new Phrase(
+                        (e.getClient() != null ? e.getClient().getRaisonSociale() + " - " : "") + e.getReference(),
+                        fontNormal));
                 tableEnc.addCell(new Phrase(String.format("%,.0f", e.getMontant()), fontNormal));
             }
             if (encaissements.isEmpty()) {
@@ -439,7 +538,7 @@ public class PdfServiceImpl implements IPdfService {
             document.add(new Paragraph(" "));
             PdfPTable tableDec = new PdfPTable(3);
             tableDec.setWidthPercentage(100);
-            tableDec.setWidths(new float[]{2f, 5f, 3f});
+            tableDec.setWidths(new float[] { 2f, 5f, 3f });
             ajouterCelluleEnTete(tableDec, "N°", fontBold);
             ajouterCelluleEnTete(tableDec, "Motif", fontBold);
             ajouterCelluleEnTete(tableDec, "Montant (XAF)", fontBold);
@@ -466,22 +565,24 @@ public class PdfServiceImpl implements IPdfService {
             tableRecap.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
             ajouterRecapRow(tableRecap, "Solde Initial (A):", session.getSoldeInitial());
-            ajouterRecapRow(tableRecap, "Total Recettes (+):", encaissements.stream().map(Encaissement::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add));
-            ajouterRecapRow(tableRecap, "Total Dépenses (-):", decaissements.stream().map(Decaissement::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add));
+            ajouterRecapRow(tableRecap, "Total Recettes (+):",
+                    encaissements.stream().map(Encaissement::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add));
+            ajouterRecapRow(tableRecap, "Total Dépenses (-):",
+                    decaissements.stream().map(Decaissement::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add));
             document.add(tableRecap);
-            
+
             document.add(new Paragraph(" "));
-            
+
             PdfPTable tableTotal = new PdfPTable(2);
             tableTotal.setWidthPercentage(60);
             tableTotal.setHorizontalAlignment(Element.ALIGN_RIGHT);
-            
+
             ajouterRecapRowBold(tableTotal, "Solde Théorique (B):", session.getSoldeFinalTheorique());
             ajouterRecapRowBold(tableTotal, "Solde Réel compté (C):", session.getSoldeFinalReel());
-            
+
             BaseColor ecartColor = session.getEcart().compareTo(BigDecimal.ZERO) == 0 ? BaseColor.BLACK : BaseColor.RED;
             ajouterRecapRowColored(tableTotal, "ÉCART (C - B):", session.getEcart(), ecartColor);
-            
+
             document.add(tableTotal);
 
             if (session.getMotifEcart() != null && !session.getMotifEcart().isEmpty()) {
@@ -565,22 +666,27 @@ public class PdfServiceImpl implements IPdfService {
             PdfWriter.getInstance(document, baos);
             document.open();
 
-            // En-tête
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, new BaseColor(30, 41, 59));
-            Font subtitleFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.GRAY);
-            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, BaseColor.WHITE);
-            Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 9, BaseColor.DARK_GRAY);
-            Font sectionFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, new BaseColor(37, 99, 235));
+            // Logo
+            boolean logoAjoute = ajouterLogo(document);
 
-            document.add(new Paragraph(getNomSociete(), titleFont));
-            document.add(new Paragraph("RELEVÉ DE COMPTE", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, new BaseColor(37, 99, 235))));
+            if (!logoAjoute) {
+                document.add(new Paragraph(getNomSociete(), titleFont));
+            }
+            document.add(new Paragraph("RELEVÉ DE COMPTE",
+                    FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, new BaseColor(37, 99, 235))));
             document.add(Chunk.NEWLINE);
 
             // Infos tiers
-            document.add(new Paragraph("Client / Fournisseur : " + tiers.getRaisonSociale(), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11)));
-            document.add(new Paragraph("Code : " + tiers.getCode() + "  |  Email : " + (tiers.getEmail() != null ? tiers.getEmail() : "—"), subtitleFont));
-            document.add(new Paragraph("Solde actuel : " + String.format("%,.0f XAF", tiers.getSolde()), FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11, new BaseColor(220, 38, 38))));
-            document.add(new Paragraph("Date d'édition : " + java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), subtitleFont));
+            document.add(new Paragraph("Client / Fournisseur : " + tiers.getRaisonSociale(),
+                    FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11)));
+            document.add(new Paragraph(
+                    "Code : " + tiers.getCode() + "  |  Email : " + (tiers.getEmail() != null ? tiers.getEmail() : "—"),
+                    subtitleFont));
+            document.add(new Paragraph("Solde actuel : " + String.format("%,.0f XAF", tiers.getSolde()),
+                    FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11, new BaseColor(220, 38, 38))));
+            document.add(new Paragraph(
+                    "Date d'édition : " + java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                    subtitleFont));
             document.add(Chunk.NEWLINE);
             document.add(new LineSeparator());
             document.add(Chunk.NEWLINE);
@@ -592,11 +698,11 @@ public class PdfServiceImpl implements IPdfService {
             if (factures.isEmpty()) {
                 document.add(new Paragraph("Aucune facture enregistrée.", cellFont));
             } else {
-                PdfPTable table = new PdfPTable(new float[]{2, 1.5f, 1.5f, 1.5f, 1.5f});
+                PdfPTable table = new PdfPTable(new float[] { 2, 1.5f, 1.5f, 1.5f, 1.5f });
                 table.setWidthPercentage(100);
 
                 BaseColor headerBg = new BaseColor(37, 99, 235);
-                for (String h : new String[]{"N° Facture", "Date", "Échéance", "Montant TTC", "Statut"}) {
+                for (String h : new String[] { "N° Facture", "Date", "Échéance", "Montant TTC", "Statut" }) {
                     PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
                     cell.setBackgroundColor(headerBg);
                     cell.setPadding(6);
@@ -606,8 +712,12 @@ public class PdfServiceImpl implements IPdfService {
                 BigDecimal totalFactures = BigDecimal.ZERO;
                 for (Facture f : factures) {
                     table.addCell(new PdfPCell(new Phrase(f.getNumero(), cellFont)));
-                    table.addCell(new PdfPCell(new Phrase(f.getDateFacture() != null ? f.getDateFacture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "—", cellFont)));
-                    table.addCell(new PdfPCell(new Phrase(f.getDateEcheance() != null ? f.getDateEcheance().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "—", cellFont)));
+                    table.addCell(new PdfPCell(new Phrase(f.getDateFacture() != null
+                            ? f.getDateFacture().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                            : "—", cellFont)));
+                    table.addCell(new PdfPCell(new Phrase(f.getDateEcheance() != null
+                            ? f.getDateEcheance().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                            : "—", cellFont)));
                     PdfPCell mCell = new PdfPCell(new Phrase(String.format("%,.0f", f.getMontantTtc()), cellFont));
                     mCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
                     table.addCell(mCell);
@@ -630,11 +740,11 @@ public class PdfServiceImpl implements IPdfService {
             if (encaissements.isEmpty()) {
                 document.add(new Paragraph("Aucun paiement enregistré.", cellFont));
             } else {
-                PdfPTable table2 = new PdfPTable(new float[]{2, 1.5f, 1.5f, 1.5f});
+                PdfPTable table2 = new PdfPTable(new float[] { 2, 1.5f, 1.5f, 1.5f });
                 table2.setWidthPercentage(100);
 
                 BaseColor headerBg2 = new BaseColor(16, 185, 129);
-                for (String h : new String[]{"N° Reçu", "Date", "Montant", "Moyen"}) {
+                for (String h : new String[] { "N° Reçu", "Date", "Montant", "Moyen" }) {
                     PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
                     cell.setBackgroundColor(headerBg2);
                     cell.setPadding(6);
@@ -644,11 +754,17 @@ public class PdfServiceImpl implements IPdfService {
                 BigDecimal totalPaye = BigDecimal.ZERO;
                 for (Encaissement e : encaissements) {
                     table2.addCell(new PdfPCell(new Phrase(e.getNumero(), cellFont)));
-                    table2.addCell(new PdfPCell(new Phrase(e.getDateEncaissement() != null ? e.getDateEncaissement().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "—", cellFont)));
+                    table2.addCell(
+                            new PdfPCell(
+                                    new Phrase(
+                                            e.getDateEncaissement() != null ? e.getDateEncaissement()
+                                                    .format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "—",
+                                            cellFont)));
                     PdfPCell mCell = new PdfPCell(new Phrase(String.format("%,.0f", e.getMontant()), cellFont));
                     mCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
                     table2.addCell(mCell);
-                    table2.addCell(new PdfPCell(new Phrase(e.getMoyenPaiement() != null ? e.getMoyenPaiement().name() : "—", cellFont)));
+                    table2.addCell(new PdfPCell(
+                            new Phrase(e.getMoyenPaiement() != null ? e.getMoyenPaiement().name() : "—", cellFont)));
                     totalPaye = totalPaye.add(e.getMontant());
                 }
                 document.add(table2);
@@ -666,4 +782,3 @@ public class PdfServiceImpl implements IPdfService {
     }
 
 }
-

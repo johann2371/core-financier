@@ -22,7 +22,7 @@ public class ParametrageServiceImpl implements IParametrageService {
     @Override
     public List<ParametrageResponse> getAll() {
         return parametrageRepository.findAll().stream()
-                .map(p -> new ParametrageResponse(p.getId(), p.getCle(), p.getValeur(), p.getDescription()))
+                .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
@@ -30,20 +30,30 @@ public class ParametrageServiceImpl implements IParametrageService {
     public ParametrageResponse update(String cle, ParametrageUpdateRequest request) {
         Parametrage p = parametrageRepository.findByCle(cle)
                 .orElse(new Parametrage(null, cle, "", "", null));
-        
+
         String ancienneValeur = p.getValeur();
         p.setValeur(request.getValeur());
-        if(request.getDescription() != null) {
+        if (request.getDescription() != null) {
             p.setDescription(request.getDescription());
         }
-        
+
         Parametrage saved = parametrageRepository.save(p);
-        
+
         journalAuditService.enregistrer("UPDATE", "Parametrage", saved.getId(),
                 "{\"valeur\":\"" + ancienneValeur + "\"}",
                 "{\"valeur\":\"" + request.getValeur() + "\"}",
                 null); // Le principal est injecté dans le filtre pour l'audit
-                
-        return new ParametrageResponse(saved.getId(), saved.getCle(), saved.getValeur(), saved.getDescription());
+
+        return toResponse(saved);
+    }
+
+    private ParametrageResponse toResponse(Parametrage p) {
+        String valeur = p.getValeur();
+        // Si c'est un logo et que c'est un chemin relatif (ne commence pas par / ou http), on ajoute le préfixe
+        if (p.getCle().contains("LOGO_URL") && valeur != null && !valeur.isEmpty() 
+            && !valeur.startsWith("http") && !valeur.startsWith("/")) {
+            valeur = "/api/uploads/" + valeur;
+        }
+        return new ParametrageResponse(p.getId(), p.getCle(), valeur, p.getDescription());
     }
 }

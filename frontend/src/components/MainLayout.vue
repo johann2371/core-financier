@@ -6,6 +6,7 @@ import { useUiStore } from '../stores/ui.store'
 import { useNotificationStore } from '../stores/notification.store'
 import { useSearchStore } from '../stores/search.store'
 import { useLangStore } from '../stores/lang.store'
+import { useParametrageStore } from '../stores/parametrage.store'
 import logoIcon from '../assets/images/logo-sodica-icon.png'
 import { 
   Squares2X2Icon, 
@@ -39,8 +40,19 @@ const searchStore = useSearchStore()
 const langStore = useLangStore()
 const router = useRouter()
 const route = useRoute()
+const parametrageStore = useParametrageStore()
 
 const t = computed(() => langStore.t)
+
+const appLogo = computed(() => {
+  const param = (parametrageStore.parametres || []).find(p => p.cle === 'APP_LOGO_URL')
+  return param?.valeur || logoIcon
+})
+
+const societeNom = computed(() => {
+  const param = (parametrageStore.parametres || []).find(p => p.cle === 'INFO_SOCIETE_NOM')
+  return param?.valeur || 'SODICA'
+})
 
 const searchInput = ref('')
 let searchTimeout = null
@@ -152,6 +164,9 @@ onMounted(() => {
   }
   loadNotifications()
   setInterval(loadNotifications, 60000)
+
+  // Fetch paramètres
+  parametrageStore.fetchParametres()
 })
 </script>
 
@@ -166,9 +181,8 @@ onMounted(() => {
     <aside class="sidebar" :class="{ 'sidebar-open': isSidebarOpen }">
       <div class="sidebar-header">
         <div class="app-logo-vector">
-          <img :src="logoIcon" alt="SODICA" />
+          <img :src="appLogo" :alt="societeNom" />
         </div>
-        <h2>SODICA</h2>
       </div>
 
       <nav class="nav-menu">
@@ -469,15 +483,17 @@ onMounted(() => {
 }
 
 .sidebar-header {
-  padding: 1.5rem 1.5rem 2rem 1.5rem;
+  padding: 2rem 1.5rem;
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0.75rem;
 }
 
 .app-logo-vector {
-  width: 40px;
-  height: 40px;
+  width: 140px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -30,7 +30,8 @@ public class ParametrageController {
 
     @PutMapping("/{cle}")
     @PreAuthorize("hasAuthority('ADMINISTRATEUR')")
-    public ResponseEntity<ParametrageResponse> update(@PathVariable String cle, @Valid @RequestBody ParametrageUpdateRequest request) {
+    public ResponseEntity<ParametrageResponse> update(@PathVariable String cle,
+            @Valid @RequestBody ParametrageUpdateRequest request) {
         return ResponseEntity.ok(parametrageService.update(cle, request));
     }
 
@@ -39,18 +40,18 @@ public class ParametrageController {
     public ResponseEntity<Map<String, String>> uploadLogo(
             @PathVariable String type,
             @RequestParam("file") MultipartFile file) {
-        
+
         // Stocker le fichier dans le sous-dossier "logos"
         String relativePath = fileStorageService.storeFile(file, "logos");
-        
+
         // Déterminer la clé de paramétrage
         String cle = "app".equalsIgnoreCase(type) ? "APP_LOGO_URL" : "INVOICE_LOGO_URL";
-        
-        // Mettre à jour le paramètre en BDD
+
+        // Mettre à jour le paramètre en BDD (on stocke le chemin relatif brut logos/...)
         ParametrageUpdateRequest updateReq = new ParametrageUpdateRequest();
-        updateReq.setValeur("/uploads/" + relativePath);
+        updateReq.setValeur(relativePath);
         parametrageService.update(cle, updateReq);
-        
-        return ResponseEntity.ok(Map.of("url", "/uploads/" + relativePath));
+
+        return ResponseEntity.ok(Map.of("url", "/api/uploads/" + relativePath));
     }
 }
