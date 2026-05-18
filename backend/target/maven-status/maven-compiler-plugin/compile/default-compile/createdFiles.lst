@@ -109,6 +109,7 @@ com\corefi\entity\JournalAudit.class
 com\corefi\dto\request\facture\LigneFactureRequest.class
 com\corefi\dto\request\parametrage\ParametrageUpdateRequest.class
 com\corefi\config\WebConfig.class
+com\corefi\dto\response\ocr\FactureExtractionResult.class
 com\corefi\repository\LigneFactureRepository.class
 com\corefi\service\impl\NotificationServiceImpl.class
 com\corefi\config\DataInitializer.class
@@ -123,9 +124,12 @@ com\corefi\repository\EncaissementRepository.class
 com\corefi\controller\NotificationController.class
 com\corefi\dto\response\tableaubord\ActiviteResponse.class
 com\corefi\entity\Parametrage.class
+com\corefi\controller\OcrController.class
 com\corefi\controller\FactureController.class
 com\corefi\entity\MouvementCompte.class
 com\corefi\mapper\DecaissementMapper.class
+com\corefi\service\impl\MindeeOcrServiceImpl$1.class
+com\corefi\service\impl\MindeeOcrServiceImpl.class
 com\corefi\dto\response\sessioncaisse\SessionCaisseResponse.class
 com\corefi\service\interfaces\IUtilisateurService.class
 com\corefi\service\interfaces\IDecaissementService.class
@@ -142,6 +146,7 @@ com\corefi\enums\StatutEncaissement.class
 com\corefi\repository\AffectationPaiementRepository.class
 com\corefi\service\interfaces\IRapprochementService.class
 com\corefi\dto\response\decaissement\DecaissementResponse$JustificatifInfo.class
+com\corefi\service\interfaces\IOcrService.class
 com\corefi\controller\RapprochementController.class
 com\corefi\dto\response\encaissement\EncaissementResponse.class
 com\corefi\entity\Decaissement.class
@@ -162,6 +167,7 @@ com\corefi\entity\LigneReleveBancaire.class
 com\corefi\enums\Role.class
 com\corefi\dto\response\tableaubord\ActiviteResponse$ActiviteResponseBuilder.class
 com\corefi\service\interfaces\ISessionCaisseService.class
+com\corefi\dto\response\ocr\FactureExtractionResult$FactureExtractionResultBuilder.class
 com\corefi\enums\TypeCompte.class
 com\corefi\dto\response\search\SearchResultDTO.class
 com\corefi\service\impl\TiersServiceImpl.class
