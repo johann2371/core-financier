@@ -483,12 +483,12 @@ onMounted(() => {
 }
 
 .sidebar-header {
-  padding: 2rem 1.5rem;
+  padding: 1rem 1.5rem 0.5rem 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .app-logo-vector {
@@ -517,14 +517,14 @@ onMounted(() => {
   padding: 0 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.15rem;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  padding: 0.625rem 1rem;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
   border-radius: 6px;
   color: #4b5563;
   font-size: 0.9rem;
@@ -545,9 +545,9 @@ onMounted(() => {
 }
 
 .nav-section-title {
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
-  padding-left: 1rem;
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  padding-left: 0.75rem;
   font-size: 0.7rem;
   font-weight: 600;
   color: #9ca3af;
@@ -557,8 +557,8 @@ onMounted(() => {
 
 /* Sidebar User Block (remonté) */
 .sidebar-user-block {
-  margin-top: 2rem;
-  padding: 1rem 0;
+  margin-top: auto;
+  padding: 0.75rem 0;
   border-top: 1px solid #f3f4f6;
   display: flex;
   align-items: center;

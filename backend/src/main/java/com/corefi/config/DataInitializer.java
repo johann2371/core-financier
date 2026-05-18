@@ -163,12 +163,14 @@ public class DataInitializer implements CommandLineRunner {
         if (tiersRepository.count() == 0) {
             com.corefi.entity.Tiers client = new com.corefi.entity.Tiers();
             client.setRaisonSociale("Client Test");
+            client.setCode("C-TEST-001");
             client.setType(com.corefi.enums.TypeTiers.CLIENT);
             client.setActif(true);
             tiersRepository.save(client);
 
             com.corefi.entity.Tiers fournisseur = new com.corefi.entity.Tiers();
             fournisseur.setRaisonSociale("Fournisseur Test");
+            fournisseur.setCode("F-TEST-001");
             fournisseur.setType(com.corefi.enums.TypeTiers.FOURNISSEUR);
             fournisseur.setActif(true);
             tiersRepository.save(fournisseur);

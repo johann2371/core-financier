@@ -19,7 +19,9 @@ import {
   ArrowDownTrayIcon,
   DocumentTextIcon,
   TrashIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  SparklesIcon,
+  DocumentArrowUpIcon
 } from '@heroicons/vue/24/outline'
 
 const store = useFactureStore()
@@ -34,6 +36,7 @@ const showModal = ref(false)
 const showPreview = ref(false)
 const previewUrl = ref(null)
 const formError = ref('')
+const isExtractingOcr = ref(false)
 
 const openPreview = async (id) => {
   try {
@@ -252,6 +255,73 @@ const submitForm = async () => {
     formError.value = e.response?.data?.error || e.response?.data?.message || e.message || 'Erreur lors de la création de la facture.'
   }
 }
+
+// ---------------------------------------------------------
+// INTELLIGENCE ARTIFICIELLE (OCR)
+// ---------------------------------------------------------
+const handleOcrUpload = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  isExtractingOcr.value = true
+  formError.value = ''
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const response = await api.post('/ocr/factures', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    
+    const ocrData = response.data
+    
+    // Auto-remplissage intelligent VENTE vs ACHAT
+    const companyName = "sodica"
+    let invoiceType = 'ACHAT'
+    let targetTiersId = ''
+
+    // Si SODICA est le fournisseur sur la facture, c'est que c'est une facture de VENTE
+    if (ocrData.nomFournisseur && ocrData.nomFournisseur.toLowerCase().includes(companyName)) {
+      invoiceType = 'VENTE'
+      if (ocrData.nomClient) {
+        const clientMatch = tierStore.clients.find(c => 
+          c.raisonSociale.toLowerCase().includes(ocrData.nomClient.toLowerCase())
+        )
+        if (clientMatch) targetTiersId = clientMatch.id
+      }
+    } else {
+      // Sinon c'est une facture d'ACHAT (envoyée par un fournisseur externe)
+      invoiceType = 'ACHAT'
+      if (ocrData.nomFournisseur) {
+        const fournisseurMatch = tierStore.fournisseurs.find(f => 
+          f.raisonSociale.toLowerCase().includes(ocrData.nomFournisseur.toLowerCase())
+        )
+        if (fournisseurMatch) targetTiersId = fournisseurMatch.id
+      }
+    }
+
+    form.value.type = invoiceType
+    if (targetTiersId) form.value.tiersId = targetTiersId
+
+    // Auto-remplissage d'une ligne générique
+    form.value.lignes = [{
+      designation: ocrData.numeroFacture ? `Facture ${ocrData.numeroFacture}` : 'Achat',
+      quantite: 1,
+      prixUnitaire: ocrData.montantHt || ocrData.montantTtc || 0
+    }]
+    
+    alert("Extraction réussie ! Veuillez vérifier les données pré-remplies.")
+
+  } catch(e) {
+    console.error('Erreur OCR', e)
+    formError.value = e.response?.data?.error || e.response?.data?.message || "Impossible d'extraire les données de cette facture."
+  } finally {
+    isExtractingOcr.value = false
+    event.target.value = '' // Reset de l'input
+  }
+}
+
 const formatFullDate = (dateStr) => {
   if (!dateStr) return 'Date inconnue'
   const date = new Date(dateStr)
@@ -479,11 +549,31 @@ const formatFullDate = (dateStr) => {
         
         <form @submit.prevent="submitForm" class="modal-body complex-body">
 
-          <!-- Bandeau d'erreur métier -->
           <div v-if="formError" class="form-error-banner">
             <ExclamationTriangleIcon class="w-5 h-5" />
             <span>{{   formError   }}</span>
             <button type="button" @click="formError = ''" class="close-error-btn">&times;</button>
+          </div>
+
+          <!-- Zone Upload OCR (IA) -->
+          <div class="ocr-zone mb-3">
+            <div class="ocr-header">
+              <SparklesIcon class="w-5 h-5 text-amber-500" />
+              <span>Saisie Automatique par IA</span>
+            </div>
+            <label class="ocr-dropzone" :class="{ 'is-loading': isExtractingOcr }">
+              <input type="file" @change="handleOcrUpload" accept="image/*,application/pdf" class="hidden-input" :disabled="isExtractingOcr" />
+              <div v-if="!isExtractingOcr" class="ocr-dropzone-content">
+                <DocumentArrowUpIcon class="w-8 h-8 text-slate-400" />
+                <span class="ocr-title">Uploadez une facture (PDF/Image)</span>
+                <span class="ocr-subtitle">L'IA extraira le fournisseur et le montant automatiquement.</span>
+              </div>
+              <div v-else class="ocr-dropzone-content text-amber-600">
+                <SparklesIcon class="w-8 h-8 animate-spin-slow" />
+                <span class="ocr-title">Analyse en cours...</span>
+                <span class="ocr-subtitle">Veuillez patienter quelques secondes.</span>
+              </div>
+            </label>
           </div>
 
           <div class="form-row">
@@ -598,6 +688,20 @@ const formatFullDate = (dateStr) => {
 .modal-header h3 { font-size: 1.125rem; font-weight: 600; color: #111827; margin:0;}
 .close-btn { background: none; border: none; color: #9ca3af; cursor: pointer;}
 .complex-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; }
+
+/* OCR UI */
+.ocr-zone { background: #fdfaf3; border: 1px solid #fde68a; border-radius: 10px; padding: 1rem; margin-bottom: 1rem;}
+.ocr-header { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: #b45309; margin-bottom: 0.75rem; font-size: 0.9rem;}
+.ocr-dropzone { display: block; border: 2px dashed #fcd34d; border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; background: white;}
+.ocr-dropzone:hover:not(.is-loading) { border-color: #f59e0b; background: #fffbeb;}
+.ocr-dropzone.is-loading { border-color: #d1d5db; border-style: solid; cursor: wait; background: #f3f4f6;}
+.hidden-input { display: none; }
+.ocr-dropzone-content { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.ocr-title { font-weight: 600; font-size: 0.9rem; color: #374151;}
+.ocr-subtitle { font-size: 0.75rem; color: #6b7280;}
+.animate-spin-slow { animation: spin 2s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 .section-divider { border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; font-size: 0.8rem; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; }
 .mt-2 { margin-top: 1rem; }
 .mt-3 { margin-top: 1.5rem; }
