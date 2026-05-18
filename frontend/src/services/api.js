@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api', // Redirigé par Vite vers le backend (http://localhost:8080/api)
+  baseURL: import.meta.env.VITE_API_URL || '/api', // En production, utiliser l'URL du backend (VITE_API_URL)
   headers: {
     'Content-Type': 'application/json',
   },

@@ -666,6 +666,13 @@ public class PdfServiceImpl implements IPdfService {
             PdfWriter.getInstance(document, baos);
             document.open();
 
+            // Initialisation des polices
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, new BaseColor(37, 99, 235));
+            Font subtitleFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.GRAY);
+            Font sectionFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, new BaseColor(37, 99, 235));
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, BaseColor.WHITE);
+            Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.BLACK);
+
             // Logo
             boolean logoAjoute = ajouterLogo(document);
 
